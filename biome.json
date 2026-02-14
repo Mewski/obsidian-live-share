@@ -18,5 +18,20 @@
   },
   "files": {
     "ignore": ["node_modules", "dist", "main.js", "data"]
-  }
+  },
+  "overrides": [
+    {
+      "include": ["**/__tests__/**", "**/__mocks__/**"],
+      "linter": {
+        "rules": {
+          "suspicious": {
+            "noExplicitAny": "off"
+          },
+          "style": {
+            "noNonNullAssertion": "off"
+          }
+        }
+      }
+    }
+  ]
 }

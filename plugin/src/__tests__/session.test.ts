@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 
 /**
  * The SessionManager.parseInvite() method is private, so we replicate its
@@ -101,22 +101,16 @@ describe("Invite format parsing (mirrors SessionManager.parseInvite)", () => {
 
   it("rejects an invite with missing fields", () => {
     // Missing `t`
-    expect(
-      parseInvite(makeInvite({ s: "https://example.com", r: "room" })),
-    ).toBeNull();
+    expect(parseInvite(makeInvite({ s: "https://example.com", r: "room" }))).toBeNull();
 
     // Missing `r`
-    expect(
-      parseInvite(makeInvite({ s: "https://example.com", t: "tok" })),
-    ).toBeNull();
+    expect(parseInvite(makeInvite({ s: "https://example.com", t: "tok" }))).toBeNull();
 
     // Missing `s`
     expect(parseInvite(makeInvite({ r: "room", t: "tok" }))).toBeNull();
 
     // Fields present but wrong type (number instead of string)
-    expect(
-      parseInvite(makeInvite({ s: 123, r: "room", t: "tok" })),
-    ).toBeNull();
+    expect(parseInvite(makeInvite({ s: 123, r: "room", t: "tok" }))).toBeNull();
   });
 
   it("rejects an invite with javascript: protocol URL (Bug 1.14)", () => {

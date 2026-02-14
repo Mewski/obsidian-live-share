@@ -16,10 +16,6 @@ export class PresenceView extends ItemView {
   private onKickRequest: ((userId: string) => void) | null = null;
   private isHost = false;
 
-  constructor(leaf: WorkspaceLeaf) {
-    super(leaf);
-  }
-
   getViewType(): string {
     return PRESENCE_VIEW_TYPE;
   }

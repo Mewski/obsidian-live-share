@@ -1,4 +1,4 @@
-import { Notice, TFile, MarkdownView } from "obsidian";
+import { MarkdownView, Notice, TFile } from "obsidian";
 import type LiveSharePlugin from "./main";
 
 export interface FocusRequest {

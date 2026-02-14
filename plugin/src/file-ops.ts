@@ -1,4 +1,5 @@
-import type { Vault, TFile, TAbstractFile } from "obsidian";
+import { Notice } from "obsidian";
+import type { TAbstractFile, TFile, Vault } from "obsidian";
 import type { FileOp } from "./types";
 
 export class FileOpsManager {
@@ -41,7 +42,7 @@ export class FileOpsManager {
         case "delete": {
           const file = this.vault.getAbstractFileByPath(op.path);
           if (file) {
-            await this.vault.delete(file);
+            await this.vault.trash(file, true);
           }
           break;
         }
@@ -53,6 +54,9 @@ export class FileOpsManager {
           break;
         }
       }
+    } catch (err) {
+      console.error("Live Share: failed to apply remote file op:", err);
+      new Notice(`Live Share: failed to apply remote ${op.type}`);
     } finally {
       this.suppressCount--;
     }
@@ -62,10 +66,14 @@ export class FileOpsManager {
   onFileCreate(file: TAbstractFile) {
     if (this.suppressCount > 0 || !this.sendOp) return;
     if ("extension" in file) {
-      // It's a TFile
-      this.vault.read(file as TFile).then((content) => {
-        this.sendOp!({ type: "create", path: file.path, content });
-      });
+      this.vault
+        .read(file as TFile)
+        .then((content) => {
+          this.sendOp?.({ type: "create", path: file.path, content });
+        })
+        .catch(() => {
+          // File may have been deleted before read completed
+        });
     }
   }
 

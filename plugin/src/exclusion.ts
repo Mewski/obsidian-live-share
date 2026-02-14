@@ -1,5 +1,5 @@
-import type { Vault, TFile } from "obsidian";
 import { minimatch } from "minimatch";
+import type { TFile, Vault } from "obsidian";
 
 export interface LiveShareConfig {
   exclude: string[];

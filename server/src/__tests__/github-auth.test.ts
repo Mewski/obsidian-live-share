@@ -1,8 +1,8 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import jwt from "jsonwebtoken";
+import type { Server } from "node:http";
 import express from "express";
-import { Server } from "http";
-import { verifyJWT, createAuthRouter } from "../github-auth.js";
+import jwt from "jsonwebtoken";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { createAuthRouter, verifyJWT } from "../github-auth.js";
 
 const DEFAULT_SECRET = "change-me-in-production";
 
@@ -22,14 +22,12 @@ describe("verifyJWT", () => {
     const payload = verifyJWT(token);
 
     expect(payload).not.toBeNull();
-    expect(payload!.sub).toBe("123456");
-    expect(payload!.username).toBe("testuser");
-    expect(payload!.displayName).toBe("Test User");
-    expect(payload!.avatar).toBe(
-      "https://avatars.githubusercontent.com/u/123456",
-    );
-    expect(payload!.iat).toBeTypeOf("number");
-    expect(payload!.exp).toBeTypeOf("number");
+    expect(payload?.sub).toBe("123456");
+    expect(payload?.username).toBe("testuser");
+    expect(payload?.displayName).toBe("Test User");
+    expect(payload?.avatar).toBe("https://avatars.githubusercontent.com/u/123456");
+    expect(payload?.iat).toBeTypeOf("number");
+    expect(payload?.exp).toBeTypeOf("number");
   });
 
   it("returns null for an expired token", () => {

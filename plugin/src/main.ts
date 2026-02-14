@@ -1,22 +1,24 @@
-import { Plugin, MarkdownView, Notice, TAbstractFile, TFile } from "obsidian";
-import { LiveShareSettings, DEFAULT_SETTINGS } from "./types";
+import { MarkdownView, Modal, Notice, Plugin, type TAbstractFile, TFile } from "obsidian";
+import { ApprovalModal, type JoinRequest } from "./approval-modal";
+import { AuthManager } from "./auth";
+import { CollabManager } from "./collab";
+import { ConnectionStateManager } from "./connection-state";
+import { ControlChannel } from "./control-ws";
+import { ExclusionManager } from "./exclusion";
+import { FileOpsManager } from "./file-ops";
+import { type FocusRequest, showFocusNotification } from "./focus-notification";
+import { ManifestManager } from "./manifest";
+import { PRESENCE_VIEW_TYPE, type PresenceUser, PresenceView } from "./presence-view";
+import { SessionManager } from "./session";
 import { LiveShareSettingTab } from "./settings";
 import { SyncManager } from "./sync";
-import { CollabManager } from "./collab";
-import { FileOpsManager } from "./file-ops";
-import { SessionManager } from "./session";
-import { ManifestManager } from "./manifest";
-import { ControlChannel } from "./control-ws";
-import { AuthManager } from "./auth";
-import { ApprovalModal, type JoinRequest } from "./approval-modal";
-import { showFocusNotification, type FocusRequest } from "./focus-notification";
-import { ExclusionManager } from "./exclusion";
-import { ConnectionStateManager } from "./connection-state";
-import {
-  PresenceView,
-  PRESENCE_VIEW_TYPE,
-  type PresenceUser,
-} from "./presence-view";
+import { DEFAULT_SETTINGS, type LiveShareSettings } from "./types";
+
+/** Extract the CM6 EditorView from an Obsidian MarkdownView (untyped internal). */
+function getCmView(view: MarkdownView): import("@codemirror/view").EditorView | undefined {
+  // biome-ignore lint/suspicious/noExplicitAny: Obsidian internal — editor.cm is untyped
+  return (view.editor as any).cm as import("@codemirror/view").EditorView | undefined;
+}
 
 export default class LiveSharePlugin extends Plugin {
   settings!: LiveShareSettings;
@@ -33,6 +35,7 @@ export default class LiveSharePlugin extends Plugin {
   private followTarget: string | null = null;
   private followSuppressUnfollow = false;
   private unfollowListeners: (() => void)[] = [];
+  private connectionStateUnsub: (() => void) | null = null;
   statusBarEl!: HTMLElement;
 
   async onload() {
@@ -48,14 +51,12 @@ export default class LiveSharePlugin extends Plugin {
     await this.exclusionManager.loadConfig(this.app.vault);
     this.manifestManager.setExclusionManager(this.exclusionManager);
     this.connectionState = new ConnectionStateManager();
-    this.connectionState.onChange((state) => this.updateStatusBar());
+    this.connectionStateUnsub = this.connectionState.onChange(() => this.updateStatusBar());
 
     this.registerEditorExtension(this.collabManager.getBaseExtension());
 
     this.statusBarEl = this.addStatusBarItem();
-    this.statusBarEl.addEventListener("click", () =>
-      this.activatePresenceView(),
-    );
+    this.statusBarEl.addEventListener("click", () => this.activatePresenceView());
     this.statusBarEl.style.cursor = "pointer";
     this.updateStatusBar();
 
@@ -164,9 +165,14 @@ export default class LiveSharePlugin extends Plugin {
         if (!this.manifestManager.isSharedPath(file.path)) return;
         this.fileOpsManager.onFileCreate(file);
         if (this.settings.role === "host" && file instanceof TFile) {
-          this.app.vault.read(file).then((content) => {
-            this.manifestManager.updateFile(file, content);
-          });
+          this.app.vault
+            .read(file)
+            .then((content) => {
+              this.manifestManager.updateFile(file, content);
+            })
+            .catch(() => {
+              // File may have been deleted before read completed
+            });
         }
       }),
     );
@@ -223,10 +229,9 @@ export default class LiveSharePlugin extends Plugin {
             }
             for (const path of removed) {
               const file = this.app.vault.getAbstractFileByPath(path);
-              if (file) await this.app.vault.delete(file);
+              if (file) await this.app.vault.trash(file, true);
             }
-            if (removed.length > 0)
-              new Notice(`Live Share: removed ${removed.length} file(s)`);
+            if (removed.length > 0) new Notice(`Live Share: removed ${removed.length} file(s)`);
           });
         }
       });
@@ -235,7 +240,18 @@ export default class LiveSharePlugin extends Plugin {
 
   onunload() {
     this.controlChannel?.destroy();
+    this.controlChannel = null;
     this.clearUnfollowListeners();
+    this.connectionStateUnsub?.();
+    this.connectionStateUnsub = null;
+
+    // Deactivate collab for any active editor
+    const activeView = this.app.workspace.getActiveViewOfType(MarkdownView);
+    if (activeView) {
+      const cmView = getCmView(activeView);
+      if (cmView) this.collabManager.deactivateAll(cmView);
+    }
+
     this.manifestManager.destroy();
     this.syncManager.destroy();
   }
@@ -289,10 +305,9 @@ export default class LiveSharePlugin extends Plugin {
         }
         for (const path of removed) {
           const file = this.app.vault.getAbstractFileByPath(path);
-          if (file) await this.app.vault.delete(file);
+          if (file) await this.app.vault.trash(file, true);
         }
-        if (removed.length > 0)
-          new Notice(`Live Share: removed ${removed.length} file(s)`);
+        if (removed.length > 0) new Notice(`Live Share: removed ${removed.length} file(s)`);
       });
       new Notice(`Live Share: joined session, synced ${count} file(s)`);
     }
@@ -307,11 +322,13 @@ export default class LiveSharePlugin extends Plugin {
     // Deactivate collab extensions before disconnecting
     const activeView = this.app.workspace.getActiveViewOfType(MarkdownView);
     if (activeView) {
-      // @ts-ignore
-      const cmView = (activeView.editor as any).cm as
-        | import("@codemirror/view").EditorView
-        | undefined;
+      const cmView = getCmView(activeView);
       if (cmView) this.collabManager.deactivateAll(cmView);
+    }
+
+    // Notify guests before disconnecting
+    if (this.settings.role === "host" && this.controlChannel) {
+      this.controlChannel.send({ type: "session-end" });
     }
 
     this.syncManager.disconnect();
@@ -330,6 +347,12 @@ export default class LiveSharePlugin extends Plugin {
   private connectSync() {
     this.connectionState.transition({ type: "connect" });
     this.syncManager.connect();
+
+    // Destroy existing control channel to prevent handler accumulation
+    if (this.controlChannel) {
+      this.controlChannel.destroy();
+      this.controlChannel = null;
+    }
 
     // Set up control channel for file ops
     this.controlChannel = new ControlChannel(this.settings);
@@ -386,18 +409,14 @@ export default class LiveSharePlugin extends Plugin {
     // Host: handle join requests from guests
     this.controlChannel.on("join-request", (msg) => {
       if (this.settings.role !== "host") return;
-      new ApprovalModal(
-        this.app,
-        msg as unknown as JoinRequest,
-        (approved, permission) => {
-          this.controlChannel?.send({
-            type: "join-response",
-            userId: msg.userId as string,
-            approved,
-            permission,
-          });
-        },
-      ).open();
+      new ApprovalModal(this.app, msg as unknown as JoinRequest, (approved, permission) => {
+        this.controlChannel?.send({
+          type: "join-response",
+          userId: msg.userId as string,
+          approved,
+          permission,
+        });
+      }).open();
     });
 
     // Handle focus requests and summons
@@ -414,6 +433,12 @@ export default class LiveSharePlugin extends Plugin {
       this.endSession();
     });
 
+    // Guest: handle host ending session
+    this.controlChannel.on("session-end", () => {
+      new Notice("Live Share: the host ended the session");
+      this.endSession();
+    });
+
     // Send initial presence with isHost flag
     this.broadcastPresence();
 
@@ -425,20 +450,12 @@ export default class LiveSharePlugin extends Plugin {
     if (!view) return;
 
     const file = view.file;
-    const editor = view.editor;
-    // @ts-ignore -- Obsidian exposes this but doesn't type it
-    const cmView = (editor as any).cm as import("@codemirror/view").EditorView;
+    const cmView = getCmView(view);
     if (!cmView) return;
 
     const filePath = file?.path ?? null;
-    const sharedPath =
-      filePath && this.manifestManager.isSharedPath(filePath) ? filePath : null;
-    this.collabManager.activateForFile(
-      cmView,
-      sharedPath,
-      this.syncManager,
-      this.settings.role,
-    );
+    const sharedPath = filePath && this.manifestManager.isSharedPath(filePath) ? filePath : null;
+    this.collabManager.activateForFile(cmView, sharedPath, this.syncManager, this.settings.role);
   }
 
   private updateStatusBar() {
@@ -475,10 +492,7 @@ export default class LiveSharePlugin extends Plugin {
     const currentFile = view?.file?.path ?? "";
     let scrollTop = 0;
     if (view) {
-      // @ts-ignore
-      const cmView = (view.editor as any).cm as
-        | import("@codemirror/view").EditorView
-        | undefined;
+      const cmView = getCmView(view);
       if (cmView) scrollTop = cmView.scrollDOM.scrollTop;
     }
     this.controlChannel.send({
@@ -519,7 +533,7 @@ export default class LiveSharePlugin extends Plugin {
     this.remoteUsers.delete(userId);
     this.refreshPresenceView();
     this.updateStatusBar();
-    new Notice(`Kicked user`);
+    new Notice("Kicked user");
   }
 
   followUser(userId: string) {
@@ -539,9 +553,7 @@ export default class LiveSharePlugin extends Plugin {
     const events = ["keydown", "mousedown", "wheel"] as const;
     for (const evt of events) {
       document.addEventListener(evt, handler);
-      this.unfollowListeners.push(() =>
-        document.removeEventListener(evt, handler),
-      );
+      this.unfollowListeners.push(() => document.removeEventListener(evt, handler));
     }
 
     // Apply immediately if we have state
@@ -578,10 +590,7 @@ export default class LiveSharePlugin extends Plugin {
     if (user.scrollTop !== undefined) {
       const view = this.app.workspace.getActiveViewOfType(MarkdownView);
       if (view) {
-        // @ts-ignore
-        const cmView = (view.editor as any).cm as
-          | import("@codemirror/view").EditorView
-          | undefined;
+        const cmView = getCmView(view);
         if (cmView) {
           cmView.scrollDOM.scrollTop = user.scrollTop;
         }
@@ -593,38 +602,52 @@ export default class LiveSharePlugin extends Plugin {
 
   promptText(placeholder: string): Promise<string | null> {
     return new Promise((resolve) => {
-      const modal = new (class extends (
-        require("obsidian") as typeof import("obsidian")
-      ).Modal {
-        result: string | null = null;
-        onOpen() {
-          const { contentEl } = this;
-          const input = contentEl.createEl("input", {
-            type: "text",
-            placeholder,
-            cls: "live-share-prompt-input",
-          });
-          input.style.width = "100%";
-          input.style.marginBottom = "1em";
-          input.addEventListener("keydown", (e) => {
-            if (e.key === "Enter") {
-              this.result = input.value;
-              this.close();
-            }
-          });
-          const btn = contentEl.createEl("button", { text: "OK" });
-          btn.addEventListener("click", () => {
-            this.result = input.value;
-            this.close();
-          });
-          input.focus();
-        }
-        onClose() {
-          resolve(this.result || null);
-          this.contentEl.empty();
-        }
-      })(this.app);
+      const modal = new PromptModal(this.app, placeholder, resolve);
       modal.open();
     });
+  }
+}
+
+class PromptModal extends Modal {
+  private result: string | null = null;
+  private placeholder: string;
+  private resolve: (value: string | null) => void;
+
+  constructor(
+    app: import("obsidian").App,
+    placeholder: string,
+    resolve: (value: string | null) => void,
+  ) {
+    super(app);
+    this.placeholder = placeholder;
+    this.resolve = resolve;
+  }
+
+  onOpen() {
+    const { contentEl } = this;
+    const input = contentEl.createEl("input", {
+      type: "text",
+      placeholder: this.placeholder,
+      cls: "live-share-prompt-input",
+    });
+    input.style.width = "100%";
+    input.style.marginBottom = "1em";
+    input.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        this.result = input.value;
+        this.close();
+      }
+    });
+    const btn = contentEl.createEl("button", { text: "OK" });
+    btn.addEventListener("click", () => {
+      this.result = input.value;
+      this.close();
+    });
+    input.focus();
+  }
+
+  onClose() {
+    this.resolve(this.result || null);
+    this.contentEl.empty();
   }
 }

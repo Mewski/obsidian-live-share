@@ -1,11 +1,8 @@
-import * as Y from "yjs";
 import { WebsocketProvider } from "y-websocket";
+import * as Y from "yjs";
 import type { LiveShareSettings } from "./types";
 
-export function waitForSync(
-  provider: WebsocketProvider,
-  timeoutMs = 10_000,
-): Promise<void> {
+export function waitForSync(provider: WebsocketProvider, timeoutMs = 10_000): Promise<void> {
   if (provider.synced) return Promise.resolve();
   return new Promise((resolve, reject) => {
     const timer = setTimeout(() => {
@@ -36,9 +33,7 @@ export class SyncManager {
   }
 
   // Get or create a Y.Doc + provider for a file path
-  getDoc(
-    filePath: string,
-  ): { doc: Y.Doc; text: Y.Text; provider: WebsocketProvider } | null {
+  getDoc(filePath: string): { doc: Y.Doc; text: Y.Text; provider: WebsocketProvider } | null {
     if (!this.connected || !this.settings.roomId) return null;
 
     let doc = this.docs.get(filePath);
@@ -50,18 +45,18 @@ export class SyncManager {
     }
 
     if (!provider) {
-      // Room name = roomId:filePath to scope per file
-      const roomName = `${this.settings.roomId}:${filePath}`;
+      // Room name = roomId:encodedFilePath to scope per file
+      const roomName = `${this.settings.roomId}:${encodeURIComponent(filePath)}`;
       const wsUrl = this.settings.serverUrl.replace(/^http/, "ws");
       const params: Record<string, string> = { token: this.settings.token };
       if (this.settings.jwt) params.jwt = this.settings.jwt;
-      provider = new WebsocketProvider(wsUrl + "/ws", roomName, doc, {
+      provider = new WebsocketProvider(`${wsUrl}/ws`, roomName, doc, {
         params,
       });
       provider.awareness.setLocalStateField("user", {
         name: this.settings.displayName,
         color: this.settings.cursorColor,
-        colorLight: this.settings.cursorColor + "33",
+        colorLight: `${this.settings.cursorColor}33`,
       });
       this.providers.set(filePath, provider);
     }

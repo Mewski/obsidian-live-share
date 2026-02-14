@@ -1,12 +1,12 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { Server } from "http";
-import { WebSocket } from "ws";
-import * as Y from "yjs";
-import * as syncProtocol from "y-protocols/sync";
-import * as encoding from "lib0/encoding";
+import type { Server } from "node:http";
 import * as decoding from "lib0/decoding";
-import { noopPersistence } from "../persistence.js";
+import * as encoding from "lib0/encoding";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { WebSocket } from "ws";
+import * as syncProtocol from "y-protocols/sync";
+import * as Y from "yjs";
 import { createApp } from "../index.js";
+import { noopPersistence } from "../persistence.js";
 
 const messageSync = 0;
 const messageFileOp = 2;
@@ -81,11 +81,7 @@ function connectWsRaw(roomId: string, token?: string): Promise<WebSocket> {
 }
 
 // Wait until the messages array has at least `count` entries
-function waitForMessages(
-  messages: Uint8Array[],
-  count: number,
-  timeoutMs = 3000,
-): Promise<void> {
+function waitForMessages(messages: Uint8Array[], count: number, timeoutMs = 3000): Promise<void> {
   if (messages.length >= count) return Promise.resolve();
   return new Promise((resolve, reject) => {
     const start = Date.now();
@@ -124,10 +120,7 @@ beforeEach(async () => {
 
 afterEach(async () => {
   for (const ws of openSockets) {
-    if (
-      ws.readyState === WebSocket.OPEN ||
-      ws.readyState === WebSocket.CONNECTING
-    ) {
+    if (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING) {
       ws.close();
     }
   }

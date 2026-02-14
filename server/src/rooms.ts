@@ -1,12 +1,7 @@
 import { Router } from "express";
 import { nanoid } from "nanoid";
-import { timingSafeEqual } from "crypto";
-import { type Room, type Persistence, noopPersistence } from "./persistence.js";
-
-function safeTokenCompare(a: string, b: string): boolean {
-  if (a.length !== b.length) return false;
-  return timingSafeEqual(Buffer.from(a), Buffer.from(b));
-}
+import { type Persistence, type Room, noopPersistence } from "./persistence.js";
+import { safeTokenCompare } from "./util.js";
 
 export type { Room };
 
@@ -27,10 +22,23 @@ export function getRoom(id: string): Room | undefined {
 
 export const roomRouter = Router();
 
+// biome-ignore lint/suspicious/noControlCharactersInRegex: intentional — validates user input
+const CONTROL_CHARS = /[\x00-\x1f\x7f]/;
+
 roomRouter.post("/", async (req, res) => {
   const { name } = req.body;
   if (!name || typeof name !== "string") {
     res.status(400).json({ error: "name is required" });
+    return;
+  }
+  if (name.length > 100 || CONTROL_CHARS.test(name)) {
+    res.status(400).json({ error: "invalid name" });
+    return;
+  }
+
+  const hostUserId = typeof req.body.hostUserId === "string" ? req.body.hostUserId : undefined;
+  if (hostUserId && (hostUserId.length > 128 || CONTROL_CHARS.test(hostUserId))) {
+    res.status(400).json({ error: "invalid hostUserId" });
     return;
   }
 
@@ -39,8 +47,7 @@ roomRouter.post("/", async (req, res) => {
     token: nanoid(24),
     name,
     createdAt: Date.now(),
-    hostUserId:
-      typeof req.body.hostUserId === "string" ? req.body.hostUserId : undefined,
+    hostUserId,
   };
   rooms.set(room.id, room);
   await _persistence.saveRoom(room);

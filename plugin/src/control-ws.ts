@@ -36,9 +36,7 @@ export class ControlChannel {
     this.settings = settings;
   }
 
-  onStateChange(
-    callback: (state: "connected" | "disconnected" | "reconnecting") => void,
-  ) {
+  onStateChange(callback: (state: "connected" | "disconnected" | "reconnecting") => void) {
     this.stateChangeCallback = callback;
   }
 
@@ -50,8 +48,7 @@ export class ControlChannel {
     if (this.destroyed) return;
     const wsUrl = this.settings.serverUrl.replace(/^http/, "ws");
     let url = `${wsUrl}/control/${this.settings.roomId}?token=${encodeURIComponent(this.settings.token)}`;
-    if (this.settings.jwt)
-      url += `&jwt=${encodeURIComponent(this.settings.jwt)}`;
+    if (this.settings.jwt) url += `&jwt=${encodeURIComponent(this.settings.jwt)}`;
 
     this.ws = new WebSocket(url);
 
@@ -63,9 +60,7 @@ export class ControlChannel {
 
     this.ws.onmessage = (event) => {
       try {
-        const msg = JSON.parse(
-          typeof event.data === "string" ? event.data : "",
-        ) as ControlMessage;
+        const msg = JSON.parse(typeof event.data === "string" ? event.data : "") as ControlMessage;
         const handlers = this.handlers.get(msg.type);
         if (handlers) {
           for (const h of handlers) h(msg);

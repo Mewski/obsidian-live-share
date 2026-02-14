@@ -1,4 +1,4 @@
-import { App, PluginSettingTab, Setting } from "obsidian";
+import { type App, PluginSettingTab, Setting } from "obsidian";
 import type LiveSharePlugin from "./main";
 
 export class LiveShareSettingTab extends PluginSettingTab {
@@ -88,14 +88,16 @@ export class LiveShareSettingTab extends PluginSettingTab {
 
     new Setting(containerEl)
       .setName("Cursor color")
-      .setDesc("Your cursor color visible to others")
+      .setDesc("Your cursor color visible to others (hex format, e.g. #7c3aed)")
       .addText((text) =>
         text
           .setPlaceholder("#7c3aed")
           .setValue(settings.cursorColor)
           .onChange(async (value) => {
-            settings.cursorColor = value;
-            await this.plugin.saveSettings();
+            if (/^#[0-9a-fA-F]{3,8}$/.test(value)) {
+              settings.cursorColor = value;
+              await this.plugin.saveSettings();
+            }
           }),
       );
 

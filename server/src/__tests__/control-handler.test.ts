@@ -1,8 +1,8 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { Server } from "http";
+import type { Server } from "node:http";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { WebSocket } from "ws";
-import { noopPersistence } from "../persistence.js";
 import { createApp } from "../index.js";
+import { noopPersistence } from "../persistence.js";
 
 interface RoomInfo {
   id: string;
@@ -56,11 +56,7 @@ function connectControl(
   });
 }
 
-function waitForMessages(
-  messages: string[],
-  count: number,
-  timeoutMs = 3000,
-): Promise<void> {
+function waitForMessages(messages: string[], count: number, timeoutMs = 3000): Promise<void> {
   if (messages.length >= count) return Promise.resolve();
   return new Promise((resolve, reject) => {
     const start = Date.now();
@@ -89,10 +85,7 @@ beforeEach(async () => {
 
 afterEach(async () => {
   for (const ws of openSockets) {
-    if (
-      ws.readyState === WebSocket.OPEN ||
-      ws.readyState === WebSocket.CONNECTING
-    ) {
+    if (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING) {
       ws.close();
     }
   }

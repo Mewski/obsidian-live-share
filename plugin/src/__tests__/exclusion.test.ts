@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ExclusionManager } from "../exclusion";
 
 describe("ExclusionManager", () => {
@@ -58,9 +58,7 @@ describe("ExclusionManager", () => {
           if (path === ".liveshare.json") return { stat: {} };
           return null;
         },
-        read: vi.fn(async () =>
-          JSON.stringify({ exclude: ["*.tmp", "drafts/**"] }),
-        ),
+        read: vi.fn(async () => JSON.stringify({ exclude: ["*.tmp", "drafts/**"] })),
       };
 
       await manager.loadConfig(mockVault as any);

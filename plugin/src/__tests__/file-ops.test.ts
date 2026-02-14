@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { FileOpsManager } from "../file-ops";
 import type { FileOp } from "../types";
 
@@ -17,6 +17,9 @@ function createMockVault() {
       return file;
     }),
     delete: vi.fn(async (file: { path: string }) => {
+      files.delete(file.path);
+    }),
+    trash: vi.fn(async (file: { path: string }) => {
       files.delete(file.path);
     }),
     rename: vi.fn(async (file: { path: string }, newPath: string) => {
@@ -60,16 +63,16 @@ describe("FileOpsManager", () => {
       expect(vault.create).not.toHaveBeenCalled();
     });
 
-    it("deletes an existing file", async () => {
+    it("moves deleted file to trash", async () => {
       const file = { path: "bye.md", extension: "md" };
       vault.files.set("bye.md", file);
       await manager.applyRemoteOp({ type: "delete", path: "bye.md" });
-      expect(vault.delete).toHaveBeenCalledWith(file);
+      expect(vault.trash).toHaveBeenCalledWith(file, true);
     });
 
     it("silently ignores delete of nonexistent file", async () => {
       await manager.applyRemoteOp({ type: "delete", path: "nope.md" });
-      expect(vault.delete).not.toHaveBeenCalled();
+      expect(vault.trash).not.toHaveBeenCalled();
     });
 
     it("renames an existing file", async () => {
@@ -147,9 +150,7 @@ describe("FileOpsManager", () => {
 
     it("broadcasts file rename", () => {
       manager.onFileRename({ path: "new-name.md" } as any, "old-name.md");
-      expect(sentOps).toEqual([
-        { type: "rename", oldPath: "old-name.md", newPath: "new-name.md" },
-      ]);
+      expect(sentOps).toEqual([{ type: "rename", oldPath: "old-name.md", newPath: "new-name.md" }]);
     });
 
     it("does not broadcast when no sender is set", () => {

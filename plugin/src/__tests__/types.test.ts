@@ -1,12 +1,6 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import { DEFAULT_SETTINGS } from "../types";
-import type {
-  LiveShareSettings,
-  FileOp,
-  FileCreateOp,
-  FileDeleteOp,
-  FileRenameOp,
-} from "../types";
+import type { FileCreateOp, FileDeleteOp, FileOp, FileRenameOp, LiveShareSettings } from "../types";
 
 describe("types", () => {
   it("DEFAULT_SETTINGS has expected shape", () => {

@@ -31,11 +31,10 @@ export interface Persistence {
   loadRooms(): Promise<Room[]>;
   saveRoom(room: Room): Promise<void>;
   deleteRoom(id: string): Promise<void>;
+  close(): Promise<void>;
 }
 
-export function createLevelPersistence(
-  dbPath = "./data/yjs-docs",
-): Persistence {
+export function createLevelPersistence(dbPath = "./data/yjs-docs"): Persistence {
   const db = new Level(dbPath, { valueEncoding: "buffer" });
 
   return {
@@ -74,10 +73,7 @@ export function createLevelPersistence(
     },
 
     async saveRoom(room: Room): Promise<void> {
-      await db.put(
-        `room:${room.id}`,
-        Buffer.from(JSON.stringify(room)) as unknown as string,
-      );
+      await db.put(`room:${room.id}`, Buffer.from(JSON.stringify(room)) as unknown as string);
     },
 
     async deleteRoom(id: string): Promise<void> {
@@ -86,6 +82,10 @@ export function createLevelPersistence(
       } catch (err: unknown) {
         if ((err as { code?: string }).code !== "LEVEL_NOT_FOUND") throw err;
       }
+    },
+
+    async close(): Promise<void> {
+      await db.close();
     },
   };
 }
@@ -98,6 +98,7 @@ export const noopPersistence: Persistence = {
   },
   async saveRoom() {},
   async deleteRoom() {},
+  async close() {},
 };
 
 let _defaultPersistence: Persistence | null = null;

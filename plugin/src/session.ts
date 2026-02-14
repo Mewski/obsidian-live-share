@@ -125,8 +125,8 @@ export class SessionManager {
     new Notice("Invite link copied to clipboard");
   }
 
-  private parseInvite(invite: string): InvitePayload | null {
-    invite = invite.trim();
+  private parseInvite(raw: string): InvitePayload | null {
+    const invite = raw.trim();
     const prefix = "obsliveshare:";
     if (!invite.startsWith(prefix)) return null;
     try {

@@ -1,21 +1,16 @@
-import express from "express";
+import { readFileSync } from "node:fs";
+import { type Server, createServer } from "node:http";
 import cors from "cors";
-import { createServer, Server } from "http";
-import { readFileSync } from "fs";
-import { timingSafeEqual } from "crypto";
+import express from "express";
 import rateLimit from "express-rate-limit";
-import { createYjsWSS } from "./ws-handler.js";
 import { createControlWSS } from "./control-handler.js";
-import { roomRouter, initRooms, getRoom } from "./rooms.js";
-import { type Persistence, getDefaultPersistence } from "./persistence.js";
 import { createAuthRouter, verifyJWT } from "./github-auth.js";
+import { type Persistence, getDefaultPersistence } from "./persistence.js";
+import { getRoom, initRooms, roomRouter } from "./rooms.js";
+import { safeTokenCompare } from "./util.js";
+import { createYjsWSS } from "./ws-handler.js";
 
 const REQUIRE_GITHUB_AUTH = process.env.REQUIRE_GITHUB_AUTH === "true";
-
-function safeTokenCompare(a: string, b: string): boolean {
-  if (a.length !== b.length) return false;
-  return timingSafeEqual(Buffer.from(a), Buffer.from(b));
-}
 
 export function createApp(
   persistence?: Persistence,
@@ -23,9 +18,11 @@ export function createApp(
 ): {
   app: express.Express;
   server: Server;
+  shutdown: () => Promise<void>;
 } {
+  const corsOrigin = process.env.CORS_ORIGIN || "*";
   const app = express();
-  app.use(cors());
+  app.use(cors({ origin: corsOrigin }));
   app.use(express.json());
 
   const limiter = rateLimit({
@@ -38,8 +35,19 @@ export function createApp(
 
   const server = externalServer ?? createServer(app);
 
-  const yjsWss = createYjsWSS(persistence);
-  const controlWss = createControlWSS();
+  const yjs = createYjsWSS(persistence);
+  const control = createControlWSS();
+
+  // Health check
+  app.get("/healthz", (_req, res) => {
+    const stats = yjs.getStats();
+    res.json({
+      ok: true,
+      uptime: process.uptime(),
+      rooms: stats.rooms,
+      connections: stats.connections,
+    });
+  });
 
   server.on("upgrade", (req, socket, head) => {
     const url = new URL(req.url || "", `http://${req.headers.host}`);
@@ -61,7 +69,6 @@ export function createApp(
         return;
       }
 
-      // Optional JWT auth
       if (REQUIRE_GITHUB_AUTH) {
         const jwtToken = url.searchParams.get("jwt");
         if (!jwtToken || !verifyJWT(jwtToken)) {
@@ -70,8 +77,8 @@ export function createApp(
         }
       }
 
-      yjsWss.handleUpgrade(req, socket, head, (ws) => {
-        yjsWss.emit("connection", ws, req, fullRoomName);
+      yjs.wss.handleUpgrade(req, socket, head, (ws) => {
+        yjs.wss.emit("connection", ws, req, fullRoomName);
       });
       return;
     }
@@ -100,8 +107,8 @@ export function createApp(
         }
       }
 
-      controlWss.handleUpgrade(req, socket, head, (ws) => {
-        controlWss.emit("connection", ws, req, roomId);
+      control.wss.handleUpgrade(req, socket, head, (ws) => {
+        control.wss.emit("connection", ws, req, roomId);
       });
       return;
     }
@@ -109,38 +116,61 @@ export function createApp(
     socket.destroy();
   });
 
-  return { app, server };
+  async function shutdown() {
+    console.log("shutting down gracefully...");
+    control.closeAll();
+    await yjs.closeAllRooms();
+    if (persistence) await persistence.close();
+    server.close();
+  }
+
+  return { app, server, shutdown };
 }
 
 // Only auto-start when run directly
 const isMain =
   process.argv[1] &&
-  (process.argv[1].endsWith("/index.ts") ||
-    process.argv[1].endsWith("/index.js"));
+  (process.argv[1].endsWith("/index.ts") || process.argv[1].endsWith("/index.js"));
 
 if (isMain) {
   const persistence = getDefaultPersistence();
-  initRooms(persistence).then(async () => {
-    const TLS_CERT = process.env.TLS_CERT;
-    const TLS_KEY = process.env.TLS_KEY;
+  initRooms(persistence)
+    .then(async () => {
+      const TLS_CERT = process.env.TLS_CERT;
+      const TLS_KEY = process.env.TLS_KEY;
 
-    let server: Server;
-    if (TLS_CERT && TLS_KEY) {
-      const https = await import("https");
-      const tlsServer = https.createServer({
-        cert: readFileSync(TLS_CERT),
-        key: readFileSync(TLS_KEY),
+      let server: Server;
+      let shutdown: () => Promise<void>;
+      if (TLS_CERT && TLS_KEY) {
+        const https = await import("node:https");
+        const tlsServer = https.createServer({
+          cert: readFileSync(TLS_CERT),
+          key: readFileSync(TLS_KEY),
+        });
+        const result = createApp(persistence, tlsServer);
+        tlsServer.on("request", result.app);
+        server = tlsServer;
+        shutdown = result.shutdown;
+      } else {
+        const result = createApp(persistence);
+        server = result.server;
+        shutdown = result.shutdown;
+      }
+
+      const port = Number.parseInt(process.env.PORT || "4321");
+      server.listen(port, () => {
+        console.log(`live-share server on :${port}`);
       });
-      const { app } = createApp(persistence, tlsServer);
-      tlsServer.on("request", app);
-      server = tlsServer;
-    } else {
-      ({ server } = createApp(persistence));
-    }
 
-    const port = parseInt(process.env.PORT || "4321");
-    server.listen(port, () => {
-      console.log(`live-share server on :${port}`);
+      // Graceful shutdown
+      const onSignal = () => {
+        shutdown().then(() => process.exit(0));
+      };
+      process.on("SIGTERM", onSignal);
+      process.on("SIGINT", onSignal);
+    })
+    .catch((err) => {
+      console.error("failed to start server:", err);
+      process.exit(1);
     });
-  });
 }

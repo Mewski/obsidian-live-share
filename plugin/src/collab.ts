@@ -1,8 +1,8 @@
 import { Compartment } from "@codemirror/state";
-import { type Extension } from "@codemirror/state";
-import { type EditorView } from "@codemirror/view";
-import { yCollab } from "y-codemirror.next";
+import type { Extension } from "@codemirror/state";
+import type { EditorView } from "@codemirror/view";
 import { Notice } from "obsidian";
+import { yCollab } from "y-codemirror.next";
 import { type SyncManager, waitForSync } from "./sync";
 import type { SessionRole } from "./types";
 
@@ -53,9 +53,7 @@ export class CollabManager {
     }
 
     view.dispatch({
-      effects: this.compartment.reconfigure(
-        yCollab(result.text, result.provider.awareness),
-      ),
+      effects: this.compartment.reconfigure(yCollab(result.text, result.provider.awareness)),
     });
   }
 

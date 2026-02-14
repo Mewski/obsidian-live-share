@@ -1,11 +1,11 @@
-import { WebSocketServer, WebSocket } from "ws";
-import { IncomingMessage } from "http";
-import * as Y from "yjs";
-import * as syncProtocol from "y-protocols/sync";
-import * as awarenessProtocol from "y-protocols/awareness";
-import * as encoding from "lib0/encoding";
+import type { IncomingMessage } from "node:http";
 import * as decoding from "lib0/decoding";
-import { getDefaultPersistence, type Persistence } from "./persistence.js";
+import * as encoding from "lib0/encoding";
+import { WebSocket, WebSocketServer } from "ws";
+import * as awarenessProtocol from "y-protocols/awareness";
+import * as syncProtocol from "y-protocols/sync";
+import * as Y from "yjs";
+import { type Persistence, getDefaultPersistence } from "./persistence.js";
 
 const messageSync = 0;
 const messageAwareness = 1;
@@ -22,8 +22,7 @@ interface RoomState {
 
 function toUint8Array(raw: Buffer | ArrayBuffer | Buffer[]): Uint8Array {
   if (raw instanceof ArrayBuffer) return new Uint8Array(raw);
-  if (Buffer.isBuffer(raw))
-    return new Uint8Array(raw.buffer, raw.byteOffset, raw.byteLength);
+  if (Buffer.isBuffer(raw)) return new Uint8Array(raw.buffer, raw.byteOffset, raw.byteLength);
   const buf = Buffer.concat(raw as Buffer[]);
   return new Uint8Array(buf.buffer, buf.byteOffset, buf.byteLength);
 }
@@ -48,11 +47,11 @@ function handleMessage(ws: WebSocket, state: RoomState, data: Uint8Array) {
       break;
     }
     case messageFileOp: {
-      state.clients.forEach((client) => {
+      for (const client of state.clients) {
         if (client !== ws && client.readyState === WebSocket.OPEN) {
           client.send(data);
         }
-      });
+      }
       break;
     }
   }
@@ -65,20 +64,14 @@ function sendSyncStep1(ws: WebSocket, doc: Y.Doc) {
   ws.send(encoding.toUint8Array(encoder));
 }
 
-function sendAwarenessState(
-  ws: WebSocket,
-  awareness: awarenessProtocol.Awareness,
-) {
+function sendAwarenessState(ws: WebSocket, awareness: awarenessProtocol.Awareness) {
   const clients = awareness.getStates();
   if (clients.size > 0) {
     const encoder = encoding.createEncoder();
     encoding.writeVarUint(encoder, messageAwareness);
     encoding.writeVarUint8Array(
       encoder,
-      awarenessProtocol.encodeAwarenessUpdate(
-        awareness,
-        Array.from(clients.keys()),
-      ),
+      awarenessProtocol.encodeAwarenessUpdate(awareness, Array.from(clients.keys())),
     );
     ws.send(encoding.toUint8Array(encoder));
   }
@@ -114,11 +107,11 @@ export function createYjsWSS(persist?: Persistence) {
       syncProtocol.writeUpdate(encoder, update);
       const msg = encoding.toUint8Array(encoder);
 
-      state.clients.forEach((client) => {
+      for (const client of state.clients) {
         if (client !== origin && client.readyState === WebSocket.OPEN) {
           client.send(msg);
         }
-      });
+      }
 
       // Debounced persistence on every update (crash recovery)
       if (state.persistTimer) clearTimeout(state.persistTimer);
@@ -163,11 +156,11 @@ export function createYjsWSS(persist?: Persistence) {
         );
         const msg = encoding.toUint8Array(encoder);
 
-        state.clients.forEach((client) => {
+        for (const client of state.clients) {
           if (client.readyState === WebSocket.OPEN) {
             client.send(msg);
           }
-        });
+        }
       },
     );
 
@@ -199,7 +192,11 @@ export function createYjsWSS(persist?: Persistence) {
 
   async function cleanupRoom(roomId: string, state: RoomState) {
     if (state.persistTimer) clearTimeout(state.persistTimer);
-    await p.persistDoc(roomId, state.doc);
+    try {
+      await p.persistDoc(roomId, state.doc);
+    } catch (err) {
+      console.error(`failed to persist room ${roomId} during cleanup:`, err);
+    }
     awarenessProtocol.removeAwarenessStates(
       state.awareness,
       Array.from(state.awareness.getStates().keys()),
@@ -209,48 +206,72 @@ export function createYjsWSS(persist?: Persistence) {
     roomStates.delete(roomId);
   }
 
-  wss.on(
-    "connection",
-    async (ws: WebSocket, _req: IncomingMessage, roomId: string) => {
-      const state = await getOrCreateRoom(roomId);
-      state.clients.add(ws);
+  /** Persist and close all rooms. Called during graceful shutdown. */
+  async function closeAllRooms() {
+    for (const [roomId, state] of roomStates) {
+      if (state.persistTimer) clearTimeout(state.persistTimer);
+      if (state.cleanupTimer) clearTimeout(state.cleanupTimer);
+      try {
+        await p.persistDoc(roomId, state.doc);
+      } catch (err) {
+        console.error(`failed to persist room ${roomId} during shutdown:`, err);
+      }
+      for (const ws of state.clients) {
+        ws.close(1000, "server shutting down");
+      }
+      state.doc.destroy();
+    }
+    roomStates.clear();
+  }
 
-      sendSyncStep1(ws, state.doc);
-      sendAwarenessState(ws, state.awareness);
+  function getStats() {
+    let connections = 0;
+    for (const state of roomStates.values()) {
+      connections += state.clients.size;
+    }
+    return { rooms: roomStates.size, connections };
+  }
 
-      ws.on("message", (raw: Buffer | ArrayBuffer | Buffer[]) => {
-        const data = toUint8Array(raw);
-        try {
-          handleMessage(ws, state, data);
-        } catch (err) {
-          console.error("ws message error:", err);
-        }
-      });
+  wss.on("connection", async (ws: WebSocket, _req: IncomingMessage, roomId: string) => {
+    const state = await getOrCreateRoom(roomId);
+    state.clients.add(ws);
 
-      ws.on("close", () => {
-        state.clients.delete(ws);
+    sendSyncStep1(ws, state.doc);
+    sendAwarenessState(ws, state.awareness);
 
-        // Remove the correct awareness clientIDs for this connection
-        const clientIds = state.clientAwarenessIds.get(ws);
-        if (clientIds && clientIds.size > 0) {
-          awarenessProtocol.removeAwarenessStates(
-            state.awareness,
-            Array.from(clientIds),
-            null,
-          );
-        }
-        state.clientAwarenessIds.delete(ws);
+    ws.on("error", (err) => {
+      console.error(`yjs ws error for room ${roomId}:`, err.message);
+      ws.close();
+    });
 
-        if (state.clients.size === 0) {
-          state.cleanupTimer = setTimeout(() => {
-            if (state.clients.size === 0) {
-              cleanupRoom(roomId, state);
-            }
-          }, 30_000);
-        }
-      });
-    },
-  );
+    ws.on("message", (raw: Buffer | ArrayBuffer | Buffer[]) => {
+      const data = toUint8Array(raw);
+      try {
+        handleMessage(ws, state, data);
+      } catch (err) {
+        console.error("ws message error:", err);
+      }
+    });
 
-  return wss;
+    ws.on("close", () => {
+      state.clients.delete(ws);
+
+      // Remove the correct awareness clientIDs for this connection
+      const clientIds = state.clientAwarenessIds.get(ws);
+      if (clientIds && clientIds.size > 0) {
+        awarenessProtocol.removeAwarenessStates(state.awareness, Array.from(clientIds), null);
+      }
+      state.clientAwarenessIds.delete(ws);
+
+      if (state.clients.size === 0) {
+        state.cleanupTimer = setTimeout(() => {
+          if (state.clients.size === 0) {
+            cleanupRoom(roomId, state);
+          }
+        }, 30_000);
+      }
+    });
+  });
+
+  return { wss, closeAllRooms, getStats };
 }

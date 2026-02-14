@@ -1,10 +1,75 @@
-import { type Vault, type TFile, TFolder } from "obsidian";
-import * as Y from "yjs";
-import { WebsocketProvider } from "y-websocket";
-import type { LiveShareSettings } from "./types";
-import { type SyncManager, waitForSync } from "./sync";
-import type { ExclusionManager } from "./exclusion";
+import { type TFile, TFolder, type Vault } from "obsidian";
 import { Notice } from "obsidian";
+import { WebsocketProvider } from "y-websocket";
+import * as Y from "yjs";
+import type { ExclusionManager } from "./exclusion";
+import { type SyncManager, waitForSync } from "./sync";
+import type { LiveShareSettings } from "./types";
+
+const TEXT_EXTENSIONS = new Set([
+  "md",
+  "txt",
+  "json",
+  "css",
+  "js",
+  "ts",
+  "jsx",
+  "tsx",
+  "html",
+  "xml",
+  "yaml",
+  "yml",
+  "csv",
+  "svg",
+  "tex",
+  "latex",
+  "bib",
+  "org",
+  "rst",
+  "adoc",
+  "canvas",
+  "mermaid",
+  "graphql",
+  "toml",
+  "ini",
+  "cfg",
+  "conf",
+  "sh",
+  "bash",
+  "zsh",
+  "fish",
+  "ps1",
+  "bat",
+  "cmd",
+  "py",
+  "rb",
+  "rs",
+  "go",
+  "java",
+  "kt",
+  "scala",
+  "c",
+  "cpp",
+  "h",
+  "hpp",
+  "cs",
+  "swift",
+  "r",
+  "lua",
+  "sql",
+  "scss",
+  "sass",
+  "less",
+  "styl",
+  "vue",
+  "svelte",
+]);
+
+function isTextFile(path: string): boolean {
+  const dot = path.lastIndexOf(".");
+  if (dot < 0) return false;
+  return TEXT_EXTENSIONS.has(path.slice(dot + 1).toLowerCase());
+}
 
 interface FileEntry {
   hash: string;
@@ -50,7 +115,7 @@ export class ManifestManager {
     const wsUrl = this.settings.serverUrl.replace(/^http/, "ws");
     const params: Record<string, string> = { token: this.settings.token };
     if (this.settings.jwt) params.jwt = this.settings.jwt;
-    this.provider = new WebsocketProvider(wsUrl + "/ws", roomName, this.doc, {
+    this.provider = new WebsocketProvider(`${wsUrl}/ws`, roomName, this.doc, {
       params,
     });
 
@@ -82,14 +147,14 @@ export class ManifestManager {
     // Single transaction with complete data
     this.doc.transact(() => {
       // Remove entries no longer on disk
-      for (const key of this.manifest!.keys()) {
+      for (const key of this.manifest?.keys() ?? []) {
         if (!entries.has(key)) {
-          this.manifest!.delete(key);
+          this.manifest?.delete(key);
         }
       }
       // Set all entries with computed hashes
       for (const [path, entry] of entries) {
-        this.manifest!.set(path, entry);
+        this.manifest?.set(path, entry);
       }
     });
   }
@@ -117,20 +182,15 @@ export class ManifestManager {
       if (needsSync) {
         // Open the per-file Y.Doc to get its content
         const fileDoc = new Y.Doc();
-        const roomName = `${this.settings.roomId}:${path}`;
+        const roomName = `${this.settings.roomId}:${encodeURIComponent(path)}`;
         const wsUrl = this.settings.serverUrl.replace(/^http/, "ws");
         const fileParams: Record<string, string> = {
           token: this.settings.token,
         };
         if (this.settings.jwt) fileParams.jwt = this.settings.jwt;
-        const fileProvider = new WebsocketProvider(
-          wsUrl + "/ws",
-          roomName,
-          fileDoc,
-          {
-            params: fileParams,
-          },
-        );
+        const fileProvider = new WebsocketProvider(`${wsUrl}/ws`, roomName, fileDoc, {
+          params: fileParams,
+        });
 
         try {
           await waitForSync(fileProvider);
@@ -165,9 +225,7 @@ export class ManifestManager {
   }
 
   // Watch manifest for changes (guest uses this to discover new files)
-  onManifestChange(
-    callback: (added: string[], removed: string[]) => void,
-  ): void {
+  onManifestChange(callback: (added: string[], removed: string[]) => void): void {
     if (!this.manifest) return;
 
     // Clean up any existing observer to prevent memory leaks
@@ -206,11 +264,7 @@ export class ManifestManager {
   }
 
   // Host: rename file in manifest, release stale Yjs doc
-  renameFile(
-    oldPath: string,
-    newPath: string,
-    syncManager?: SyncManager,
-  ): void {
+  renameFile(oldPath: string, newPath: string, syncManager?: SyncManager): void {
     if (!this.manifest) return;
     const entry = this.manifest.get(oldPath);
     if (entry) {
@@ -224,12 +278,12 @@ export class ManifestManager {
   }
 
   isSharedPath(path: string): boolean {
-    if (this.exclusionManager && this.exclusionManager.isExcluded(path))
-      return false;
+    if (this.exclusionManager?.isExcluded(path)) return false;
+    if (!isTextFile(path)) return false;
     if (!this.settings.sharedFolder) return true;
     const folder = this.settings.sharedFolder.endsWith("/")
       ? this.settings.sharedFolder
-      : this.settings.sharedFolder + "/";
+      : `${this.settings.sharedFolder}/`;
     return path.startsWith(folder) || path === this.settings.sharedFolder;
   }
 
