@@ -9,7 +9,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "lint": "biome check .",
-    "format": "biome check --apply ."
+    "format": "biome check --apply .",
+    "version": "node version-bump.mjs && git add manifest.json versions.json"
   },
   "dependencies": {
     "lib0": "^0.2.97",

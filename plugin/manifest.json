@@ -1,9 +1,9 @@
 {
-  "id": "obsidian-live-share",
-  "name": "Live Share",
-  "version": "0.1.0",
-  "minAppVersion": "1.5.0",
-  "description": "Real-time collaborative editing with live cursors",
-  "author": "mewski",
-  "isDesktopOnly": true
+	"id": "obsidian-live-share",
+	"name": "Live Share",
+	"version": "0.1.0",
+	"minAppVersion": "1.5.0",
+	"description": "Real-time collaborative editing with live cursors",
+	"author": "mewski",
+	"isDesktopOnly": true
 }
