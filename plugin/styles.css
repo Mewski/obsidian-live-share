@@ -1,0 +1,143 @@
+/* Approval modal */
+.live-share-approval-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 16px 0;
+}
+
+.live-share-approval-avatar {
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.live-share-approval-buttons {
+  display: flex;
+  gap: 8px;
+  margin-top: 16px;
+  justify-content: flex-end;
+}
+
+.live-share-approval-buttons button {
+  padding: 6px 14px;
+}
+
+/* Focus notification */
+.live-share-focus-goto {
+  margin-top: 6px;
+  padding: 3px 10px;
+  font-size: 0.85em;
+  cursor: pointer;
+}
+
+/* Read-only banner (shown at top of editor for read-only guests) */
+.live-share-readonly-banner {
+  background: var(--background-secondary);
+  color: var(--text-muted);
+  padding: 4px 12px;
+  font-size: 0.8em;
+  text-align: center;
+  border-bottom: 1px solid var(--background-modifier-border);
+}
+
+/* Presence panel */
+.live-share-presence-empty {
+  color: var(--text-muted);
+  padding: 12px;
+}
+
+.live-share-presence-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px;
+}
+
+.live-share-presence-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: 4px;
+}
+
+.live-share-presence-item:hover {
+  background: var(--background-secondary);
+}
+
+.live-share-presence-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.live-share-presence-info {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+  gap: 2px;
+}
+
+.live-share-presence-name {
+  font-weight: 500;
+}
+
+.live-share-presence-file {
+  font-size: 0.8em;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.live-share-presence-actions {
+  display: flex;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.live-share-presence-follow,
+.live-share-presence-kick {
+  font-size: 0.75em;
+  padding: 2px 8px;
+}
+
+.live-share-presence-kick {
+  color: var(--text-error);
+}
+
+/* Prompt input (used in start/join session dialogs) */
+.live-share-prompt-input {
+  width: 100%;
+  margin-bottom: 1em;
+}
+
+/* Remote cursor labels */
+.yRemoteSelectionHead {
+  position: relative;
+  border-left: 2px solid;
+  border-color: inherit;
+  margin-left: -1px;
+}
+
+.yRemoteSelectionHead::after {
+  content: attr(data-name);
+  position: absolute;
+  top: -1.4em;
+  left: -1px;
+  font-size: 0.7em;
+  padding: 1px 4px;
+  border-radius: 3px 3px 3px 0;
+  white-space: nowrap;
+  color: #fff;
+  background: inherit;
+  background-color: currentColor;
+  pointer-events: none;
+  line-height: 1.2;
+}
+
+.yRemoteSelection {
+  opacity: 0.3;
+}
