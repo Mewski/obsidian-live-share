@@ -61,14 +61,14 @@ Open **Settings > Live Share** and set:
 
 - **Server URL** -- `http://localhost:4321` (or your deployed server URL)
 - **Display name** -- Your name shown to collaborators
-- **Cursor color** -- Hex color for your cursor (e.g. `#7c3aed`)
+- **Cursor color** -- Pick your cursor color using the color picker
 - **Shared folder** -- Subfolder to share (leave empty for the whole vault)
 
 ### 4. Start Collaborating
 
 **Host:**
 1. Open the command palette and run **Live Share: Start session**
-2. Enter a session name -- an invite link is copied to your clipboard
+2. An invite link is automatically copied to your clipboard
 3. Share the invite link with collaborators
 
 **Guest:**
@@ -141,7 +141,7 @@ npm run lint         # Biome linter
 # Plugin
 cd plugin
 npm run dev          # Watch mode (esbuild)
-npm test             # 156 tests
+npm test             # 155 tests
 npm run lint         # Biome linter
 ```
 

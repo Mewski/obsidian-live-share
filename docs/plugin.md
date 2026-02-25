@@ -27,7 +27,7 @@ Open **Settings > Live Share**:
 |---------|-------------|
 | **Server URL** | URL of your server (e.g. `http://localhost:4321`) |
 | **Display name** | Your name shown to collaborators |
-| **Cursor color** | Hex color for your cursor (e.g. `#7c3aed`) |
+| **Cursor color** | Pick your cursor color using the color picker |
 | **Shared folder** | Subfolder to share (leave empty for the whole vault) |
 
 When a session is active, the settings page also shows the connection state, room ID, token, and encryption status.
@@ -40,7 +40,7 @@ All commands are accessible via the command palette (Ctrl/Cmd+P, then type "Live
 
 | Command | Description |
 |---------|-------------|
-| **Start session** | Create a new room and start hosting. Generates an E2E encryption passphrase and copies the invite link to your clipboard. |
+| **Start session** | Create a new room and start hosting. Generates an E2E encryption passphrase and automatically copies the invite link to your clipboard. |
 | **Join session** | Paste an invite link to join an existing session. Files sync automatically from the host. |
 | **End session** | Leave the session. If you're the host, all participants are disconnected. |
 | **Copy invite link** | Copy the current session's invite link to share with others. |
@@ -60,7 +60,7 @@ All commands are accessible via the command palette (Ctrl/Cmd+P, then type "Live
 
 | Command | Description |
 |---------|-------------|
-| **Log in with GitHub** | Opens the GitHub OAuth flow in your browser. Paste the resulting token in Obsidian. |
+| **Log in with GitHub** | Opens the GitHub OAuth flow in your browser. |
 | **Log out** | Clear stored JWT and GitHub identity. |
 
 ## Presence Panel

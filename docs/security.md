@@ -61,7 +61,7 @@ Host-only operations enforced server-side:
 | Payload limits | Yjs WebSocket: 10 MB max payload. Control WebSocket: 2 MB max payload |
 | HTML escaping | OAuth callback page escapes display names for safe HTML rendering |
 | Server URL validation | Invite link parser validates the server URL protocol (`http:` or `https:` only) |
-| Session name validation | Room names are limited to 100 characters, control characters are rejected |
+| Room name validation | Auto-generated room names are validated; control characters are rejected |
 | Chunk validation | Chunked file assembly verifies all chunks arrived before writing to disk |
 
 ## Threat Model
