@@ -1,4 +1,3 @@
-// Minimal obsidian mock for tests
 export class Notice {}
 
 export class Modal {
