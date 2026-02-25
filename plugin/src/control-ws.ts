@@ -32,24 +32,34 @@ export interface ControlMessage {
 
 type Handler = (msg: ControlMessage) => void;
 
+const RECONNECT_BASE_MS = 1000;
+const RECONNECT_MAX_MS = 30_000;
+const MAX_RECONNECT_ATTEMPTS = 10;
+
 export class ControlChannel {
   private ws: WebSocket | null = null;
   private handlers = new Map<ControlMessageType, Handler[]>();
   private settings: LiveShareSettings;
   private isDestroyed = false;
   private e2e: E2ECrypto | null = null;
-  private stateChangeCallback: ((state: "connected" | "disconnected") => void) | null = null;
+  private stateChangeCallback:
+    | ((state: "connected" | "reconnecting" | "disconnected") => void)
+    | null = null;
 
   private latencyMs = 0;
   private pingTimer: ReturnType<typeof setInterval> | null = null;
   private lastPingTime = 0;
+
+  private shouldConnect = false;
+  private reconnectAttempts = 0;
+  private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor(settings: LiveShareSettings, e2e?: E2ECrypto) {
     this.settings = settings;
     this.e2e = e2e ?? null;
   }
 
-  onStateChange(callback: (state: "connected" | "disconnected") => void) {
+  onStateChange(callback: (state: "connected" | "reconnecting" | "disconnected") => void) {
     this.stateChangeCallback = callback;
   }
 
@@ -59,6 +69,13 @@ export class ControlChannel {
 
   connect(): void {
     if (this.isDestroyed) return;
+    this.shouldConnect = true;
+    this.reconnectAttempts = 0;
+    this.openWebSocket();
+  }
+
+  private openWebSocket(): void {
+    if (this.isDestroyed || !this.shouldConnect) return;
     const wsUrl = toWsUrl(this.settings.serverUrl);
     let url = `${wsUrl}/control/${this.settings.roomId}?token=${encodeURIComponent(this.settings.token)}`;
     if (this.settings.jwt) url += `&jwt=${encodeURIComponent(this.settings.jwt)}`;
@@ -66,6 +83,7 @@ export class ControlChannel {
     this.ws = new WebSocket(url);
 
     this.ws.onopen = () => {
+      this.reconnectAttempts = 0;
       this.stateChangeCallback?.("connected");
       this.startPing();
     };
@@ -95,15 +113,32 @@ export class ControlChannel {
     };
 
     this.ws.onclose = () => {
-      if (!this.ws) return;
       this.stopPing();
       this.ws = null;
-      if (!this.isDestroyed) {
+      if (this.isDestroyed) return;
+      if (this.shouldConnect) {
+        this.stateChangeCallback?.("reconnecting");
+        this.scheduleReconnect();
+      } else {
         this.stateChangeCallback?.("disconnected");
       }
     };
 
     this.ws.onerror = () => {};
+  }
+
+  private scheduleReconnect(): void {
+    if (this.reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
+      this.shouldConnect = false;
+      this.stateChangeCallback?.("disconnected");
+      return;
+    }
+    const delay = Math.min(RECONNECT_BASE_MS * 2 ** this.reconnectAttempts, RECONNECT_MAX_MS);
+    this.reconnectAttempts++;
+    this.reconnectTimer = setTimeout(() => {
+      this.reconnectTimer = null;
+      if (this.shouldConnect) this.openWebSocket();
+    }, delay);
   }
 
   send(msg: ControlMessage): void {
@@ -139,6 +174,11 @@ export class ControlChannel {
 
   destroy(): void {
     this.isDestroyed = true;
+    this.shouldConnect = false;
+    if (this.reconnectTimer) {
+      clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = null;
+    }
     this.stopPing();
     const wasOpen = this.ws !== null;
     if (this.ws) {

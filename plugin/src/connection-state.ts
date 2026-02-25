@@ -2,6 +2,7 @@ export type ConnectionState =
   | "disconnected"
   | "connecting"
   | "connected"
+  | "reconnecting"
   | "error"
   | "auth-required";
 
@@ -9,6 +10,7 @@ export type ConnectionEvent =
   | { type: "connect" }
   | { type: "connected" }
   | { type: "disconnect" }
+  | { type: "reconnecting" }
   | { type: "error"; message: string }
   | { type: "auth-expired" };
 
@@ -33,6 +35,9 @@ export class ConnectionStateManager {
         break;
       case "disconnect":
         this.state = "disconnected";
+        break;
+      case "reconnecting":
+        this.state = "reconnecting";
         break;
       case "error":
         this.state = "error";

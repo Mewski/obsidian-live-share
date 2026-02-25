@@ -666,6 +666,8 @@ export default class LiveSharePlugin extends Plugin {
     this.controlChannel.onStateChange((controlState) => {
       if (controlState === "connected") {
         this.connectionState.transition({ type: "connected" });
+      } else if (controlState === "reconnecting") {
+        this.connectionState.transition({ type: "reconnecting" });
       } else {
         this.connectionState.transition({ type: "disconnect" });
         if (this.sessionManager.isActive && !this.isEndingSession) {
@@ -947,6 +949,9 @@ export default class LiveSharePlugin extends Plugin {
         break;
       case "connecting":
         this.statusBarEl.setText("Live Share: connecting...");
+        break;
+      case "reconnecting":
+        this.statusBarEl.setText("Live Share: reconnecting...");
         break;
       case "connected": {
         const count = this.remoteUsers.size;

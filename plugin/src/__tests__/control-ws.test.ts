@@ -36,7 +36,9 @@ vi.stubGlobal("WebSocket", MockWebSocket);
 
 const { ControlChannel: CC } = await import("../control-ws");
 
-function createSettings(overrides?: Partial<LiveShareSettings>): LiveShareSettings {
+function createSettings(
+  overrides?: Partial<LiveShareSettings>,
+): LiveShareSettings {
   return {
     serverUrl: "http://localhost:4321",
     roomId: "test-room",
@@ -136,7 +138,9 @@ describe("ControlChannel", () => {
 
       const ws = connectAndGetWs(channel);
       ws.simulateMessage(JSON.stringify({ type: "file-op", path: "a.md" }));
-      ws.simulateMessage(JSON.stringify({ type: "presence-update", userId: "u1" }));
+      ws.simulateMessage(
+        JSON.stringify({ type: "presence-update", userId: "u1" }),
+      );
 
       expect(fileOpHandler).toHaveBeenCalledOnce();
       expect(presenceHandler).toHaveBeenCalledOnce();
@@ -421,7 +425,9 @@ describe("ControlChannel", () => {
 
       connectAndGetWs(channel);
 
-      await vi.waitFor(() => expect(stateCallback).toHaveBeenCalledWith("connected"));
+      await vi.waitFor(() =>
+        expect(stateCallback).toHaveBeenCalledWith("connected"),
+      );
     });
 
     it("cleans up on destroy", () => {
@@ -459,35 +465,38 @@ describe("ControlChannel", () => {
   });
 
   describe("disconnect behavior", () => {
-    it("fires disconnected immediately when WebSocket closes", async () => {
+    it("fires reconnecting when WebSocket closes", async () => {
       channel = new CC(createSettings());
       const stateCallback = vi.fn();
       channel.onStateChange(stateCallback);
 
       const ws = connectAndGetWs(channel);
-      await vi.waitFor(() => expect(stateCallback).toHaveBeenCalledWith("connected"));
+      await vi.waitFor(() =>
+        expect(stateCallback).toHaveBeenCalledWith("connected"),
+      );
       stateCallback.mockClear();
 
       ws.readyState = MockWebSocket.CLOSED;
       ws.onclose?.();
 
-      expect(stateCallback).toHaveBeenCalledWith("disconnected");
+      expect(stateCallback).toHaveBeenCalledWith("reconnecting");
       expect((channel as any).isDestroyed).toBe(false);
     });
 
-    it("does not fire disconnected twice if already destroyed", async () => {
+    it("fires disconnected after destroy", async () => {
       channel = new CC(createSettings());
       const stateCallback = vi.fn();
       channel.onStateChange(stateCallback);
 
       const ws = connectAndGetWs(channel);
-      await vi.waitFor(() => expect(stateCallback).toHaveBeenCalledWith("connected"));
+      await vi.waitFor(() =>
+        expect(stateCallback).toHaveBeenCalledWith("connected"),
+      );
       stateCallback.mockClear();
 
-      ws.readyState = MockWebSocket.CLOSED;
-      ws.onclose?.();
-      ws.onclose?.();
+      channel.destroy();
 
+      expect(stateCallback).toHaveBeenCalledWith("disconnected");
       expect(stateCallback).toHaveBeenCalledTimes(1);
     });
 
