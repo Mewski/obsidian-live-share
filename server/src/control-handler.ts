@@ -1,7 +1,7 @@
 import type { IncomingMessage } from "node:http";
 import { WebSocket, WebSocketServer } from "ws";
 import { verifyJWT } from "./github-auth.js";
-import { getRoom } from "./rooms.js";
+import { getRoom, removeRoom, touchRoom } from "./rooms.js";
 
 const ALLOWED_TYPES = new Set([
   "file-op",
@@ -142,7 +142,8 @@ export function createControlWSS() {
         return;
       }
 
-      // Respond to ping directly back to sender (not broadcast)
+      touchRoom(roomId);
+
       if (msg.type === "ping") {
         sendTo(ws, { type: "pong", timestamp: msg.timestamp });
         return;
@@ -276,6 +277,7 @@ export function createControlWSS() {
       room.clients.delete(ws);
       if (room.clients.size === 0) {
         rooms.delete(roomId);
+        removeRoom(roomId);
       }
     });
   });

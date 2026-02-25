@@ -19,6 +19,7 @@ export interface Room {
   token: string;
   name: string;
   createdAt: number;
+  lastActivityAt: number;
   hostUserId?: string;
   requireApproval?: boolean;
   defaultPermission?: Permission;

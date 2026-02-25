@@ -5,14 +5,46 @@ import { safeTokenCompare } from "./util.js";
 
 export type { Room };
 
+const ROOM_MAX_AGE_MS = 24 * 60 * 60 * 1000; // 24 hours
+
 const rooms = new Map<string, Room>();
 let _persistence: Persistence = noopPersistence;
 
 export async function initRooms(persistence: Persistence) {
   _persistence = persistence;
   const stored = await persistence.loadRooms();
+  const now = Date.now();
   for (const room of stored) {
+    const age = now - (room.lastActivityAt || room.createdAt);
+    if (age > ROOM_MAX_AGE_MS) {
+      await persistence.deleteRoom(room.id);
+      continue;
+    }
     rooms.set(room.id, room);
+  }
+}
+
+export function touchRoom(id: string) {
+  const room = rooms.get(id);
+  if (room) {
+    room.lastActivityAt = Date.now();
+    _persistence.saveRoom(room).catch(() => {});
+  }
+}
+
+export async function removeRoom(id: string) {
+  rooms.delete(id);
+  await _persistence.deleteRoom(id).catch(() => {});
+}
+
+export async function reapStaleRooms() {
+  const now = Date.now();
+  for (const [id, room] of rooms) {
+    const age = now - (room.lastActivityAt || room.createdAt);
+    if (age > ROOM_MAX_AGE_MS) {
+      rooms.delete(id);
+      await _persistence.deleteRoom(id).catch(() => {});
+    }
   }
 }
 
@@ -39,11 +71,13 @@ roomRouter.post("/", async (req, res) => {
     return;
   }
 
+  const now = Date.now();
   const room: Room = {
     id: nanoid(12),
     token: nanoid(24),
     name,
-    createdAt: Date.now(),
+    createdAt: now,
+    lastActivityAt: now,
     hostUserId,
   };
   rooms.set(room.id, room);

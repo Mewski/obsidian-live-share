@@ -378,7 +378,7 @@ describe("Control WebSocket handler", () => {
     expect(presenceMsg.userId).toBe("readonly-guest");
   });
 
-  it("cleans up room when all clients disconnect and fresh connects work", async () => {
+  it("cleans up room when all clients disconnect", async () => {
     const room = await createRoom("ctrl-cleanup");
 
     const clientA = await connectControl(room.id, room.token);
@@ -405,20 +405,8 @@ describe("Control WebSocket handler", () => {
 
     await new Promise((r) => setTimeout(r, 300));
 
-    const freshClient = await connectControl(room.id, room.token);
-    await new Promise((r) => setTimeout(r, 100));
-
-    expect(freshClient.ws.readyState).toBe(WebSocket.OPEN);
-
-    sendJSON(freshClient.ws, {
-      type: "presence-update",
-      userId: "freshUser",
-      displayName: "Fresh",
-      isHost: true,
-    });
-
-    await new Promise((r) => setTimeout(r, 300));
-    expect(freshClient.messages.length).toBe(0);
+    // Room metadata should be deleted after all clients disconnect
+    await expect(connectControl(room.id, room.token)).rejects.toThrow();
   });
 
   it("auto-approves join-request when room does not require approval", async () => {

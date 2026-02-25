@@ -8,7 +8,7 @@ import rateLimit from "express-rate-limit";
 import { createControlWSS } from "./control-handler.js";
 import { createAuthRouter, verifyJWT } from "./github-auth.js";
 import { type Persistence, getDefaultPersistence } from "./persistence.js";
-import { getRoom, initRooms, roomRouter } from "./rooms.js";
+import { getRoom, initRooms, reapStaleRooms, roomRouter } from "./rooms.js";
 import { safeTokenCompare } from "./util.js";
 import { createYjsWSS } from "./ws-handler.js";
 
@@ -120,8 +120,16 @@ export function createApp(
     socket.destroy();
   });
 
+  const reaperInterval = setInterval(
+    () => {
+      reapStaleRooms().catch((err) => console.error("reaper error:", err));
+    },
+    60 * 60 * 1000,
+  ); // every hour
+
   async function shutdown() {
     console.log("shutting down gracefully...");
+    clearInterval(reaperInterval);
     control.closeAll();
     await yjs.closeAllRooms();
     if (persistence) await persistence.close();

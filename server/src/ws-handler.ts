@@ -6,6 +6,7 @@ import * as awarenessProtocol from "y-protocols/awareness";
 import * as syncProtocol from "y-protocols/sync";
 import * as Y from "yjs";
 import { type Persistence, getDefaultPersistence } from "./persistence.js";
+import { removeRoom } from "./rooms.js";
 
 const messageSync = 0;
 const messageAwareness = 1;
