@@ -60,11 +60,18 @@ export default class LiveSharePlugin extends Plugin {
   /** Guard to prevent re-entrant calls to endSession (e.g. kicked -> endSession -> session-end -> endSession). */
   private endingSession = false;
 
+  /** Request a binary file from the host via the control channel. */
+  private requestBinaryFile(path: string) {
+    this.controlChannel?.send({ type: "sync-request", path });
+  }
+
   /** Register the manifest-change observer for guest file sync. */
   private registerManifestChangeHandler() {
     this.manifestManager.onManifestChange(async (added, removed) => {
       if (added.length > 0) {
-        const n = await this.manifestManager.syncFromManifest();
+        const n = await this.manifestManager.syncFromManifest(undefined, undefined, (p) =>
+          this.requestBinaryFile(p),
+        );
         if (n > 0) new Notice(`Live Share: synced ${n} file(s)`);
       }
       for (const path of removed) {
@@ -118,7 +125,16 @@ export default class LiveSharePlugin extends Plugin {
     this.addCommand({
       id: "end-session",
       name: "End session",
-      callback: () => this.endSession(),
+      callback: async () => {
+        if (!this.sessionManager.isActive) {
+          new Notice("Live Share: no active session");
+          return;
+        }
+        const confirmed = await this.confirm(
+          "Are you sure you want to end the session? All participants will be disconnected.",
+        );
+        if (confirmed) this.endSession();
+      },
     });
 
     this.addCommand({
@@ -262,7 +278,9 @@ export default class LiveSharePlugin extends Plugin {
               ? await this.app.vault.read(file)
               : await this.app.vault.readBinary(file);
             await this.manifestManager.updateFile(file, content);
-          } catch {}
+          } catch {
+            new Notice(`Live Share: failed to update manifest for ${file.path}`);
+          }
         }
       }),
     );
@@ -315,7 +333,9 @@ export default class LiveSharePlugin extends Plugin {
             try {
               const buf = await this.app.vault.readBinary(file);
               await this.manifestManager.updateFile(file, buf);
-            } catch {}
+            } catch {
+              new Notice(`Live Share: failed to update manifest for ${file.path}`);
+            }
           }
         }
       }),
@@ -329,7 +349,9 @@ export default class LiveSharePlugin extends Plugin {
       if (this.settings.role === "host") {
         await this.manifestManager.publishManifest();
       } else {
-        await this.manifestManager.syncFromManifest();
+        await this.manifestManager.syncFromManifest(undefined, undefined, (p) =>
+          this.requestBinaryFile(p),
+        );
         this.registerManifestChangeHandler();
       }
     }
@@ -395,7 +417,9 @@ export default class LiveSharePlugin extends Plugin {
     if (ok) {
       await this.connectSync();
       await this.manifestManager.connect();
-      const count = await this.manifestManager.syncFromManifest();
+      const count = await this.manifestManager.syncFromManifest(undefined, undefined, (p) =>
+        this.requestBinaryFile(p),
+      );
       this.registerManifestChangeHandler();
       new Notice(`Live Share: joined session, synced ${count} file(s)`);
     }
@@ -527,12 +551,16 @@ export default class LiveSharePlugin extends Plugin {
     this.controlChannel.on("presence-leave", (msg) => {
       const userId = msg.userId as string;
       if (userId) {
+        const leavingUser = this.remoteUsers.get(userId);
         this.remoteUsers.delete(userId);
         this.refreshPresenceView();
         this.updateStatusBar();
         if (this.followTarget === userId) {
           this.followTarget = null;
           this.clearUnfollowListeners();
+        }
+        if (leavingUser?.isHost && this.settings.role === "guest") {
+          new Notice("Live Share: host disconnected -- your changes may not be saved");
         }
       }
     });
@@ -549,11 +577,36 @@ export default class LiveSharePlugin extends Plugin {
       }).open();
     });
 
+    this.controlChannel.on("join-response", async (msg) => {
+      if (this.settings.role !== "guest") return;
+      if (msg.approved === false) {
+        new Notice("Live Share: join request denied by host");
+        this.endSession();
+        return;
+      }
+      const perm = msg.permission as string | undefined;
+      if (perm === "read-only" || perm === "read-write") {
+        this.settings.permission = perm;
+        await this.saveSettings();
+      }
+    });
+
     this.controlChannel.on("focus-request", (msg) => {
       showFocusNotification(this, msg as unknown as FocusRequest);
     });
     this.controlChannel.on("summon", (msg) => {
       showFocusNotification(this, msg as unknown as FocusRequest);
+    });
+
+    this.controlChannel.on("sync-request", async (msg) => {
+      if (this.settings.role !== "host") return;
+      const path = msg.path as string | undefined;
+      if (path && this.manifestManager.isSharedPath(path)) {
+        const file = this.app.vault.getAbstractFileByPath(path);
+        if (file instanceof TFile) {
+          this.fileOpsManager.onFileCreate(file);
+        }
+      }
     });
 
     this.controlChannel.on("kicked", () => {
@@ -565,6 +618,15 @@ export default class LiveSharePlugin extends Plugin {
       new Notice("Live Share: the host ended the session");
       this.endSession();
     });
+
+    if (this.settings.role === "guest") {
+      this.controlChannel.send({
+        type: "join-request",
+        userId: this.settings.githubUserId || this.settings.displayName,
+        displayName: this.settings.displayName,
+        avatarUrl: this.settings.avatarUrl,
+      });
+    }
 
     this.broadcastPresence();
 
@@ -688,14 +750,17 @@ export default class LiveSharePlugin extends Plugin {
     }
   }
 
-  private kickUser(userId: string) {
+  private async kickUser(userId: string) {
     if (this.settings.role !== "host" || !this.controlChannel) return;
     const user = this.remoteUsers.get(userId);
+    const name = user?.displayName ?? userId;
+    const confirmed = await this.confirm(`Kick ${name} from the session?`);
+    if (!confirmed) return;
     this.controlChannel.send({ type: "kick", userId });
     this.remoteUsers.delete(userId);
     this.refreshPresenceView();
     this.updateStatusBar();
-    new Notice(`Live Share: kicked ${user?.displayName ?? userId}`);
+    new Notice(`Live Share: kicked ${name}`);
   }
 
   private async reloadFromHost() {
@@ -709,10 +774,11 @@ export default class LiveSharePlugin extends Plugin {
     }
     if (!this.controlChannel) return;
     new Notice("Live Share: reloading all files from host...");
-    this.controlChannel.send({ type: "sync-request" });
     const suppress = (p: string) => this.fileOpsManager.suppressPath(p);
     const unsuppress = (p: string) => this.fileOpsManager.unsuppressPath(p);
-    const n = await this.manifestManager.syncFromManifest(suppress, unsuppress);
+    const n = await this.manifestManager.syncFromManifest(suppress, unsuppress, (p) =>
+      this.requestBinaryFile(p),
+    );
     if (n > 0) new Notice(`Live Share: reloaded ${n} file(s) from host`);
   }
 
@@ -822,6 +888,13 @@ export default class LiveSharePlugin extends Plugin {
       modal.open();
     });
   }
+
+  private confirm(message: string): Promise<boolean> {
+    return new Promise((resolve) => {
+      const modal = new ConfirmModal(this.app, message, resolve);
+      modal.open();
+    });
+  }
 }
 
 class PromptModal extends Modal {
@@ -890,5 +963,43 @@ class UserPickerModal extends FuzzySuggestModal<string> {
 
   onChooseItem(userId: string): void {
     this.onChoose(userId);
+  }
+}
+
+class ConfirmModal extends Modal {
+  private message: string;
+  private resolve: (value: boolean) => void;
+  private decided = false;
+
+  constructor(app: import("obsidian").App, message: string, resolve: (value: boolean) => void) {
+    super(app);
+    this.message = message;
+    this.resolve = resolve;
+  }
+
+  onOpen() {
+    const { contentEl } = this;
+    contentEl.createEl("p", { text: this.message });
+    const buttons = contentEl.createDiv({ cls: "live-share-confirm-buttons" });
+    const confirm = buttons.createEl("button", {
+      text: "Confirm",
+      cls: "mod-warning",
+    });
+    confirm.addEventListener("click", () => {
+      this.decided = true;
+      this.resolve(true);
+      this.close();
+    });
+    const cancel = buttons.createEl("button", { text: "Cancel" });
+    cancel.addEventListener("click", () => {
+      this.decided = true;
+      this.resolve(false);
+      this.close();
+    });
+  }
+
+  onClose() {
+    if (!this.decided) this.resolve(false);
+    this.contentEl.empty();
   }
 }

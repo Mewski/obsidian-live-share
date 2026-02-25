@@ -24,6 +24,7 @@ interface RoomState {
   awareness: awarenessProtocol.Awareness;
   clients: Set<WebSocket>;
   clientAwarenessIds: Map<WebSocket, Set<number>>;
+  readOnlyClients: Set<WebSocket>;
   cleanupTimer?: ReturnType<typeof setTimeout>;
   persistTimer?: ReturnType<typeof setTimeout>;
 }
@@ -35,12 +36,22 @@ function toUint8Array(raw: Buffer | ArrayBuffer | Buffer[]): Uint8Array {
   return new Uint8Array(buf.buffer, buf.byteOffset, buf.byteLength);
 }
 
+const syncStep1 = 0;
+const syncStep2 = 1;
+const syncUpdate = 2;
+
 function handleMessage(ws: WebSocket, state: RoomState, data: Uint8Array) {
   const decoder = decoding.createDecoder(data);
   const msgType = decoding.readVarUint(decoder);
 
   switch (msgType) {
     case messageSync: {
+      // Peek at the sync sub-type to enforce read-only permissions.
+      // Step2 and Update carry document mutations; block them for read-only clients.
+      const syncType = decoding.peekVarUint(decoder);
+      if (state.readOnlyClients.has(ws) && (syncType === syncStep2 || syncType === syncUpdate)) {
+        break;
+      }
       const encoder = encoding.createEncoder();
       encoding.writeVarUint(encoder, messageSync);
       syncProtocol.readSyncMessage(decoder, encoder, state.doc, ws);
@@ -105,6 +116,7 @@ export function createYjsWSS(persist?: Persistence) {
       awareness,
       clients: new Set(),
       clientAwarenessIds: new Map(),
+      readOnlyClients: new Set(),
     };
     roomStates.set(roomId, state);
     pendingRooms.delete(roomId);
@@ -237,7 +249,7 @@ export function createYjsWSS(persist?: Persistence) {
     return { rooms: roomStates.size, connections };
   }
 
-  wss.on("connection", async (ws: WebSocket, _req: IncomingMessage, roomId: string) => {
+  wss.on("connection", async (ws: WebSocket, req: IncomingMessage, roomId: string) => {
     let state: RoomState;
     try {
       state = await getOrCreateRoom(roomId);
@@ -247,6 +259,11 @@ export function createYjsWSS(persist?: Persistence) {
       return;
     }
     state.clients.add(ws);
+
+    const reqUrl = new URL(req.url || "", `http://${req.headers.host}`);
+    if (reqUrl.searchParams.get("permission") === "read-only") {
+      state.readOnlyClients.add(ws);
+    }
 
     sendSyncStep1(ws, state.doc);
     sendAwarenessState(ws, state.awareness);
@@ -267,6 +284,7 @@ export function createYjsWSS(persist?: Persistence) {
 
     ws.on("close", () => {
       state.clients.delete(ws);
+      state.readOnlyClients.delete(ws);
 
       const clientIds = state.clientAwarenessIds.get(ws);
       if (clientIds && clientIds.size > 0) {

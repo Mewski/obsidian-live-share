@@ -153,13 +153,17 @@ export class FileOpsManager {
             if (dir) await ensureFolder(this.vault, dir);
             await this.vault.rename(file, op.newPath);
           } else if (file && alreadyExists) {
-            // Target already exists -- remove old file
+            // Both sides renamed to the same target -- keep existing, trash source
+            new Notice(`Live Share: rename conflict -- ${op.newPath} already exists`);
             await this.vault.trash(file, true);
           }
           break;
         }
         case "chunk-start": {
-          if (op.totalSize > MAX_FILE_SIZE) break;
+          if (op.totalSize > MAX_FILE_SIZE) {
+            new Notice(`Live Share: incoming ${op.path} exceeds 50 MB limit, skipping`);
+            break;
+          }
           this.pendingChunks.set(op.path, {
             chunks: [],
             totalSize: op.totalSize,
@@ -234,14 +238,19 @@ export class FileOpsManager {
       if (binary) {
         const buf = await this.vault.readBinary(file as TFile);
         if (this.isPathSuppressed(path)) return;
-        if (buf.byteLength > MAX_FILE_SIZE) return;
+        if (buf.byteLength > MAX_FILE_SIZE) {
+          new Notice(`Live Share: ${path} exceeds 50 MB limit, skipping`);
+          return;
+        }
         this.sendFileContent(path, arrayBufferToBase64(buf), true);
       } else {
         const content = await this.vault.read(file as TFile);
         if (this.isPathSuppressed(path)) return;
         this.sendFileContent(path, content, false);
       }
-    } catch {}
+    } catch {
+      new Notice(`Live Share: failed to sync ${path}`);
+    }
   }
 
   async onFileModify(file: TAbstractFile) {
@@ -253,14 +262,19 @@ export class FileOpsManager {
     try {
       const buf = await this.vault.readBinary(file as TFile);
       if (this.isPathSuppressed(path)) return;
-      if (buf.byteLength > MAX_FILE_SIZE) return;
+      if (buf.byteLength > MAX_FILE_SIZE) {
+        new Notice(`Live Share: ${path} exceeds 50 MB limit, skipping`);
+        return;
+      }
       const content = arrayBufferToBase64(buf);
       if (content.length > CHUNK_SIZE) {
         this.sendChunked(path, content, true);
       } else {
         this.sendOp?.({ type: "modify", path, content, binary: true });
       }
-    } catch {}
+    } catch {
+      new Notice(`Live Share: failed to sync ${path}`);
+    }
   }
 
   onFileDelete(file: TAbstractFile) {

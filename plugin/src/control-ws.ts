@@ -16,7 +16,6 @@ export type ControlMessageType =
   | "file-chunk-end"
   | "presence-update"
   | "presence-leave"
-  | "follow-update"
   | "session-end"
   | "join-request"
   | "join-response"

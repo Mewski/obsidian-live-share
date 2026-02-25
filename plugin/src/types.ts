@@ -7,6 +7,8 @@
 
 export type SessionRole = "host" | "guest" | null;
 
+export type Permission = "read-write" | "read-only";
+
 export interface LiveShareSettings {
   serverUrl: string;
   roomId: string;
@@ -19,6 +21,8 @@ export interface LiveShareSettings {
   sharedFolder: string;
   role: SessionRole;
   encryptionPassphrase: string;
+  permission: Permission;
+  requireApproval: boolean;
 }
 
 export const DEFAULT_SETTINGS: LiveShareSettings = {
@@ -33,6 +37,8 @@ export const DEFAULT_SETTINGS: LiveShareSettings = {
   sharedFolder: "",
   role: null,
   encryptionPassphrase: "",
+  permission: "read-write",
+  requireApproval: false,
 };
 
 export interface FileCreateOp {

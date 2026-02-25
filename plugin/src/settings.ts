@@ -90,7 +90,7 @@ export class LiveShareSettingTab extends PluginSettingTab {
           .setPlaceholder("Anonymous")
           .setValue(settings.displayName)
           .onChange(async (value) => {
-            settings.displayName = value;
+            settings.displayName = value.trim() || "Anonymous";
             await this.plugin.saveSettings();
           }),
       );
@@ -117,6 +117,17 @@ export class LiveShareSettingTab extends PluginSettingTab {
             await this.plugin.saveSettings();
           });
         if (active) text.setDisabled(true);
+      });
+
+    new Setting(containerEl)
+      .setName("Require approval")
+      .setDesc("Guests must be approved by the host before joining")
+      .addToggle((toggle) => {
+        toggle.setValue(settings.requireApproval).onChange(async (value) => {
+          settings.requireApproval = value;
+          await this.plugin.saveSettings();
+        });
+        if (active) toggle.setDisabled(true);
       });
 
     if (active) {

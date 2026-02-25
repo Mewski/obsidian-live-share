@@ -49,6 +49,8 @@ function createSettings(overrides?: Partial<LiveShareSettings>): LiveShareSettin
     sharedFolder: "shared",
     role: "host",
     encryptionPassphrase: "",
+    permission: "read-write",
+    requireApproval: false,
     ...overrides,
   };
 }

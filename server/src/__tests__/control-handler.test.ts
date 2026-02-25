@@ -510,7 +510,7 @@ describe("Control WebSocket handler", () => {
     expect(clientA.messages.length).toBe(0);
   });
 
-  it("broadcasts follow-update to others", async () => {
+  it("drops unknown message types silently", async () => {
     const room = await createRoom("ctrl-follow");
 
     const clientA = await connectControl(room.id, room.token);
@@ -524,12 +524,7 @@ describe("Control WebSocket handler", () => {
       filePath: "notes/today.md",
     });
 
-    await waitForMessages(clientB.messages, 1);
-    const msg = JSON.parse(clientB.messages[0]);
-    expect(msg.type).toBe("follow-update");
-    expect(msg.followingUserId).toBe("userB");
-
     await new Promise((r) => setTimeout(r, 300));
-    expect(clientA.messages.length).toBe(0);
+    expect(clientB.messages.length).toBe(0);
   });
 });

@@ -89,6 +89,8 @@ roomRouter.post("/", async (req, res) => {
     return;
   }
 
+  const requireApproval = req.body.requireApproval === true;
+
   const now = Date.now();
   const room: Room = {
     id: nanoid(12),
@@ -97,6 +99,7 @@ roomRouter.post("/", async (req, res) => {
     createdAt: now,
     lastActivityAt: now,
     hostUserId,
+    requireApproval,
   };
   rooms.set(room.id, room);
   await _persistence.saveRoom(room);

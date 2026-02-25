@@ -13,7 +13,14 @@ import * as Y from "yjs";
 import type { ExclusionManager } from "./exclusion";
 import { type SyncManager, waitForSync } from "./sync";
 import type { LiveShareSettings } from "./types";
-import { ensureFolder, isTextFile, normalizePath, toWsUrl } from "./utils";
+import {
+  arrayBufferToBase64,
+  base64ToArrayBuffer,
+  ensureFolder,
+  isTextFile,
+  normalizePath,
+  toWsUrl,
+} from "./utils";
 
 interface FileEntry {
   hash: string;
@@ -66,6 +73,7 @@ export class ManifestManager {
     const wsUrl = toWsUrl(this.settings.serverUrl);
     const params: Record<string, string> = { token: this.settings.token };
     if (this.settings.jwt) params.jwt = this.settings.jwt;
+    if (this.settings.permission === "read-only") params.permission = "read-only";
     this.provider = new WebsocketProvider(`${wsUrl}/ws`, roomName, this.doc, {
       params,
     });
@@ -119,6 +127,7 @@ export class ManifestManager {
   async syncFromManifest(
     suppress?: (path: string) => void,
     unsuppress?: (path: string) => void,
+    requestBinary?: (path: string) => void,
   ): Promise<number> {
     if (!this.manifest || !this.doc) return 0;
 
@@ -126,7 +135,6 @@ export class ManifestManager {
     const entries = Array.from(this.manifest.entries());
 
     for (const [path, entry] of entries) {
-      if (entry.binary) continue;
       if (
         !path ||
         path.startsWith("/") ||
@@ -140,6 +148,11 @@ export class ManifestManager {
       let needsSync = false;
       if (!localFile) {
         needsSync = true;
+      } else if (entry.binary) {
+        const buf = await this.vault.readBinary(localFile);
+        if ((await hashBinaryContent(buf)) !== entry.hash) {
+          needsSync = true;
+        }
       } else {
         const content = await this.vault.read(localFile);
         if ((await hashContent(content)) !== entry.hash) {
@@ -147,48 +160,56 @@ export class ManifestManager {
         }
       }
 
-      if (needsSync) {
-        const fileDoc = new Y.Doc();
-        const roomName = `${this.settings.roomId}:${encodeURIComponent(path)}`;
-        const wsUrl = toWsUrl(this.settings.serverUrl);
-        const fileParams: Record<string, string> = {
-          token: this.settings.token,
-        };
-        if (this.settings.jwt) fileParams.jwt = this.settings.jwt;
-        const fileProvider = new WebsocketProvider(`${wsUrl}/ws`, roomName, fileDoc, {
-          params: fileParams,
-        });
+      if (!needsSync) continue;
 
-        try {
-          await waitForSync(fileProvider);
+      if (entry.binary) {
+        // Binary files sync via the control channel (chunked transfer).
+        requestBinary?.(path);
+        synced++;
+        continue;
+      }
 
-          const text = fileDoc.getText("content");
-          const content = text.toString();
+      const fileDoc = new Y.Doc();
+      const roomName = `${this.settings.roomId}:${encodeURIComponent(path)}`;
+      const wsUrl = toWsUrl(this.settings.serverUrl);
+      const fileParams: Record<string, string> = {
+        token: this.settings.token,
+      };
+      if (this.settings.jwt) fileParams.jwt = this.settings.jwt;
+      if (this.settings.permission === "read-only") fileParams.permission = "read-only";
+      const fileProvider = new WebsocketProvider(`${wsUrl}/ws`, roomName, fileDoc, {
+        params: fileParams,
+      });
 
-          if (content.length > 0) {
-            const dir = path.substring(0, path.lastIndexOf("/"));
-            if (dir) await ensureFolder(this.vault, dir);
+      try {
+        await waitForSync(fileProvider);
 
-            suppress?.(path);
-            try {
-              if (localFile) {
-                await this.vault.modify(localFile, content);
-              } else {
-                await this.vault.create(path, content);
-              }
-            } finally {
-              if (unsuppress) {
-                setTimeout(() => unsuppress(path), 50);
-              }
+        const text = fileDoc.getText("content");
+        const content = text.toString();
+
+        if (content.length > 0) {
+          const dir = path.substring(0, path.lastIndexOf("/"));
+          if (dir) await ensureFolder(this.vault, dir);
+
+          suppress?.(path);
+          try {
+            if (localFile) {
+              await this.vault.modify(localFile, content);
+            } else {
+              await this.vault.create(path, content);
             }
-            synced++;
+          } finally {
+            if (unsuppress) {
+              setTimeout(() => unsuppress(path), 50);
+            }
           }
-        } catch {
-          // sync timed out or vault write failed -- skip this file
-        } finally {
-          fileProvider.destroy();
-          fileDoc.destroy();
+          synced++;
         }
+      } catch {
+        // sync timed out or vault write failed -- skip this file
+      } finally {
+        fileProvider.destroy();
+        fileDoc.destroy();
       }
     }
 

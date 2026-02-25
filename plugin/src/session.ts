@@ -35,6 +35,7 @@ export class SessionManager {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           hostUserId: settings.githubUserId || settings.displayName,
+          requireApproval: settings.requireApproval,
         }),
       });
     } catch {
@@ -119,6 +120,7 @@ export class SessionManager {
     settings.token = "";
     settings.encryptionPassphrase = "";
     settings.role = null;
+    settings.permission = "read-write";
     await this.plugin.saveSettings();
   }
 

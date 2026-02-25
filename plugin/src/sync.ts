@@ -57,6 +57,7 @@ export class SyncManager {
       const wsUrl = toWsUrl(this.settings.serverUrl);
       const params: Record<string, string> = { token: this.settings.token };
       if (this.settings.jwt) params.jwt = this.settings.jwt;
+      if (this.settings.permission === "read-only") params.permission = "read-only";
       provider = new WebsocketProvider(`${wsUrl}/ws`, roomName, doc, {
         params,
       });

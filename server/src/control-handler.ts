@@ -17,7 +17,6 @@ const ALLOWED_TYPES = new Set([
   "file-chunk-data",
   "file-chunk-end",
   "presence-update",
-  "follow-update",
   "session-end",
   "join-request",
   "join-response",
