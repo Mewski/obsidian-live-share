@@ -234,10 +234,11 @@ export class FileOpsManager {
           break;
         }
       }
-    } catch {
+    } catch (err) {
       const detail =
         "path" in op ? op.path : "oldPath" in op ? (op as { oldPath: string }).oldPath : "";
-      new Notice(`Live Share: failed to apply remote ${op.type} for ${detail}`);
+      const msg = err instanceof Error ? err.message : String(err);
+      new Notice(`Live Share: failed to apply remote ${op.type} for ${detail}: ${msg}`);
     } finally {
       setTimeout(() => {
         for (const path of paths) this.unsuppressPath(path);

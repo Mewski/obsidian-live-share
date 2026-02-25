@@ -45,8 +45,10 @@ export class CollabManager {
 
     if (role === "host") {
       const localContent = view.state.doc.toString();
-      if (docHandle.text.length === 0 && localContent.length > 0) {
+      const remoteContent = docHandle.text.toString();
+      if (localContent !== remoteContent) {
         docHandle.doc.transact(() => {
+          docHandle.text.delete(0, docHandle.text.length);
           docHandle.text.insert(0, localContent);
         });
       }

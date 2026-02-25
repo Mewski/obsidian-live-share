@@ -279,13 +279,15 @@ export class ManifestManager {
   }
 
   renameFile(oldPath: string, newPath: string, syncManager?: SyncManager): void {
-    if (!this.manifest) return;
+    if (!this.manifest || !this.doc) return;
     const normOld = normalizePath(oldPath);
     const normNew = normalizePath(newPath);
     const fileEntry = this.manifest.get(normOld);
     if (fileEntry) {
-      this.manifest.delete(normOld);
-      this.manifest.set(normNew, fileEntry);
+      this.doc.transact(() => {
+        this.manifest?.delete(normOld);
+        this.manifest?.set(normNew, fileEntry);
+      });
     }
     if (syncManager) {
       syncManager.releaseDoc(normOld);

@@ -53,12 +53,14 @@ export class BackgroundSync {
 
       if (this.observers.has(path)) return;
 
-      if (this.role === "host" && docHandle.text.length === 0) {
+      if (this.role === "host") {
         const file = this.vault.getAbstractFileByPath(path) as TFile | null;
         if (file) {
           const content = await this.vault.read(file);
-          if (docHandle.text.length === 0 && content.length > 0) {
+          const remoteContent = docHandle.text.toString();
+          if (content !== remoteContent) {
             docHandle.doc.transact(() => {
+              docHandle.text.delete(0, docHandle.text.length);
               docHandle.text.insert(0, content);
             });
           }

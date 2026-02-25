@@ -65,10 +65,8 @@ export default class LiveSharePlugin extends Plugin {
       const renamedOld = new Set<string>();
       const renamedNew = new Set<string>();
       if (added.length > 0 && removed.length > 0) {
-        const addedText = added.filter((p) => isTextFile(p));
-        const removedText = removed.filter((p) => isTextFile(p));
-        for (const oldPath of removedText) {
-          for (const newPath of addedText) {
+        for (const oldPath of removed) {
+          for (const newPath of added) {
             if (renamedNew.has(newPath)) continue;
             const oldFile = this.app.vault.getAbstractFileByPath(oldPath);
             const newFile = this.app.vault.getAbstractFileByPath(newPath);
@@ -87,15 +85,23 @@ export default class LiveSharePlugin extends Plugin {
                   this.fileOpsManager.unsuppressPath(newPath);
                 }, 100);
               }
-              this.backgroundSync.onFileRemoved(oldPath);
-              await this.backgroundSync.onFileAdded(newPath);
+              if (isTextFile(oldPath)) {
+                this.backgroundSync.onFileRemoved(oldPath);
+              }
+              if (isTextFile(newPath)) {
+                await this.backgroundSync.onFileAdded(newPath);
+              }
               break;
             }
             if (!oldFile && newFile) {
               renamedOld.add(oldPath);
               renamedNew.add(newPath);
-              this.backgroundSync.onFileRemoved(oldPath);
-              await this.backgroundSync.onFileAdded(newPath);
+              if (isTextFile(oldPath)) {
+                this.backgroundSync.onFileRemoved(oldPath);
+              }
+              if (isTextFile(newPath)) {
+                await this.backgroundSync.onFileAdded(newPath);
+              }
               break;
             }
           }
