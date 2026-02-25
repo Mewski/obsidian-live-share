@@ -1,6 +1,7 @@
 /** Plugin settings tab UI. */
 import { type App, PluginSettingTab, Setting } from "obsidian";
 import type LiveSharePlugin from "./main";
+import { HEX_COLOR_RE } from "./utils";
 
 export class LiveShareSettingTab extends PluginSettingTab {
   plugin: LiveSharePlugin;
@@ -95,11 +96,7 @@ export class LiveShareSettingTab extends PluginSettingTab {
           .setPlaceholder("#7c3aed")
           .setValue(settings.cursorColor)
           .onChange(async (value) => {
-            if (
-              /^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/.test(
-                value,
-              )
-            ) {
+            if (HEX_COLOR_RE.test(value)) {
               settings.cursorColor = value;
               await this.plugin.saveSettings();
             }

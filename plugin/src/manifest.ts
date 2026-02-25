@@ -1,12 +1,12 @@
 /** File inventory sync via shared Y.Map with hash-based change detection. */
-import { type TFile, TFolder, type Vault } from "obsidian";
+import type { TFile, Vault } from "obsidian";
 import { Notice } from "obsidian";
 import { WebsocketProvider } from "y-websocket";
 import * as Y from "yjs";
 import type { ExclusionManager } from "./exclusion";
 import { type SyncManager, waitForSync } from "./sync";
 import type { LiveShareSettings } from "./types";
-import { isTextFile, normalizePath, toWsUrl } from "./utils";
+import { ensureFolder, isTextFile, normalizePath, toWsUrl } from "./utils";
 
 interface FileEntry {
   hash: string;
@@ -165,7 +165,7 @@ export class ManifestManager {
 
           if (content.length > 0) {
             const dir = path.substring(0, path.lastIndexOf("/"));
-            if (dir) await this.ensureFolder(dir);
+            if (dir) await ensureFolder(this.vault, dir);
 
             suppress?.(path);
             try {
@@ -291,19 +291,5 @@ export class ManifestManager {
 
   private getSharedFiles(): TFile[] {
     return this.vault.getFiles().filter((f) => this.isSharedPath(f.path));
-  }
-
-  private async ensureFolder(path: string): Promise<void> {
-    const existing = this.vault.getAbstractFileByPath(path);
-    if (existing instanceof TFolder) return;
-    const parts = path.split("/");
-    let current = "";
-    for (const part of parts) {
-      current = current ? `${current}/${part}` : part;
-      const folder = this.vault.getAbstractFileByPath(current);
-      if (!folder) {
-        await this.vault.createFolder(current);
-      }
-    }
   }
 }

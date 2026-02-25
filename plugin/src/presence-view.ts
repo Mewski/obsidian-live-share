@@ -1,5 +1,6 @@
 /** Sidebar panel showing connected users with follow, kick, and summon controls. */
 import { ItemView, WorkspaceLeaf } from "obsidian";
+import { HEX_COLOR_RE } from "./utils";
 
 export const PRESENCE_VIEW_TYPE = "live-share-presence";
 
@@ -91,11 +92,7 @@ export class PresenceView extends ItemView {
       const item = list.createEl("div", { cls: itemCls });
 
       const dot = item.createEl("span", { cls: "live-share-presence-dot" });
-      if (
-        /^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/.test(
-          user.cursorColor,
-        )
-      ) {
+      if (HEX_COLOR_RE.test(user.cursorColor)) {
         dot.style.backgroundColor = user.cursorColor;
       }
 

@@ -112,7 +112,7 @@ export class FileOpsManager {
             }
           } else {
             const dir = op.path.substring(0, op.path.lastIndexOf("/"));
-            if (dir) await this.ensureFolder(dir);
+            if (dir) await ensureFolder(this.vault, dir);
             if (op.binary) {
               const buf = base64ToArrayBuffer(op.content);
               await this.vault.createBinary(op.path, buf);
@@ -146,7 +146,7 @@ export class FileOpsManager {
           const alreadyExists = this.vault.getAbstractFileByPath(op.newPath);
           if (file && !alreadyExists) {
             const dir = op.newPath.substring(0, op.newPath.lastIndexOf("/"));
-            if (dir) await this.ensureFolder(dir);
+            if (dir) await ensureFolder(this.vault, dir);
             await this.vault.rename(file, op.newPath);
           } else if (file && alreadyExists) {
             // Target already exists -- remove old file
@@ -190,7 +190,7 @@ export class FileOpsManager {
           const exists = this.vault.getAbstractFileByPath(op.path);
           if (!exists) {
             const dir = op.path.substring(0, op.path.lastIndexOf("/"));
-            if (dir) await this.ensureFolder(dir);
+            if (dir) await ensureFolder(this.vault, dir);
           }
           if (completed.binary) {
             const buf = base64ToArrayBuffer(joined);
@@ -304,19 +304,5 @@ export class FileOpsManager {
       this.sendOp({ type: "chunk-data", path, index: i, data });
     }
     this.sendOp({ type: "chunk-end", path });
-  }
-
-  private async ensureFolder(path: string): Promise<void> {
-    const existing = this.vault.getAbstractFileByPath(path);
-    if (existing instanceof TFolder) return;
-    const parts = path.split("/");
-    let current = "";
-    for (const part of parts) {
-      current = current ? `${current}/${part}` : part;
-      const folder = this.vault.getAbstractFileByPath(current);
-      if (!folder) {
-        await this.vault.createFolder(current);
-      }
-    }
   }
 }

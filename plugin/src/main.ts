@@ -61,6 +61,22 @@ export default class LiveSharePlugin extends Plugin {
   /** Guard to prevent re-entrant calls to endSession (e.g. kicked -> endSession -> session-end -> endSession). */
   private endingSession = false;
 
+  /** Register the manifest-change observer for guest file sync. */
+  private registerManifestChangeHandler() {
+    this.manifestManager.onManifestChange(async (added, removed) => {
+      if (added.length > 0) {
+        const n = await this.manifestManager.syncFromManifest();
+        if (n > 0) new Notice(`Live Share: synced ${n} file(s)`);
+      }
+      for (const path of removed) {
+        const file = this.app.vault.getAbstractFileByPath(path);
+        if (file) await this.app.vault.trash(file, true);
+      }
+      if (removed.length > 0)
+        new Notice(`Live Share: removed ${removed.length} file(s)`);
+    });
+  }
+
   private presenceTimer: ReturnType<typeof setTimeout> | null = null;
 
   /** Current scroll listener and its DOM element, so we can remove it on file change. */
@@ -322,18 +338,7 @@ export default class LiveSharePlugin extends Plugin {
         await this.manifestManager.publishManifest();
       } else {
         await this.manifestManager.syncFromManifest();
-        this.manifestManager.onManifestChange(async (added, removed) => {
-          if (added.length > 0) {
-            const n = await this.manifestManager.syncFromManifest();
-            if (n > 0) new Notice(`Live Share: synced ${n} file(s)`);
-          }
-          for (const path of removed) {
-            const file = this.app.vault.getAbstractFileByPath(path);
-            if (file) await this.app.vault.trash(file, true);
-          }
-          if (removed.length > 0)
-            new Notice(`Live Share: removed ${removed.length} file(s)`);
-        });
+        this.registerManifestChangeHandler();
       }
     }
   }
@@ -399,18 +404,7 @@ export default class LiveSharePlugin extends Plugin {
       await this.connectSync();
       await this.manifestManager.connect();
       const count = await this.manifestManager.syncFromManifest();
-      this.manifestManager.onManifestChange(async (added, removed) => {
-        if (added.length > 0) {
-          const n = await this.manifestManager.syncFromManifest();
-          if (n > 0) new Notice(`Live Share: synced ${n} file(s)`);
-        }
-        for (const path of removed) {
-          const file = this.app.vault.getAbstractFileByPath(path);
-          if (file) await this.app.vault.trash(file, true);
-        }
-        if (removed.length > 0)
-          new Notice(`Live Share: removed ${removed.length} file(s)`);
-      });
+      this.registerManifestChangeHandler();
       new Notice(`Live Share: joined session, synced ${count} file(s)`);
     }
   }
