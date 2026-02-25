@@ -89,7 +89,7 @@ Both require `?token=<room_token>` query parameter. When GitHub auth is enabled,
 
 ## Persistence
 
-Y.Doc state and room metadata are persisted to LevelDB at `./data/yjs-docs`. Documents are persisted on a 5-second debounce after every edit. Rooms are cleaned up from memory 30 seconds after the last client disconnects (persisted data is retained).
+Y.Doc state and room metadata are persisted to LevelDB at `./data/yjs-docs`. Documents are persisted on a 5-second debounce after every edit. Rooms are cleaned up from memory after the last client disconnects (30 seconds for Yjs state, 35 seconds for the control channel). Persisted data is retained.
 
 ## Rate Limiting
 

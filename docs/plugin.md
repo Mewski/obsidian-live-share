@@ -13,11 +13,11 @@ npm run build
 Copy the built files into your vault's plugin directory:
 
 ```bash
-mkdir -p /path/to/vault/.obsidian/plugins/live-share
-cp main.js manifest.json styles.css /path/to/vault/.obsidian/plugins/live-share/
+mkdir -p /path/to/vault/.obsidian/plugins/obsidian-live-share
+cp main.js manifest.json styles.css /path/to/vault/.obsidian/plugins/obsidian-live-share/
 ```
 
-Open Obsidian, go to **Settings > Community Plugins**, and enable **Live Share**.
+Open Obsidian, go to **Settings > Community Plugins**, and enable **Obsidian Live Share**.
 
 ## Configuration
 
@@ -72,7 +72,7 @@ The collaborators panel (right sidebar) shows each connected user with:
 - **Display name** with a "Host" badge if applicable
 - **Current file** they're viewing
 - **Follow button**: Click to follow their navigation and scroll. Click again to unfollow. Any keyboard, mouse, or scroll interaction automatically unfollows.
-- **Permission toggle** (host only): Toggle a guest between read-write and read-only. Takes effect immediately; the guest's providers are recreated with the new permission.
+- **Permission toggle** (host only): Toggle a guest between read-write and read-only. Takes effect immediately.
 - **Summon button** (host only): Navigate that specific user to your cursor
 - **Kick button** (host only): Remove the user from the session (asks for confirmation)
 
@@ -95,7 +95,7 @@ When **Require approval** is enabled and a guest joins, the host sees a modal to
 
 When approval is disabled (default), all guests join with read-write access.
 
-The host can change a guest's permission at any time via the permission toggle button in the presence panel. The change takes effect immediately: the guest's sync providers are recreated with the new permission level.
+The host can change a guest's permission at any time via the permission toggle button in the presence panel. The change takes effect immediately.
 
 ## Host Disconnect
 

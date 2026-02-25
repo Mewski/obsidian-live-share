@@ -44,6 +44,7 @@ Host-only operations enforced server-side:
 - `session-end`: Only the host can end the session
 - `kick`: Only the host can kick participants
 - `set-permission`: Only the host can change guest permissions
+- `present-start` / `present-stop`: Only the host can toggle presentation mode
 
 ## Defenses
 

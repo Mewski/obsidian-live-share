@@ -27,10 +27,12 @@ Each session uses two WebSocket channels:
 | Component | File | Responsibility |
 |-----------|------|----------------|
 | REST API | `rooms.ts` | Room CRUD, join validation, token-based auth |
-| Yjs handler | `ws-handler.ts` | Yjs sync protocol, awareness relay, per-doc persistence |
+| Yjs handler | `ws-handler.ts` | Yjs sync protocol, awareness relay, per-doc persistence, read-only enforcement |
 | Control handler | `control-handler.ts` | Message routing, host determination, rate limiting, permission enforcement |
 | Persistence | `persistence.ts` | LevelDB storage for Y.Docs and room metadata |
+| Permissions | `permissions.ts` | Per-user permission store for read-only enforcement |
 | Auth | `github-auth.ts` | GitHub OAuth flow, JWT signing/verification |
+| Util | `util.ts` | Timing-safe token comparison |
 | Entry | `index.ts` | HTTP/HTTPS server, WebSocket upgrade routing, graceful shutdown |
 
 ## Plugin Components
@@ -38,27 +40,35 @@ Each session uses two WebSocket channels:
 | Component | File | Responsibility |
 |-----------|------|----------------|
 | Main plugin | `main.ts` | Commands, vault event handlers, session lifecycle, presentation mode |
+| Background sync | `background-sync.ts` | Yjs observer-based sync for non-active text files, disk writes |
 | Control channel | `control-ws.ts` | WebSocket client with ping/pong latency, E2E encryption |
 | File operations | `file-ops.ts` | Remote op application, per-path suppression, chunked transfer |
-| Collaboration | `collab.ts` | CodeMirror 6 Yjs integration, per-file activation |
+| Collaboration | `collab.ts` | CodeMirror 6 Yjs integration, per-file activation, cursor awareness |
 | Sync manager | `sync.ts` | Per-file Y.Doc and WebsocketProvider management |
 | Manifest | `manifest.ts` | File inventory sync via shared Y.Map, hash-based change detection |
 | Presence view | `presence-view.ts` | Sidebar panel showing users, follow/kick/summon buttons |
+| Approval modal | `approval-modal.ts` | Host approval dialog for guest join requests |
+| Focus notification | `focus-notification.ts` | Focus request notification with "Go to" action |
 | Connection state | `connection-state.ts` | State machine for connection lifecycle |
 | Crypto | `crypto.ts` | AES-256-GCM encryption with PBKDF2 key derivation |
 | Session | `session.ts` | Room creation/join, invite link encoding/parsing |
 | Settings | `settings.ts` | Plugin settings UI |
 | Auth | `auth.ts` | GitHub OAuth token handling |
 | Exclusion | `exclusion.ts` | File exclusion patterns from `.liveshare.json` |
+| Types | `types.ts` | Shared type definitions and default settings |
+| Utils | `utils.ts` | Path normalization, line ending normalization, file type detection |
 
 ## Key Design Decisions
 
 - **Yjs CRDT**: Character-level conflict-free merging without coordination. Battle-tested with CodeMirror 6 via `y-codemirror.next`.
-- **One Y.Doc per file**: Keeps memory bounded; only open files have active sync providers.
+- **One Y.Doc per file**: Each shared text file gets its own Y.Doc and WebsocketProvider for independent sync.
 - **Hub-and-spoke topology**: All clients connect to the central relay server. No peer-to-peer.
 - **Per-path suppression**: Ref-counted suppression map prevents vault events from echoing remote operations back to the server. Uses 50ms delayed unsuppress to handle async vault event firing.
 - **Host determination**: Server-side, not client-side. JWT-verified identity is preferred; fallback without JWT: first connected client becomes host.
 - **LevelDB persistence**: Server persists Y.Doc state with 5-second debounce after edits. Rooms are cleaned up 30 seconds after the last client disconnects.
+- **Background sync**: Non-active text files are synced via Y.Text observers with debounced disk writes. The active file syncs through yCollab in the editor.
+- **Minimal Y.Text updates**: When the host re-seeds a Yjs doc (e.g., on reload), only the differing portion is replaced (prefix/suffix preserved) to avoid CRDT merge artifacts.
+- **Line ending normalization**: All text content is normalized to `\n` at every entry point to prevent cross-platform mismatches.
 - **Forward-slash path normalization**: All file paths are normalized to `/` separators for cross-platform compatibility.
 - **Fail-fast connections**: When a WebSocket connection drops, the session ends immediately and all resources are cleaned up. No automatic reconnection or message queuing.
 
@@ -82,4 +92,6 @@ Each session uses two WebSocket channels:
 | `permission-update` | Server -> Guest | Notification that your permission was changed |
 | `session-end` | Host -> All | Host ended the session |
 | `sync-request` | Guest -> Host | Request full file resync |
+| `present-start` | Host -> All | Host started presentation mode |
+| `present-stop` | Host -> All | Host stopped presentation mode |
 | `ping` / `pong` | Client <-> Server | Latency measurement (30s interval) |

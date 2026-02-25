@@ -52,12 +52,12 @@ npm run build
 Copy the built files into your vault:
 
 ```bash
-mkdir -p /path/to/vault/.obsidian/plugins/live-share
+mkdir -p /path/to/vault/.obsidian/plugins/obsidian-live-share
 cp plugin/main.js plugin/manifest.json plugin/styles.css \
-   /path/to/vault/.obsidian/plugins/live-share/
+   /path/to/vault/.obsidian/plugins/obsidian-live-share/
 ```
 
-Open Obsidian, go to **Settings > Community Plugins**, and enable **Live Share**.
+Open Obsidian, go to **Settings > Community Plugins**, and enable **Obsidian Live Share**.
 
 ### 3. Configure
 
@@ -146,7 +146,7 @@ npm run lint         # Biome linter
 # Plugin
 cd plugin
 npm run dev          # Watch mode (esbuild)
-npm test             # 220 tests
+npm test             # 226 tests
 npm run lint         # Biome linter
 ```
 
