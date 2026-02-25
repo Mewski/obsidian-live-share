@@ -275,7 +275,7 @@ describe("ControlChannel", () => {
       expect(handler).not.toHaveBeenCalled();
     });
 
-    it("passes through delete ops without encrypting content", async () => {
+    it("encrypts paths in delete ops", async () => {
       const e2e = createMockE2E();
       channel = new CC(createSettings(), e2e as any);
       const ws = connectAndGetWs(channel);
@@ -289,8 +289,49 @@ describe("ControlChannel", () => {
 
       const sent = JSON.parse(ws.sent[0]);
       expect(sent.op.type).toBe("delete");
-      expect(sent.encrypted).toBeUndefined();
-      expect(e2e.encryptString).not.toHaveBeenCalled();
+      expect(sent.op.path).toBe("encrypted:old.md");
+      expect(sent.encrypted).toBe(true);
+      expect(e2e.encryptString).toHaveBeenCalledWith("old.md");
+    });
+
+    it("encrypts paths in rename ops", async () => {
+      const e2e = createMockE2E();
+      channel = new CC(createSettings(), e2e as any);
+      const ws = connectAndGetWs(channel);
+
+      channel.send({
+        type: "file-op",
+        op: { type: "rename", oldPath: "a.md", newPath: "b.md" },
+      });
+
+      await vi.waitFor(() => expect(ws.sent.length).toBe(1));
+
+      const sent = JSON.parse(ws.sent[0]);
+      expect(sent.op.type).toBe("rename");
+      expect(sent.op.oldPath).toBe("encrypted:a.md");
+      expect(sent.op.newPath).toBe("encrypted:b.md");
+      expect(sent.encrypted).toBe(true);
+    });
+
+    it("decrypts incoming encrypted delete ops", async () => {
+      const e2e = createMockE2E();
+      channel = new CC(createSettings(), e2e as any);
+      const handler = vi.fn();
+      channel.on("file-op", handler);
+
+      const ws = connectAndGetWs(channel);
+
+      ws.simulateMessage(
+        JSON.stringify({
+          type: "file-op",
+          encrypted: true,
+          op: { type: "delete", path: "encrypted:secret.md" },
+        }),
+      );
+
+      await vi.waitFor(() => expect(handler).toHaveBeenCalled());
+      const received = handler.mock.calls[0][0];
+      expect(received.op.path).toBe("secret.md");
     });
 
     it("encrypts file-chunk-data content before sending", async () => {

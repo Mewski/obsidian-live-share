@@ -27,6 +27,7 @@ import { DEFAULT_SETTINGS, type LiveShareSettings } from "./types";
 import { isTextFile, normalizePath } from "./utils";
 
 function getCmView(view: MarkdownView): import("@codemirror/view").EditorView | undefined {
+  // biome-ignore lint/suspicious/noExplicitAny: Obsidian does not expose .cm in its public typings
   return (view.editor as any).cm as import("@codemirror/view").EditorView | undefined;
 }
 
@@ -143,11 +144,12 @@ export default class LiveSharePlugin extends Plugin {
       checkCallback: (checking) => {
         if (this.settings.role !== "host" || !this.sessionManager.isActive) return false;
         if (checking) return true;
-        this.confirm(
-          "Are you sure you want to end the session? All participants will be disconnected.",
-        ).then((confirmed) => {
+        (async () => {
+          const confirmed = await this.confirm(
+            "Are you sure you want to end the session? All participants will be disconnected.",
+          );
           if (confirmed) this.endSession();
-        });
+        })();
       },
     });
 
@@ -157,9 +159,10 @@ export default class LiveSharePlugin extends Plugin {
       checkCallback: (checking) => {
         if (this.settings.role !== "guest" || !this.sessionManager.isActive) return false;
         if (checking) return true;
-        this.confirm("Are you sure you want to leave the session?").then((confirmed) => {
+        (async () => {
+          const confirmed = await this.confirm("Are you sure you want to leave the session?");
           if (confirmed) this.endSession();
-        });
+        })();
       },
     });
 
@@ -349,6 +352,8 @@ export default class LiveSharePlugin extends Plugin {
           if (this.backgroundSync.isWrittenByUs(file.path)) return;
           if (this.settings.role === "host") {
             await this.backgroundSync.handleLocalTextModify(file.path);
+            const content = await this.app.vault.read(file);
+            await this.manifestManager.updateFile(file, content);
           }
           return;
         }
@@ -371,8 +376,8 @@ export default class LiveSharePlugin extends Plugin {
         await this.connectSync();
         await this.manifestManager.connect();
         if (this.settings.role === "host") {
-          await this.manifestManager.publishManifest();
           await this.backgroundSync.startAll("host");
+          await this.manifestManager.publishManifest();
         } else {
           await this.manifestManager.syncFromManifest(
             this.suppressPath,
@@ -462,8 +467,8 @@ export default class LiveSharePlugin extends Plugin {
       try {
         await this.connectSync();
         await this.manifestManager.connect();
-        await this.manifestManager.publishManifest();
         await this.backgroundSync.startAll("host");
+        await this.manifestManager.publishManifest();
         new Notice("Live Share: session started, invite copied to clipboard");
       } catch {
         await this.abortSession("Live Share: failed to start session");
@@ -595,8 +600,14 @@ export default class LiveSharePlugin extends Plugin {
         "oldPath" in op ? op.oldPath : null,
         "newPath" in op ? op.newPath : null,
       ].filter(Boolean) as string[];
-      if (paths.some((path) => !this.manifestManager.isSharedPath(path))) return;
-      this.fileOpsManager.applyRemoteOp(op);
+      if (paths.length === 0) return;
+      const isRename = op.type === "rename";
+      if (isRename) {
+        if (!paths.some((path) => this.manifestManager.isSharedPath(path))) return;
+      } else {
+        if (paths.some((path) => !this.manifestManager.isSharedPath(path))) return;
+      }
+      this.fileOpsManager.applyRemoteOp(op).catch(() => {});
     });
     for (const chunkType of ["file-chunk-start", "file-chunk-data", "file-chunk-end"] as const) {
       this.controlChannel.on(chunkType, (msg) => {
@@ -607,17 +618,23 @@ export default class LiveSharePlugin extends Plugin {
           "file-chunk-data": "chunk-data",
           "file-chunk-end": "chunk-end",
         } as const;
-        this.fileOpsManager.applyRemoteOp({
-          ...msg,
-          type: typeMap[chunkType],
-        } as never);
+        this.fileOpsManager
+          .applyRemoteOp({
+            ...msg,
+            type: typeMap[chunkType],
+          } as never)
+          .catch(() => {});
       });
     }
     this.controlChannel.on("presence-update", (msg) => {
       const user = msg as unknown as PresenceUser;
+      const isNew = !this.remoteUsers.has(user.userId);
       this.remoteUsers.set(user.userId, user);
       this.refreshPresenceView();
       this.updateStatusBar();
+      if (isNew) {
+        this.broadcastPresence();
+      }
       if (this.followTarget === user.userId) {
         this.applyFollowState(user);
       }
@@ -667,6 +684,7 @@ export default class LiveSharePlugin extends Plugin {
         this.settings.permission = permission;
         await this.saveSettings();
       }
+      this.broadcastPresence();
     });
 
     this.controlChannel.on("permission-update", async (msg) => {

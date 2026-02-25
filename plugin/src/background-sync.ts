@@ -1,3 +1,4 @@
+import { Notice } from "obsidian";
 import type { TFile, Vault } from "obsidian";
 import type * as Y from "yjs";
 
@@ -101,7 +102,12 @@ export class BackgroundSync {
     if (oldActive && oldActive !== path) {
       const docHandle = this.syncManager.getDoc(oldActive);
       if (docHandle) {
-        this.writeToDisk(oldActive, docHandle.text.toString());
+        const content = docHandle.text.toString();
+        this.writeToDisk(oldActive, content);
+        if (this.role === "host") {
+          const file = this.vault.getAbstractFileByPath(oldActive) as TFile | null;
+          if (file) this.manifestManager.updateFile(file, content);
+        }
       }
     }
   }
@@ -228,6 +234,7 @@ export class BackgroundSync {
         await this.vault.create(path, content);
       }
     } catch {
+      new Notice(`Live Share: failed to write ${path} to disk`);
     } finally {
       setTimeout(() => {
         this.writtenByUs.delete(path);

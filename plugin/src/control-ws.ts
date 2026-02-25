@@ -168,6 +168,14 @@ export class ControlChannel {
               encrypted: true,
             }),
           );
+        } else if (op) {
+          const encryptedOp = { ...op };
+          if (typeof op.path === "string") encryptedOp.path = await this.e2e.encryptString(op.path);
+          if (typeof op.oldPath === "string")
+            encryptedOp.oldPath = await this.e2e.encryptString(op.oldPath);
+          if (typeof op.newPath === "string")
+            encryptedOp.newPath = await this.e2e.encryptString(op.newPath);
+          this.ws.send(JSON.stringify({ ...msg, op: encryptedOp, encrypted: true }));
         } else {
           this.ws.send(JSON.stringify(msg));
         }
@@ -204,6 +212,14 @@ export class ControlChannel {
             op: { ...op, content: decrypted },
             encrypted: undefined,
           };
+        } else if (op) {
+          const decryptedOp = { ...op };
+          if (typeof op.path === "string") decryptedOp.path = await this.e2e.decryptString(op.path);
+          if (typeof op.oldPath === "string")
+            decryptedOp.oldPath = await this.e2e.decryptString(op.oldPath);
+          if (typeof op.newPath === "string")
+            decryptedOp.newPath = await this.e2e.decryptString(op.newPath);
+          decryptedMsg = { ...msg, op: decryptedOp, encrypted: undefined };
         } else {
           decryptedMsg = msg;
         }

@@ -213,7 +213,7 @@ export class ManifestManager {
           }
         } finally {
           if (unsuppress) {
-            setTimeout(() => unsuppress(path), 50);
+            setTimeout(() => unsuppress(path), 100);
           }
         }
         synced++;

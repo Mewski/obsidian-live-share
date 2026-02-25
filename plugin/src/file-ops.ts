@@ -137,8 +137,15 @@ export class FileOpsManager {
           break;
         }
         case "rename": {
-          const file = this.vault.getAbstractFileByPath(op.oldPath);
+          let file = this.vault.getAbstractFileByPath(op.oldPath);
+          if (!file) {
+            await new Promise((r) => setTimeout(r, 300));
+            file = this.vault.getAbstractFileByPath(op.oldPath);
+          }
           const alreadyExists = this.vault.getAbstractFileByPath(op.newPath);
+          if (alreadyExists && !file) {
+            break;
+          }
           if (file && !alreadyExists) {
             const dir = op.newPath.substring(0, op.newPath.lastIndexOf("/"));
             if (dir) await ensureFolder(this.vault, dir);
@@ -182,7 +189,10 @@ export class FileOpsManager {
               break;
             }
           }
-          if (!chunksValid) break;
+          if (!chunksValid) {
+            new Notice(`Live Share: incomplete transfer for ${op.path}, some chunks were lost`);
+            break;
+          }
 
           const joined = assembly.chunks.join("");
           const exists = this.vault.getAbstractFileByPath(op.path);
@@ -212,11 +222,13 @@ export class FileOpsManager {
         }
       }
     } catch {
-      new Notice(`Live Share: failed to apply remote ${op.type}`);
+      const detail =
+        "path" in op ? op.path : "oldPath" in op ? (op as { oldPath: string }).oldPath : "";
+      new Notice(`Live Share: failed to apply remote ${op.type} for ${detail}`);
     } finally {
       setTimeout(() => {
         for (const path of paths) this.unsuppressPath(path);
-      }, 50);
+      }, 100);
     }
   }
 
