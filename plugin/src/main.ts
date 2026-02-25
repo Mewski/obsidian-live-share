@@ -145,15 +145,17 @@ export default class LiveSharePlugin extends Plugin {
 
     this.addCommand({
       id: "end-session",
-      name: "End session",
+      name: "End / leave session",
       callback: async () => {
         if (!this.sessionManager.isActive) {
           new Notice("Live Share: no active session");
           return;
         }
-        const confirmed = await this.confirm(
-          "Are you sure you want to end the session? All participants will be disconnected.",
-        );
+        const message =
+          this.settings.role === "host"
+            ? "Are you sure you want to end the session? All participants will be disconnected."
+            : "Are you sure you want to leave the session?";
+        const confirmed = await this.confirm(message);
         if (confirmed) this.endSession();
       },
     });
@@ -204,20 +206,18 @@ export default class LiveSharePlugin extends Plugin {
     this.addCommand({
       id: "summon-all",
       name: "Summon all participants here",
-      editorCallback: (editor, view) => {
-        if (this.settings.role !== "host") {
-          new Notice("Live Share: only the host can summon all participants");
-          return;
-        }
-        const cursor = editor.getCursor();
-        const filePath = view.file?.path;
-        if (!filePath || !this.controlChannel) return;
-        this.controlChannel.send({
+      checkCallback: (checking) => {
+        if (this.settings.role !== "host" || !this.sessionManager.isActive) return false;
+        const mdView = this.app.workspace.getActiveViewOfType(MarkdownView);
+        if (!mdView?.file) return false;
+        if (checking) return true;
+        const cursor = mdView.editor.getCursor();
+        this.controlChannel?.send({
           type: "summon",
           fromUserId: this.userId,
           fromDisplayName: this.settings.displayName,
           targetUserId: "__all__",
-          filePath,
+          filePath: mdView.file.path,
           line: cursor.line,
           ch: cursor.ch,
         });
@@ -228,21 +228,20 @@ export default class LiveSharePlugin extends Plugin {
     this.addCommand({
       id: "reload-from-host",
       name: "Reload all files from host",
-      callback: () => this.reloadFromHost(),
+      checkCallback: (checking) => {
+        if (this.settings.role !== "guest" || !this.sessionManager.isActive) return false;
+        if (checking) return true;
+        this.reloadFromHost();
+      },
     });
 
     this.addCommand({
       id: "summon-user",
       name: "Summon a specific participant here",
-      editorCallback: () => {
-        if (this.settings.role !== "host") {
-          new Notice("Live Share: only the host can summon");
-          return;
-        }
-        if (this.remoteUsers.size === 0) {
-          new Notice("Live Share: no participants to summon");
-          return;
-        }
+      checkCallback: (checking) => {
+        if (this.settings.role !== "host" || !this.sessionManager.isActive) return false;
+        if (this.remoteUsers.size === 0) return false;
+        if (checking) return true;
         new UserPickerModal(this.app, this.remoteUsers, (userId) => {
           this.summonUser(userId);
         }).open();
@@ -252,7 +251,11 @@ export default class LiveSharePlugin extends Plugin {
     this.addCommand({
       id: "toggle-present",
       name: "Toggle presentation mode",
-      callback: () => this.togglePresent(),
+      checkCallback: (checking) => {
+        if (this.settings.role !== "host" || !this.sessionManager.isActive) return false;
+        if (checking) return true;
+        this.togglePresent();
+      },
     });
 
     this.registerView(PRESENCE_VIEW_TYPE, (leaf) => {
@@ -533,7 +536,9 @@ export default class LiveSharePlugin extends Plugin {
       this.fileOpsManager.clearPendingChunks();
       this.manifestManager.destroy();
       this.connectionState.transition({ type: "disconnect" });
-      new Notice("Live Share: session ended");
+      new Notice(
+        this.settings.role === "host" ? "Live Share: session ended" : "Live Share: left session",
+      );
     } finally {
       await this.sessionManager.endSession();
       this.endingSession = false;
@@ -913,14 +918,6 @@ export default class LiveSharePlugin extends Plugin {
   }
 
   private async reloadFromHost() {
-    if (!this.sessionManager.isActive) {
-      new Notice("Live Share: no active session");
-      return;
-    }
-    if (this.settings.role !== "guest") {
-      new Notice("Live Share: only guests can reload from host");
-      return;
-    }
     if (!this.controlChannel) return;
     new Notice("Live Share: reloading all files from host...");
     const n = await this.manifestManager.syncFromManifest(
@@ -954,14 +951,6 @@ export default class LiveSharePlugin extends Plugin {
   }
 
   private togglePresent() {
-    if (this.settings.role !== "host") {
-      new Notice("Live Share: only the host can present");
-      return;
-    }
-    if (!this.sessionManager.isActive) {
-      new Notice("Live Share: no active session");
-      return;
-    }
     this.presenting = !this.presenting;
     if (this.presenting) {
       new Notice("Live Share: presentation mode ON");
