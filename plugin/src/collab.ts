@@ -13,6 +13,10 @@ export class CollabManager {
   private compartment = new Compartment();
   private currentPath: string | null = null;
 
+  getCurrentPath(): string | null {
+    return this.currentPath;
+  }
+
   getBaseExtension(): Extension {
     return this.compartment.of([]);
   }

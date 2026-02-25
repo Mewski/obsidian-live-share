@@ -17,7 +17,7 @@ import {
   toWsUrl,
 } from "./utils";
 
-interface FileEntry {
+export interface FileEntry {
   hash: string;
   size: number;
   mtime: number;
@@ -259,6 +259,11 @@ export class ManifestManager {
     if (syncManager) {
       syncManager.releaseDoc(normOld);
     }
+  }
+
+  getEntries(): Map<string, FileEntry> {
+    if (!this.manifest) return new Map();
+    return new Map(this.manifest.entries());
   }
 
   isSharedPath(rawPath: string): boolean {

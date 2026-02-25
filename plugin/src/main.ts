@@ -12,6 +12,7 @@ import {
 
 import { ApprovalModal, type JoinRequest } from "./approval-modal";
 import { AuthManager } from "./auth";
+import { BackgroundSync } from "./background-sync";
 import { CollabManager } from "./collab";
 import { ConnectionStateManager } from "./connection-state";
 import { ControlChannel } from "./control-ws";
@@ -42,6 +43,7 @@ export default class LiveSharePlugin extends Plugin {
   manifestManager!: ManifestManager;
   authManager!: AuthManager;
   exclusionManager!: ExclusionManager;
+  backgroundSync!: BackgroundSync;
   connectionState!: ConnectionStateManager;
   controlChannel: ControlChannel | null = null;
   private remoteUsers = new Map<string, PresenceUser>();
@@ -66,8 +68,14 @@ export default class LiveSharePlugin extends Plugin {
           this.requestBinaryFile(path),
         );
         if (n > 0) new Notice(`Live Share: synced ${n} file(s)`);
+        for (const path of added) {
+          if (isTextFile(path)) {
+            await this.backgroundSync.onFileAdded(path);
+          }
+        }
       }
       for (const path of removed) {
+        this.backgroundSync.onFileRemoved(path);
         const file = this.app.vault.getAbstractFileByPath(path);
         if (file) await this.app.vault.trash(file, true);
       }
@@ -101,6 +109,12 @@ export default class LiveSharePlugin extends Plugin {
     this.exclusionManager = new ExclusionManager();
     await this.exclusionManager.loadConfig(this.app.vault);
     this.manifestManager.setExclusionManager(this.exclusionManager);
+    this.backgroundSync = new BackgroundSync(
+      this.app.vault,
+      this.syncManager,
+      this.manifestManager,
+      this.fileOpsManager,
+    );
     this.connectionState = new ConnectionStateManager();
     this.connectionStateUnsub = this.connectionState.onChange(() => this.updateStatusBar());
 
@@ -324,20 +338,23 @@ export default class LiveSharePlugin extends Plugin {
           }
           return;
         }
-        if (
-          file instanceof TFile &&
-          !isTextFile(file.path) &&
-          this.manifestManager.isSharedPath(file.path)
-        ) {
-          if (this.fileOpsManager.isPathSuppressed(file.path)) return;
-          this.fileOpsManager.onFileModify(file);
+        if (!(file instanceof TFile) || !this.manifestManager.isSharedPath(file.path)) return;
+        if (this.fileOpsManager.isPathSuppressed(file.path)) return;
+
+        if (isTextFile(file.path)) {
+          if (this.backgroundSync.isWrittenByUs(file.path)) return;
           if (this.settings.role === "host") {
-            try {
-              const buf = await this.app.vault.readBinary(file);
-              await this.manifestManager.updateFile(file, buf);
-            } catch {
-              new Notice(`Live Share: failed to update manifest for ${file.path}`);
-            }
+            await this.backgroundSync.handleLocalTextModify(file.path);
+          }
+          return;
+        }
+        this.fileOpsManager.onFileModify(file);
+        if (this.settings.role === "host") {
+          try {
+            const buf = await this.app.vault.readBinary(file);
+            await this.manifestManager.updateFile(file, buf);
+          } catch {
+            new Notice(`Live Share: failed to update manifest for ${file.path}`);
           }
         }
       }),
@@ -350,10 +367,12 @@ export default class LiveSharePlugin extends Plugin {
       await this.manifestManager.connect();
       if (this.settings.role === "host") {
         await this.manifestManager.publishManifest();
+        await this.backgroundSync.startAll("host");
       } else {
         await this.manifestManager.syncFromManifest(undefined, undefined, (path) =>
           this.requestBinaryFile(path),
         );
+        await this.backgroundSync.startAll("guest");
         this.registerManifestChangeHandler();
       }
     }
@@ -377,6 +396,7 @@ export default class LiveSharePlugin extends Plugin {
       if (cmView) this.collabManager.deactivateAll(cmView);
     }
 
+    this.backgroundSync.destroy();
     this.manifestManager.destroy();
     this.syncManager.destroy();
   }
@@ -402,6 +422,7 @@ export default class LiveSharePlugin extends Plugin {
       await this.connectSync();
       await this.manifestManager.connect();
       await this.manifestManager.publishManifest();
+      await this.backgroundSync.startAll("host");
       new Notice("Live Share: session started, invite copied");
     }
   }
@@ -422,6 +443,7 @@ export default class LiveSharePlugin extends Plugin {
       const count = await this.manifestManager.syncFromManifest(undefined, undefined, (path) =>
         this.requestBinaryFile(path),
       );
+      await this.backgroundSync.startAll("guest");
       this.registerManifestChangeHandler();
       new Notice(`Live Share: joined session, synced ${count} file(s)`);
     }
@@ -448,6 +470,7 @@ export default class LiveSharePlugin extends Plugin {
         this.controlChannel.send({ type: "session-end" });
       }
 
+      this.backgroundSync.destroy();
       this.syncManager.disconnect();
       this.controlChannel?.destroy();
       this.controlChannel = null;
@@ -603,12 +626,14 @@ export default class LiveSharePlugin extends Plugin {
       await this.saveSettings();
 
       // Reconnect Yjs providers so they use the updated permission param
+      this.backgroundSync.destroy();
       this.syncManager.disconnect();
       this.manifestManager.destroy();
       this.syncManager.updateSettings(this.settings);
       this.manifestManager.updateSettings(this.settings);
       this.syncManager.connect();
       await this.manifestManager.connect();
+      await this.backgroundSync.startAll(this.settings.role ?? "guest");
       this.registerManifestChangeHandler();
 
       new Notice(`Live Share: your permission was changed to ${perm}`);
@@ -669,6 +694,7 @@ export default class LiveSharePlugin extends Plugin {
       filePath && this.manifestManager.isSharedPath(filePath) && isTextFile(filePath)
         ? filePath
         : null;
+    this.backgroundSync.setActiveFile(sharedPath);
     this.collabManager.activateForFile(cmView, sharedPath, this.syncManager, this.settings.role);
 
     this.removeScrollListener();
