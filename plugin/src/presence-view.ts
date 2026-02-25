@@ -8,13 +8,17 @@ export interface PresenceUser {
   cursorColor: string;
   currentFile: string;
   scrollTop?: number;
+  isHost?: boolean;
+  line?: number;
 }
 
 export class PresenceView extends ItemView {
   private users = new Map<string, PresenceUser>();
   private onFollowRequest: ((userId: string) => void) | null = null;
   private onKickRequest: ((userId: string) => void) | null = null;
+  private summonHandler: ((userId: string) => void) | null = null;
   private isHost = false;
+  private followedUserId: string | null = null;
 
   getViewType(): string {
     return PRESENCE_VIEW_TYPE;
@@ -34,6 +38,15 @@ export class PresenceView extends ItemView {
 
   setKickHandler(handler: (userId: string) => void) {
     this.onKickRequest = handler;
+  }
+
+  setSummonHandler(handler: (userId: string) => void): void {
+    this.summonHandler = handler;
+  }
+
+  setFollowedUser(userId: string | null) {
+    this.followedUserId = userId;
+    this.render();
   }
 
   setIsHost(isHost: boolean) {
@@ -69,7 +82,11 @@ export class PresenceView extends ItemView {
     const list = contentEl.createEl("div", { cls: "live-share-presence-list" });
 
     for (const [userId, user] of this.users) {
-      const item = list.createEl("div", { cls: "live-share-presence-item" });
+      const isFollowed = this.followedUserId === userId;
+      const itemCls = isFollowed
+        ? "live-share-presence-item is-followed"
+        : "live-share-presence-item";
+      const item = list.createEl("div", { cls: itemCls });
 
       const dot = item.createEl("span", { cls: "live-share-presence-dot" });
       if (
@@ -79,10 +96,16 @@ export class PresenceView extends ItemView {
       }
 
       const info = item.createEl("div", { cls: "live-share-presence-info" });
-      info.createEl("span", {
+      const nameEl = info.createEl("span", {
         text: user.displayName,
         cls: "live-share-presence-name",
       });
+      if (user.isHost) {
+        nameEl.createEl("span", {
+          text: "Host",
+          cls: "live-share-presence-badge",
+        });
+      }
       if (user.currentFile) {
         info.createEl("span", {
           text: user.currentFile,
@@ -96,13 +119,21 @@ export class PresenceView extends ItemView {
 
       const followBtn = actions.createEl("button", {
         text: "Follow",
-        cls: "live-share-presence-follow",
+        cls: isFollowed ? "live-share-presence-follow is-active" : "live-share-presence-follow",
       });
       followBtn.addEventListener("click", () => {
         this.onFollowRequest?.(userId);
       });
 
       if (this.isHost) {
+        const summonBtn = actions.createEl("button", {
+          text: "Summon",
+          cls: "live-share-presence-summon",
+        });
+        summonBtn.addEventListener("click", () => {
+          this.summonHandler?.(userId);
+        });
+
         const kickBtn = actions.createEl("button", {
           text: "Kick",
           cls: "live-share-presence-kick",

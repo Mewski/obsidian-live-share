@@ -68,7 +68,7 @@ export class ManifestManager {
     try {
       await waitForSync(this.provider);
     } catch {
-      new Notice("Live Share: manifest sync timed out");
+      new Notice("Obsidian Live Share: manifest sync timed out");
     }
   }
 
@@ -110,7 +110,10 @@ export class ManifestManager {
     });
   }
 
-  async syncFromManifest(): Promise<number> {
+  async syncFromManifest(
+    suppress?: (path: string) => void,
+    unsuppress?: (path: string) => void,
+  ): Promise<number> {
     if (!this.manifest || !this.doc) return 0;
 
     let synced = 0;
@@ -159,10 +162,17 @@ export class ManifestManager {
           const dir = path.substring(0, path.lastIndexOf("/"));
           if (dir) await this.ensureFolder(dir);
 
-          if (localFile) {
-            await this.vault.modify(localFile, content);
-          } else {
-            await this.vault.create(path, content);
+          suppress?.(path);
+          try {
+            if (localFile) {
+              await this.vault.modify(localFile, content);
+            } else {
+              await this.vault.create(path, content);
+            }
+          } finally {
+            if (unsuppress) {
+              setTimeout(() => unsuppress(path), 50);
+            }
           }
           synced++;
         }

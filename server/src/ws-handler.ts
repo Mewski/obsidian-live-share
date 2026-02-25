@@ -231,7 +231,14 @@ export function createYjsWSS(persist?: Persistence) {
   }
 
   wss.on("connection", async (ws: WebSocket, _req: IncomingMessage, roomId: string) => {
-    const state = await getOrCreateRoom(roomId);
+    let state: RoomState;
+    try {
+      state = await getOrCreateRoom(roomId);
+    } catch (err) {
+      console.error(`failed to get/create room ${roomId}:`, err);
+      ws.close(1011, "internal error");
+      return;
+    }
     state.clients.add(ws);
 
     sendSyncStep1(ws, state.doc);
@@ -263,7 +270,9 @@ export function createYjsWSS(persist?: Persistence) {
       if (state.clients.size === 0) {
         state.cleanupTimer = setTimeout(() => {
           if (state.clients.size === 0) {
-            cleanupRoom(roomId, state);
+            cleanupRoom(roomId, state).catch((err) => {
+              console.error(`failed to cleanup room ${roomId}:`, err);
+            });
           }
         }, 30_000);
       }

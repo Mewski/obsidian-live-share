@@ -141,3 +141,52 @@
 .yRemoteSelection {
   opacity: 0.3;
 }
+
+.live-share-presence-summon {
+  background: transparent;
+  border: 1px solid var(--interactive-accent);
+  color: var(--interactive-accent);
+  border-radius: 4px;
+  padding: 2px 8px;
+  cursor: pointer;
+  font-size: 11px;
+  margin-left: 4px;
+}
+
+.live-share-presence-summon:hover {
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
+}
+
+.live-share-presence-badge {
+  font-size: 10px;
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
+  border-radius: 3px;
+  padding: 1px 5px;
+  margin-left: 6px;
+  font-weight: 600;
+}
+
+.live-share-presence-activity {
+  font-size: 10px;
+  color: var(--text-muted);
+  margin-left: auto;
+  padding-left: 8px;
+}
+
+.live-share-presence-item.is-followed {
+  background: var(--background-modifier-hover);
+  border-left: 3px solid var(--interactive-accent);
+  padding-left: 5px;
+}
+
+.live-share-presence-follow.is-active {
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
+}
+
+.live-share-presence-kick:hover {
+  background: var(--text-error);
+  color: var(--text-on-accent);
+}

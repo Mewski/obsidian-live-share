@@ -164,8 +164,16 @@ if (isMain) {
         console.log(`live-share server on :${port}`);
       });
 
+      let shuttingDown = false;
       const onSignal = () => {
-        shutdown().then(() => process.exit(0));
+        if (shuttingDown) return;
+        shuttingDown = true;
+        shutdown()
+          .then(() => process.exit(0))
+          .catch((err) => {
+            console.error("error during shutdown:", err);
+            process.exit(1);
+          });
       };
       process.on("SIGTERM", onSignal);
       process.on("SIGINT", onSignal);

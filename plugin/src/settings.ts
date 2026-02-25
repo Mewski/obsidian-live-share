@@ -22,7 +22,10 @@ export class LiveShareSettingTab extends PluginSettingTab {
         .setDesc(`Logged in as ${settings.displayName}`)
         .addButton((btn) =>
           btn.setButtonText("Log out").onClick(() => {
-            authManager.logout().then(() => this.display());
+            authManager
+              .logout()
+              .then(() => this.display())
+              .catch(() => {});
           }),
         );
     } else {
@@ -34,7 +37,10 @@ export class LiveShareSettingTab extends PluginSettingTab {
             .setButtonText("Log in with GitHub")
             .setCta()
             .onClick(() => {
-              authManager.authenticate().then(() => this.display());
+              authManager
+                .authenticate()
+                .then(() => this.display())
+                .catch(() => {});
             }),
         );
     }
@@ -59,7 +65,7 @@ export class LiveShareSettingTab extends PluginSettingTab {
 
     new Setting(containerEl)
       .setName("Server URL")
-      .setDesc("HTTP URL of the Live Share server")
+      .setDesc("HTTP URL of the Obsidian Live Share server")
       .addText((text) => {
         text
           .setPlaceholder("http://localhost:4321")

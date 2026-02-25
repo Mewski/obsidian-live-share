@@ -1,5 +1,5 @@
 /**
- * End-to-end encryption for Live Share using AES-GCM with PBKDF2 key derivation.
+ * End-to-end encryption for Obsidian Live Share using AES-GCM with PBKDF2 key derivation.
  *
  * The encryption key is derived from a passphrase that is shared via the invite
  * link and never sent to the server. The server only sees encrypted blobs.
@@ -12,13 +12,11 @@ const PBKDF2_ITERATIONS = 100_000;
 /** Derive an AES-GCM key from a passphrase and salt. */
 async function deriveKey(passphrase: string, salt: Uint8Array): Promise<CryptoKey> {
   const raw = new TextEncoder().encode(passphrase);
-  const base = await crypto.subtle.importKey("raw", raw.buffer as ArrayBuffer, "PBKDF2", false, [
-    "deriveKey",
-  ]);
+  const base = await crypto.subtle.importKey("raw", raw, "PBKDF2", false, ["deriveKey"]);
   return crypto.subtle.deriveKey(
     {
       name: "PBKDF2",
-      salt: salt.buffer as ArrayBuffer,
+      salt: salt as BufferSource,
       iterations: PBKDF2_ITERATIONS,
       hash: "SHA-256",
     },
@@ -59,7 +57,7 @@ export class E2ECrypto {
     const ciphertext = await crypto.subtle.encrypt(
       { name: "AES-GCM", iv },
       this.key,
-      plaintext.buffer as ArrayBuffer,
+      plaintext as BufferSource,
     );
     // Prepend IV so the receiver can extract it
     const result = new Uint8Array(IV_BYTES + ciphertext.byteLength);
@@ -73,11 +71,7 @@ export class E2ECrypto {
     if (!this.key) throw new Error("E2E not initialised");
     const iv = data.slice(0, IV_BYTES);
     const ciphertext = data.slice(IV_BYTES);
-    const plaintext = await crypto.subtle.decrypt(
-      { name: "AES-GCM", iv },
-      this.key,
-      ciphertext.buffer as ArrayBuffer,
-    );
+    const plaintext = await crypto.subtle.decrypt({ name: "AES-GCM", iv }, this.key, ciphertext);
     return new Uint8Array(plaintext);
   }
 

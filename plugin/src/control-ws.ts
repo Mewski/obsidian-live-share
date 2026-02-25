@@ -16,7 +16,11 @@ export type ControlMessageType =
   | "focus-request"
   | "summon"
   | "kick"
-  | "kicked";
+  | "kicked"
+  | "sync-request"
+  | "sync-response"
+  | "ping"
+  | "pong";
 
 export interface ControlMessage {
   type: ControlMessageType;
@@ -38,6 +42,20 @@ export class ControlChannel {
     | ((state: "connected" | "disconnected" | "reconnecting") => void)
     | null = null;
 
+  /** Queue of messages that arrived while the socket was not open. */
+  private sendQueue: ControlMessage[] = [];
+
+  /** Callback invoked after a successful reconnect (socket re-opens). */
+  private reconnectCallback: (() => void) | null = null;
+
+  /** Whether the socket has connected at least once (to distinguish initial connect from reconnect). */
+  private hasConnected = false;
+
+  /** Latest round-trip latency in ms (measured via ping/pong). */
+  latencyMs = 0;
+  private pingTimer: ReturnType<typeof setInterval> | null = null;
+  private lastPingTime = 0;
+
   constructor(settings: LiveShareSettings, e2e?: E2ECrypto) {
     this.settings = settings;
     this.e2e = e2e ?? null;
@@ -47,8 +65,18 @@ export class ControlChannel {
     this.stateChangeCallback = callback;
   }
 
+  /** Register a callback that fires each time the socket reconnects (not on first connect). */
+  onReconnect(callback: () => void) {
+    this.reconnectCallback = callback;
+  }
+
   updateSettings(settings: LiveShareSettings) {
     this.settings = settings;
+  }
+
+  /** Get the latest measured latency in milliseconds. Returns 0 if not yet measured. */
+  getLatency(): number {
+    return this.latencyMs;
   }
 
   connect(): void {
@@ -60,9 +88,21 @@ export class ControlChannel {
     this.ws = new WebSocket(url);
 
     this.ws.onopen = () => {
+      const wasReconnect = this.hasConnected;
+      this.hasConnected = true;
       this.reconnectDelay = 1000;
       this.reconnectAttempt = 0;
       this.stateChangeCallback?.("connected");
+
+      // Flush queued messages
+      this.flushQueue();
+
+      // Start periodic ping for latency measurement
+      this.startPing();
+
+      if (wasReconnect) {
+        this.reconnectCallback?.();
+      }
     };
 
     this.ws.onmessage = (event) => {
@@ -70,6 +110,16 @@ export class ControlChannel {
         const msg = JSON.parse(
           typeof event.data === "string" ? event.data : "",
         ) as ControlMessage & { encrypted?: boolean };
+
+        // Handle pong for latency measurement
+        if (msg.type === "pong") {
+          if (this.lastPingTime > 0) {
+            this.latencyMs = Date.now() - this.lastPingTime;
+            this.lastPingTime = 0;
+          }
+          // Still dispatch to handlers in case anyone is listening
+        }
+
         if (msg.encrypted && this.e2e?.enabled) {
           this.decryptAndDispatch(msg);
           return;
@@ -84,6 +134,7 @@ export class ControlChannel {
     };
 
     this.ws.onclose = () => {
+      this.stopPing();
       if (!this.destroyed) {
         this.scheduleReconnect();
       }
@@ -93,13 +144,51 @@ export class ControlChannel {
   }
 
   send(msg: ControlMessage): void {
-    if (this.ws?.readyState !== WebSocket.OPEN) return;
+    if (this.ws?.readyState !== WebSocket.OPEN) {
+      // Queue messages instead of silently dropping them.
+      // Presence updates are ephemeral -- only keep the latest one.
+      if (msg.type === "presence-update") {
+        const idx = this.sendQueue.findIndex((m) => m.type === "presence-update");
+        if (idx >= 0) {
+          this.sendQueue[idx] = msg;
+        } else {
+          this.sendQueue.push(msg);
+        }
+      } else {
+        this.sendQueue.push(msg);
+      }
+      return;
+    }
     const encryptable =
       msg.type === "file-op" || msg.type === "file-chunk-data" || msg.type === "file-chunk-end";
     if (this.e2e?.enabled && encryptable) {
       this.encryptAndSend(msg);
     } else {
       this.ws.send(JSON.stringify(msg));
+    }
+  }
+
+  private flushQueue(): void {
+    const queue = this.sendQueue.splice(0);
+    for (const msg of queue) {
+      this.send(msg);
+    }
+  }
+
+  private startPing(): void {
+    this.stopPing();
+    this.pingTimer = setInterval(() => {
+      if (this.ws?.readyState === WebSocket.OPEN) {
+        this.lastPingTime = Date.now();
+        this.ws.send(JSON.stringify({ type: "ping", timestamp: this.lastPingTime }));
+      }
+    }, 30_000);
+  }
+
+  private stopPing(): void {
+    if (this.pingTimer) {
+      clearInterval(this.pingTimer);
+      this.pingTimer = null;
     }
   }
 
@@ -154,7 +243,7 @@ export class ControlChannel {
         for (const h of handlers) h(decMsg as ControlMessage);
       }
     } catch {
-      console.warn("Live Share: failed to decrypt control message");
+      console.warn("Obsidian Live Share: failed to decrypt control message");
     }
   }
 
@@ -178,6 +267,7 @@ export class ControlChannel {
   destroy(): void {
     this.destroyed = true;
     this.stateChangeCallback?.("disconnected");
+    this.stopPing();
     if (this.reconnectTimer) {
       clearTimeout(this.reconnectTimer);
       this.reconnectTimer = null;
@@ -187,6 +277,8 @@ export class ControlChannel {
       this.ws = null;
     }
     this.handlers.clear();
+    this.sendQueue.length = 0;
+    this.reconnectCallback = null;
   }
 
   private scheduleReconnect(): void {

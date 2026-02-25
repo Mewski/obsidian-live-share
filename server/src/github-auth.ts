@@ -51,84 +51,85 @@ export function createAuthRouter(): Router {
   });
 
   router.get("/github/callback", async (req, res) => {
-    const code = req.query.code as string;
-    if (!code) {
-      res.status(400).send("Missing code");
-      return;
-    }
-
-    let tokenRes: Response;
     try {
-      tokenRes = await fetch("https://github.com/login/oauth/access_token", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Accept: "application/json",
-        },
-        body: JSON.stringify({
-          client_id: GITHUB_CLIENT_ID,
-          client_secret: GITHUB_CLIENT_SECRET,
-          code,
-        }),
-      });
-    } catch {
-      res.status(502).send("Failed to contact GitHub");
-      return;
-    }
+      const code = req.query.code as string;
+      if (!code) {
+        res.status(400).send("Missing code");
+        return;
+      }
 
-    if (!tokenRes.ok) {
-      res.status(401).send("GitHub auth failed");
-      return;
-    }
+      let tokenRes: Response;
+      try {
+        tokenRes = await fetch("https://github.com/login/oauth/access_token", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Accept: "application/json",
+          },
+          body: JSON.stringify({
+            client_id: GITHUB_CLIENT_ID,
+            client_secret: GITHUB_CLIENT_SECRET,
+            code,
+          }),
+        });
+      } catch {
+        res.status(502).send("Failed to contact GitHub");
+        return;
+      }
 
-    const { access_token } = (await tokenRes.json()) as {
-      access_token: string;
-    };
+      if (!tokenRes.ok) {
+        res.status(401).send("GitHub auth failed");
+        return;
+      }
 
-    if (!access_token) {
-      res.status(401).send("GitHub auth failed");
-      return;
-    }
+      const { access_token } = (await tokenRes.json()) as {
+        access_token: string;
+      };
 
-    let userRes: Response;
-    try {
-      userRes = await fetch("https://api.github.com/user", {
-        headers: {
-          Authorization: `Bearer ${access_token}`,
-          Accept: "application/vnd.github+json",
-        },
-      });
-    } catch {
-      res.status(502).send("Failed to fetch user info");
-      return;
-    }
+      if (!access_token) {
+        res.status(401).send("GitHub auth failed");
+        return;
+      }
 
-    if (!userRes.ok) {
-      res.status(401).send("Failed to fetch user info");
-      return;
-    }
+      let userRes: Response;
+      try {
+        userRes = await fetch("https://api.github.com/user", {
+          headers: {
+            Authorization: `Bearer ${access_token}`,
+            Accept: "application/vnd.github+json",
+          },
+        });
+      } catch {
+        res.status(502).send("Failed to fetch user info");
+        return;
+      }
 
-    const ghUser = (await userRes.json()) as GitHubUser;
-    const displayName = ghUser.name || ghUser.login;
+      if (!userRes.ok) {
+        res.status(401).send("Failed to fetch user info");
+        return;
+      }
 
-    const payload: Omit<JWTPayload, "iat" | "exp"> = {
-      sub: String(ghUser.id),
-      username: ghUser.login,
-      displayName,
-      avatar: ghUser.avatar_url,
-    };
+      const ghUser = (await userRes.json()) as GitHubUser;
+      const displayName = ghUser.name || ghUser.login;
 
-    const jwtToken = jwt.sign(payload, JWT_SECRET, { expiresIn: "7d" });
+      const payload: Omit<JWTPayload, "iat" | "exp"> = {
+        sub: String(ghUser.id),
+        username: ghUser.login,
+        displayName,
+        avatar: ghUser.avatar_url,
+      };
 
-    // Escape for safe HTML interpolation
-    const safeName = displayName
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;")
-      .replace(/"/g, "&quot;");
+      const jwtToken = jwt.sign(payload, JWT_SECRET, { expiresIn: "7d" });
 
-    res.send(`<!DOCTYPE html>
-<html><head><title>Live Share Auth</title></head>
+      // Escape for safe HTML interpolation
+      const safeName = displayName
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;");
+
+      res.send(`<!DOCTYPE html>
+<html><head><title>Obsidian Live Share Auth</title></head>
 <body style="font-family:system-ui;max-width:500px;margin:60px auto;text-align:center">
   <h2>Authenticated as ${safeName}</h2>
   <p>Copy this token and paste it into Obsidian:</p>
@@ -140,6 +141,12 @@ export function createAuthRouter(): Router {
     window.location = 'obsidian://live-share-auth?token=' + encodeURIComponent(${JSON.stringify(jwtToken)});
   </script>
 </body></html>`);
+    } catch (err) {
+      console.error("auth callback error:", err);
+      if (!res.headersSent) {
+        res.status(500).send("Internal server error");
+      }
+    }
   });
 
   return router;

@@ -117,4 +117,141 @@ describe("ConnectionStateManager", () => {
       expect(listenerB).toHaveBeenCalledWith("connecting", { type: "connect" });
     });
   });
+
+  // -----------------------------------------------------------------------
+  // Transitions from every state
+  // -----------------------------------------------------------------------
+  describe("transitions from every state", () => {
+    it("error -> connecting via connect event", () => {
+      csm.transition({ type: "error", message: "fail" });
+      expect(csm.getState()).toBe("error");
+
+      csm.transition({ type: "connect" });
+      expect(csm.getState()).toBe("connecting");
+    });
+
+    it("error -> disconnected via disconnect event", () => {
+      csm.transition({ type: "error", message: "fail" });
+      csm.transition({ type: "disconnect" });
+      expect(csm.getState()).toBe("disconnected");
+    });
+
+    it("reconnecting -> connected via connected event", () => {
+      csm.transition({ type: "connect" });
+      csm.transition({ type: "connected" });
+      csm.transition({ type: "reconnecting", attempt: 1 });
+      expect(csm.getState()).toBe("reconnecting");
+
+      csm.transition({ type: "connected" });
+      expect(csm.getState()).toBe("connected");
+    });
+
+    it("reconnecting -> error via error event", () => {
+      csm.transition({ type: "connect" });
+      csm.transition({ type: "connected" });
+      csm.transition({ type: "reconnecting", attempt: 1 });
+
+      csm.transition({ type: "error", message: "network down" });
+      expect(csm.getState()).toBe("error");
+    });
+
+    it("auth-required -> connecting via connect event", () => {
+      csm.transition({ type: "connect" });
+      csm.transition({ type: "connected" });
+      csm.transition({ type: "auth-expired" });
+      expect(csm.getState()).toBe("auth-required");
+
+      csm.transition({ type: "connect" });
+      expect(csm.getState()).toBe("connecting");
+    });
+
+    it("auth-required -> disconnected via disconnect event", () => {
+      csm.transition({ type: "connect" });
+      csm.transition({ type: "connected" });
+      csm.transition({ type: "auth-expired" });
+
+      csm.transition({ type: "disconnect" });
+      expect(csm.getState()).toBe("disconnected");
+    });
+
+    it("connecting -> error via error event", () => {
+      csm.transition({ type: "connect" });
+      expect(csm.getState()).toBe("connecting");
+
+      csm.transition({ type: "error", message: "refused" });
+      expect(csm.getState()).toBe("error");
+    });
+
+    it("connected -> error via error event", () => {
+      csm.transition({ type: "connect" });
+      csm.transition({ type: "connected" });
+
+      csm.transition({ type: "error", message: "dropped" });
+      expect(csm.getState()).toBe("error");
+    });
+
+    it("disconnected -> error via error event", () => {
+      csm.transition({ type: "error", message: "unexpected" });
+      expect(csm.getState()).toBe("error");
+    });
+  });
+
+  // -----------------------------------------------------------------------
+  // No-op transitions (same state, no listener fire)
+  // -----------------------------------------------------------------------
+  describe("no-op transitions", () => {
+    it("connecting -> connect event stays connecting (no listener fire)", () => {
+      const listener = vi.fn();
+      csm.transition({ type: "connect" });
+      csm.onChange(listener);
+
+      csm.transition({ type: "connect" });
+      expect(csm.getState()).toBe("connecting");
+      expect(listener).not.toHaveBeenCalled();
+    });
+
+    it("disconnected -> disconnect event stays disconnected (no listener fire)", () => {
+      const listener = vi.fn();
+      csm.onChange(listener);
+
+      csm.transition({ type: "disconnect" });
+      expect(csm.getState()).toBe("disconnected");
+      expect(listener).not.toHaveBeenCalled();
+    });
+
+    it("connected -> connected event stays connected (no listener fire)", () => {
+      const listener = vi.fn();
+      csm.transition({ type: "connect" });
+      csm.transition({ type: "connected" });
+      csm.onChange(listener);
+
+      csm.transition({ type: "connected" });
+      expect(csm.getState()).toBe("connected");
+      expect(listener).not.toHaveBeenCalled();
+    });
+  });
+
+  // -----------------------------------------------------------------------
+  // Rapid transitions
+  // -----------------------------------------------------------------------
+  describe("rapid transitions", () => {
+    it("handles many rapid transitions correctly", () => {
+      const listener = vi.fn();
+      csm.onChange(listener);
+
+      csm.transition({ type: "connect" });
+      csm.transition({ type: "connected" });
+      csm.transition({ type: "reconnecting", attempt: 1 });
+      csm.transition({ type: "connected" });
+      csm.transition({ type: "error", message: "oops" });
+      csm.transition({ type: "connect" });
+      csm.transition({ type: "connected" });
+      csm.transition({ type: "auth-expired" });
+      csm.transition({ type: "disconnect" });
+
+      expect(csm.getState()).toBe("disconnected");
+      // Each transition changed state, so listener should have been called 9 times
+      expect(listener).toHaveBeenCalledTimes(9);
+    });
+  });
 });

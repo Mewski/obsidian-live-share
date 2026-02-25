@@ -63,7 +63,11 @@ export function createLevelPersistence(dbPath = "./data/yjs-docs"): Persistence 
           keyEncoding: "utf8",
         })) {
           if (key.startsWith("room:")) {
-            rooms.push(JSON.parse(value.toString("utf-8")));
+            try {
+              rooms.push(JSON.parse(value.toString("utf-8")));
+            } catch {
+              // Skip corrupt room entry
+            }
           }
         }
       } catch {

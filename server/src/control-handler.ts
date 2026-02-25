@@ -1,5 +1,6 @@
 import type { IncomingMessage } from "node:http";
 import { WebSocket, WebSocketServer } from "ws";
+import { verifyJWT } from "./github-auth.js";
 import { getRoom } from "./rooms.js";
 
 const ALLOWED_TYPES = new Set([
@@ -15,6 +16,10 @@ const ALLOWED_TYPES = new Set([
   "focus-request",
   "summon",
   "kick",
+  "sync-request",
+  "sync-response",
+  "ping",
+  "pong",
 ]);
 
 const MSG_RATE_WINDOW = 10_000;
@@ -23,6 +28,7 @@ const MSG_RATE_LIMIT = 100;
 interface ControlClient {
   ws: WebSocket;
   userId: string;
+  verifiedUserId: string | null;
   displayName: string;
   isHost: boolean;
   approved: boolean;
@@ -52,9 +58,10 @@ export function createControlWSS() {
   }
 
   function broadcast(room: ControlRoom, data: Buffer | string, exclude?: WebSocket) {
+    const str = typeof data === "string" ? data : data.toString("utf-8");
     for (const [ws, client] of room.clients) {
       if (ws !== exclude && client.approved && ws.readyState === WebSocket.OPEN) {
-        ws.send(data);
+        ws.send(str);
       }
     }
   }
@@ -72,13 +79,26 @@ export function createControlWSS() {
     return undefined;
   }
 
-  wss.on("connection", (ws: WebSocket, _req: IncomingMessage, roomId: string) => {
+  wss.on("connection", (ws: WebSocket, req: IncomingMessage, roomId: string) => {
+    console.log(`control: new connection for room ${roomId}`);
     const room = getOrCreateRoom(roomId);
     const serverRoom = getRoom(roomId);
+
+    // Extract verified identity from JWT if present
+    let verifiedUserId: string | null = null;
+    try {
+      const reqUrl = new URL(req.url || "", `http://${req.headers.host}`);
+      const jwtToken = reqUrl.searchParams.get("jwt");
+      if (jwtToken) {
+        const payload = verifyJWT(jwtToken);
+        if (payload) verifiedUserId = payload.sub;
+      }
+    } catch {}
 
     const client: ControlClient = {
       ws,
       userId: "",
+      verifiedUserId,
       displayName: "",
       isHost: false,
       approved: true,
@@ -119,6 +139,12 @@ export function createControlWSS() {
       }
 
       if (typeof msg.type !== "string" || !ALLOWED_TYPES.has(msg.type)) {
+        return;
+      }
+
+      // Respond to ping directly back to sender (not broadcast)
+      if (msg.type === "ping") {
+        sendTo(ws, { type: "pong", timestamp: msg.timestamp });
         return;
       }
 
@@ -191,13 +217,22 @@ export function createControlWSS() {
         return;
       }
 
+      // Only the host can summon participants or end the session
+      if (msg.type === "summon" && !client.isHost) {
+        return;
+      }
+      if (msg.type === "session-end" && !client.isHost) {
+        return;
+      }
+
       if (!client.approved) return;
 
       if (msg.type === "summon" && msg.targetUserId !== "__all__") {
         const targetUserId = msg.targetUserId as string;
+        const strData = typeof data === "string" ? data : data.toString("utf-8");
         for (const [clientWs, c] of room.clients) {
           if (c.userId === targetUserId && clientWs.readyState === WebSocket.OPEN) {
-            clientWs.send(data);
+            clientWs.send(strData);
           }
         }
         return;
@@ -207,9 +242,12 @@ export function createControlWSS() {
       if (msg.type === "presence-update") {
         if (msg.userId) {
           if (!client.userId) {
-            // Determine host status on first identification
+            // Determine host status on first identification.
+            // Use the JWT-verified identity when available to prevent spoofing;
+            // fall back to the client-reported userId only when no JWT is present.
+            const identityForHostCheck = client.verifiedUserId ?? (msg.userId as string);
             if (serverRoom?.hostUserId) {
-              client.isHost = msg.userId === serverRoom.hostUserId;
+              client.isHost = identityForHostCheck === serverRoom.hostUserId;
             } else {
               // Fallback: first client to identify becomes host
               client.isHost = !findHost(room);

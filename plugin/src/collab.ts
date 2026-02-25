@@ -34,7 +34,7 @@ export class CollabManager {
     try {
       await waitForSync(result.provider);
     } catch {
-      new Notice("Live Share: sync timed out");
+      new Notice("Obsidian Live Share: sync timed out");
       view.dispatch({ effects: this.compartment.reconfigure([]) });
       return;
     }

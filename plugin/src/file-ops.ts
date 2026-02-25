@@ -1,4 +1,4 @@
-import { Notice } from "obsidian";
+import { Notice, TFolder } from "obsidian";
 import type { TAbstractFile, TFile, Vault } from "obsidian";
 import type { FileOp } from "./types";
 import { arrayBufferToBase64, base64ToArrayBuffer, isTextFile, normalizePath } from "./utils";
@@ -15,8 +15,9 @@ interface ChunkAssembly {
 export class FileOpsManager {
   private vault: Vault;
   private sendOp: ((op: FileOp) => void) | null = null;
-  private suppressCount = 0;
+  private suppressedPaths = new Map<string, number>();
   private pendingChunks = new Map<string, ChunkAssembly>();
+  private opQueues = new Map<string, Promise<void>>();
 
   constructor(vault: Vault) {
     this.vault = vault;
@@ -26,6 +27,32 @@ export class FileOpsManager {
     this.sendOp = fn;
   }
 
+  /** Increment suppression ref-count for a path. */
+  suppressPath(path: string): void {
+    const norm = normalizePath(path);
+    this.suppressedPaths.set(norm, (this.suppressedPaths.get(norm) ?? 0) + 1);
+  }
+
+  /** Decrement suppression ref-count for a path. */
+  unsuppressPath(path: string): void {
+    const norm = normalizePath(path);
+    const count = this.suppressedPaths.get(norm) ?? 0;
+    if (count <= 1) {
+      this.suppressedPaths.delete(norm);
+    } else {
+      this.suppressedPaths.set(norm, count - 1);
+    }
+  }
+
+  isPathSuppressed(path: string): boolean {
+    return (this.suppressedPaths.get(normalizePath(path)) ?? 0) > 0;
+  }
+
+  /** Clear incomplete chunk assemblies (e.g. after disconnect/reconnect). */
+  clearPendingChunks(): void {
+    this.pendingChunks.clear();
+  }
+
   private isPathSafe(path: string): boolean {
     if (!path || path.startsWith("/") || path.startsWith("\\")) return false;
     const segments = path.split(/[\\/]/);
@@ -33,6 +60,28 @@ export class FileOpsManager {
   }
 
   async applyRemoteOp(op: FileOp) {
+    const paths = this.getOpPaths(op);
+    // Serialize operations on the same path to prevent interleaving
+    const waitFor = paths.map((p) => this.opQueues.get(p)).filter(Boolean) as Promise<void>[];
+    if (waitFor.length > 0) await Promise.all(waitFor);
+
+    const promise = this.applyRemoteOpInner(op);
+    for (const p of paths) this.opQueues.set(p, promise);
+    await promise;
+    for (const p of paths) {
+      if (this.opQueues.get(p) === promise) this.opQueues.delete(p);
+    }
+  }
+
+  private getOpPaths(op: FileOp): string[] {
+    const paths: string[] = [];
+    if ("path" in op) paths.push(normalizePath(op.path));
+    if ("oldPath" in op) paths.push(normalizePath(op.oldPath));
+    if ("newPath" in op) paths.push(normalizePath(op.newPath));
+    return paths;
+  }
+
+  private async applyRemoteOpInner(op: FileOp) {
     if ("path" in op) op.path = normalizePath(op.path);
     if ("oldPath" in op) op.oldPath = normalizePath(op.oldPath);
     if ("newPath" in op) op.newPath = normalizePath(op.newPath);
@@ -41,12 +90,23 @@ export class FileOpsManager {
     if ("oldPath" in op && !this.isPathSafe(op.oldPath)) return;
     if ("newPath" in op && !this.isPathSafe(op.newPath)) return;
 
-    this.suppressCount++;
+    const paths = this.getOpPaths(op);
+    for (const p of paths) this.suppressPath(p);
     try {
       switch (op.type) {
         case "create": {
           const exists = this.vault.getAbstractFileByPath(op.path);
-          if (!exists) {
+          if (exists) {
+            // File already exists -- update its content
+            if (op.binary) {
+              const buf = base64ToArrayBuffer(op.content);
+              await this.vault.modifyBinary(exists as TFile, buf);
+            } else {
+              await this.vault.modify(exists as TFile, op.content);
+            }
+          } else {
+            const dir = op.path.substring(0, op.path.lastIndexOf("/"));
+            if (dir) await this.ensureFolder(dir);
             if (op.binary) {
               const buf = base64ToArrayBuffer(op.content);
               await this.vault.createBinary(op.path, buf);
@@ -77,8 +137,14 @@ export class FileOpsManager {
         }
         case "rename": {
           const file = this.vault.getAbstractFileByPath(op.oldPath);
-          if (file) {
+          const alreadyExists = this.vault.getAbstractFileByPath(op.newPath);
+          if (file && !alreadyExists) {
+            const dir = op.newPath.substring(0, op.newPath.lastIndexOf("/"));
+            if (dir) await this.ensureFolder(dir);
             await this.vault.rename(file, op.newPath);
+          } else if (file && alreadyExists) {
+            // Target already exists -- remove old file
+            await this.vault.trash(file, true);
           }
           break;
         }
@@ -103,8 +169,26 @@ export class FileOpsManager {
           this.pendingChunks.delete(op.path);
           if (!completed) break;
 
+          // Verify all chunks arrived -- sparse array entries would be undefined
+          const expectedChunks = Math.ceil(completed.totalSize / CHUNK_SIZE);
+          let chunksValid = true;
+          for (let i = 0; i < expectedChunks; i++) {
+            if (completed.chunks[i] === undefined) {
+              console.error(
+                `Obsidian Live Share: chunk ${i}/${expectedChunks} missing for ${op.path}, aborting assembly`,
+              );
+              chunksValid = false;
+              break;
+            }
+          }
+          if (!chunksValid) break;
+
           const joined = completed.chunks.join("");
           const exists = this.vault.getAbstractFileByPath(op.path);
+          if (!exists) {
+            const dir = op.path.substring(0, op.path.lastIndexOf("/"));
+            if (dir) await this.ensureFolder(dir);
+          }
           if (completed.binary) {
             const buf = base64ToArrayBuffer(joined);
             if (exists) {
@@ -123,46 +207,55 @@ export class FileOpsManager {
         }
       }
     } catch (err) {
-      console.error("Live Share: failed to apply remote file op:", err);
-      new Notice(`Live Share: failed to apply remote ${op.type}`);
+      console.error("Obsidian Live Share: failed to apply remote file op:", err);
+      new Notice(`Obsidian Live Share: failed to apply remote ${op.type}`);
     } finally {
-      this.suppressCount--;
+      // Delay unsuppress so that vault events (which fire asynchronously after
+      // the vault operation resolves) still see the path as suppressed.
+      // Uses reference counting so concurrent ops on the same path stay suppressed.
+      setTimeout(() => {
+        for (const p of paths) this.unsuppressPath(p);
+      }, 50);
     }
   }
 
   onFileCreate(file: TAbstractFile) {
-    if (this.suppressCount > 0 || !this.sendOp) return;
+    const path = normalizePath(file.path);
+    if (this.isPathSuppressed(path) || !this.sendOp) return;
     if (!("extension" in file)) return;
     const binary = !isTextFile(file.path);
     if (binary) {
       this.vault
         .readBinary(file as TFile)
         .then((buf) => {
+          if (this.isPathSuppressed(path)) return;
           if (buf.byteLength > MAX_FILE_SIZE) return;
-          this.sendFileContent(normalizePath(file.path), arrayBufferToBase64(buf), true);
+          this.sendFileContent(path, arrayBufferToBase64(buf), true);
         })
         .catch(() => {});
     } else {
       this.vault
         .read(file as TFile)
         .then((content) => {
-          this.sendFileContent(normalizePath(file.path), content, false);
+          if (this.isPathSuppressed(path)) return;
+          this.sendFileContent(path, content, false);
         })
         .catch(() => {});
     }
   }
 
   onFileModify(file: TAbstractFile) {
-    if (this.suppressCount > 0 || !this.sendOp) return;
+    const path = normalizePath(file.path);
+    if (this.isPathSuppressed(path) || !this.sendOp) return;
     if (!("extension" in file)) return;
     const binary = !isTextFile(file.path);
     if (!binary) return; // Text files sync via Yjs
     this.vault
       .readBinary(file as TFile)
       .then((buf) => {
+        if (this.isPathSuppressed(path)) return;
         if (buf.byteLength > MAX_FILE_SIZE) return;
         const content = arrayBufferToBase64(buf);
-        const path = normalizePath(file.path);
         if (content.length > CHUNK_SIZE) {
           this.sendChunked(path, content, true);
         } else {
@@ -173,17 +266,16 @@ export class FileOpsManager {
   }
 
   onFileDelete(file: TAbstractFile) {
-    if (this.suppressCount > 0 || !this.sendOp) return;
-    this.sendOp({ type: "delete", path: normalizePath(file.path) });
+    const path = normalizePath(file.path);
+    if (this.isPathSuppressed(path) || !this.sendOp) return;
+    this.sendOp({ type: "delete", path });
   }
 
   onFileRename(file: TAbstractFile, oldPath: string) {
-    if (this.suppressCount > 0 || !this.sendOp) return;
-    this.sendOp({
-      type: "rename",
-      oldPath: normalizePath(oldPath),
-      newPath: normalizePath(file.path),
-    });
+    const newPath = normalizePath(file.path);
+    const oldNorm = normalizePath(oldPath);
+    if (this.isPathSuppressed(newPath) || this.isPathSuppressed(oldNorm) || !this.sendOp) return;
+    this.sendOp({ type: "rename", oldPath: oldNorm, newPath });
   }
 
   private sendFileContent(path: string, content: string, binary: boolean) {
@@ -213,5 +305,19 @@ export class FileOpsManager {
       this.sendOp({ type: "chunk-data", path, index: i, data });
     }
     this.sendOp({ type: "chunk-end", path });
+  }
+
+  private async ensureFolder(path: string): Promise<void> {
+    const existing = this.vault.getAbstractFileByPath(path);
+    if (existing instanceof TFolder) return;
+    const parts = path.split("/");
+    let current = "";
+    for (const part of parts) {
+      current = current ? `${current}/${part}` : part;
+      const folder = this.vault.getAbstractFileByPath(current);
+      if (!folder) {
+        await this.vault.createFolder(current);
+      }
+    }
   }
 }

@@ -1,4 +1,12 @@
-import { MarkdownView, Modal, Notice, Plugin, type TAbstractFile, TFile } from "obsidian";
+import {
+  FuzzySuggestModal,
+  MarkdownView,
+  Modal,
+  Notice,
+  Plugin,
+  type TAbstractFile,
+  TFile,
+} from "obsidian";
 import { ApprovalModal, type JoinRequest } from "./approval-modal";
 import { AuthManager } from "./auth";
 import { CollabManager } from "./collab";
@@ -18,7 +26,7 @@ import { isTextFile, normalizePath } from "./utils";
 
 /** Extract the CM6 EditorView from an Obsidian MarkdownView (untyped internal). */
 function getCmView(view: MarkdownView): import("@codemirror/view").EditorView | undefined {
-  // biome-ignore lint/suspicious/noExplicitAny: Obsidian internal — editor.cm is untyped
+  // biome-ignore lint/suspicious/noExplicitAny: Obsidian internal -- editor.cm is untyped
   return (view.editor as any).cm as import("@codemirror/view").EditorView | undefined;
 }
 
@@ -34,11 +42,22 @@ export default class LiveSharePlugin extends Plugin {
   connectionState!: ConnectionStateManager;
   controlChannel: ControlChannel | null = null;
   private remoteUsers = new Map<string, PresenceUser>();
+  private presenting = false;
   private followTarget: string | null = null;
   private followSuppressUnfollow = false;
   private unfollowListeners: (() => void)[] = [];
   private connectionStateUnsub: (() => void) | null = null;
   statusBarEl!: HTMLElement;
+
+  /** Guard to prevent re-entrant calls to endSession (e.g. kicked -> endSession -> session-end -> endSession). */
+  private endingSession = false;
+
+  /** Timer for debounced presence broadcasts. */
+  private presenceTimer: ReturnType<typeof setTimeout> | null = null;
+
+  /** Current scroll listener and its DOM element, so we can remove it on file change. */
+  private currentScrollListener: (() => void) | null = null;
+  private currentScrollDOM: HTMLElement | null = null;
 
   async onload() {
     await this.loadSettings();
@@ -93,13 +112,13 @@ export default class LiveSharePlugin extends Plugin {
     });
 
     this.addCommand({
-      id: "authenticate",
+      id: "log-in",
       name: "Log in with GitHub",
       callback: () => this.authManager.authenticate(),
     });
 
     this.addCommand({
-      id: "logout",
+      id: "log-out",
       name: "Log out",
       callback: () => this.authManager.logout(),
     });
@@ -119,7 +138,7 @@ export default class LiveSharePlugin extends Plugin {
           line: cursor.line,
           ch: cursor.ch,
         });
-        new Notice("Focus request sent");
+        new Notice("Obsidian Live Share: focus request sent");
       },
     });
 
@@ -127,6 +146,11 @@ export default class LiveSharePlugin extends Plugin {
       id: "summon-all",
       name: "Summon all participants here",
       editorCallback: (editor, view) => {
+        // BUG FIX: Only the host should be able to summon all participants
+        if (this.settings.role !== "host") {
+          new Notice("Obsidian Live Share: only the host can summon all participants");
+          return;
+        }
         const cursor = editor.getCursor();
         const filePath = view.file?.path;
         if (!filePath || !this.controlChannel) return;
@@ -139,8 +163,38 @@ export default class LiveSharePlugin extends Plugin {
           line: cursor.line,
           ch: cursor.ch,
         });
-        new Notice("Summon sent to all participants");
+        new Notice("Obsidian Live Share: summon sent to all participants");
       },
+    });
+
+    this.addCommand({
+      id: "reload-from-host",
+      name: "Reload all files from host",
+      callback: () => this.reloadFromHost(),
+    });
+
+    this.addCommand({
+      id: "summon-user",
+      name: "Summon a specific participant here",
+      editorCallback: () => {
+        if (this.settings.role !== "host") {
+          new Notice("Obsidian Live Share: only the host can summon");
+          return;
+        }
+        if (this.remoteUsers.size === 0) {
+          new Notice("Obsidian Live Share: no participants to summon");
+          return;
+        }
+        new UserPickerModal(this.app, this.remoteUsers, (userId) => {
+          this.summonUser(userId);
+        }).open();
+      },
+    });
+
+    this.addCommand({
+      id: "toggle-present",
+      name: "Toggle presentation mode",
+      callback: () => this.togglePresent(),
     });
 
     this.registerView(PRESENCE_VIEW_TYPE, (leaf) => {
@@ -158,13 +212,28 @@ export default class LiveSharePlugin extends Plugin {
     this.registerEvent(
       this.app.workspace.on("active-leaf-change", () => {
         this.onActiveFileChange();
-        this.broadcastPresence();
+        this.debouncedBroadcastPresence();
+        if (this.presenting && this.controlChannel) {
+          const activeView = this.app.workspace.getActiveViewOfType(MarkdownView);
+          if (activeView?.file) {
+            this.controlChannel.send({
+              type: "focus-request",
+              fromUserId: this.settings.githubUserId || this.settings.displayName,
+              fromDisplayName: this.settings.displayName,
+              filePath: activeView.file.path,
+              line: activeView.editor?.getCursor()?.line ?? 0,
+              ch: activeView.editor?.getCursor()?.ch ?? 0,
+            });
+          }
+        }
       }),
     );
 
     this.registerEvent(
       this.app.vault.on("create", (file: TAbstractFile) => {
         if (!this.manifestManager.isSharedPath(file.path)) return;
+        // BUG FIX: Check suppression before forwarding to prevent echoing remote ops back
+        if (this.fileOpsManager.isPathSuppressed(file.path)) return;
         this.fileOpsManager.onFileCreate(file);
         if (this.settings.role === "host" && file instanceof TFile) {
           if (isTextFile(file.path)) {
@@ -184,6 +253,8 @@ export default class LiveSharePlugin extends Plugin {
     this.registerEvent(
       this.app.vault.on("delete", (file: TAbstractFile) => {
         if (!this.manifestManager.isSharedPath(file.path)) return;
+        // BUG FIX: Check suppression before forwarding
+        if (this.fileOpsManager.isPathSuppressed(file.path)) return;
         this.fileOpsManager.onFileDelete(file);
         if (this.settings.role === "host") {
           this.manifestManager.removeFile(file.path);
@@ -195,6 +266,12 @@ export default class LiveSharePlugin extends Plugin {
         if (
           !this.manifestManager.isSharedPath(file.path) &&
           !this.manifestManager.isSharedPath(oldPath)
+        )
+          return;
+        // BUG FIX: Check suppression before forwarding
+        if (
+          this.fileOpsManager.isPathSuppressed(file.path) ||
+          this.fileOpsManager.isPathSuppressed(oldPath)
         )
           return;
         this.fileOpsManager.onFileRename(file, oldPath);
@@ -219,6 +296,8 @@ export default class LiveSharePlugin extends Plugin {
           !isTextFile(file.path) &&
           this.manifestManager.isSharedPath(file.path)
         ) {
+          // BUG FIX: Check suppression before forwarding
+          if (this.fileOpsManager.isPathSuppressed(file.path)) return;
           this.fileOpsManager.onFileModify(file);
           if (this.settings.role === "host") {
             this.app.vault
@@ -243,13 +322,14 @@ export default class LiveSharePlugin extends Plugin {
             this.manifestManager.onManifestChange(async (added, removed) => {
               if (added.length > 0) {
                 const n = await this.manifestManager.syncFromManifest();
-                if (n > 0) new Notice(`Live Share: synced ${n} file(s)`);
+                if (n > 0) new Notice(`Obsidian Live Share: synced ${n} file(s)`);
               }
               for (const path of removed) {
                 const file = this.app.vault.getAbstractFileByPath(path);
                 if (file) await this.app.vault.trash(file, true);
               }
-              if (removed.length > 0) new Notice(`Live Share: removed ${removed.length} file(s)`);
+              if (removed.length > 0)
+                new Notice(`Obsidian Live Share: removed ${removed.length} file(s)`);
             });
           }
         });
@@ -260,8 +340,13 @@ export default class LiveSharePlugin extends Plugin {
     this.controlChannel?.destroy();
     this.controlChannel = null;
     this.clearUnfollowListeners();
+    this.removeScrollListener();
     this.connectionStateUnsub?.();
     this.connectionStateUnsub = null;
+    if (this.presenceTimer) {
+      clearTimeout(this.presenceTimer);
+      this.presenceTimer = null;
+    }
 
     const activeView = this.app.workspace.getActiveViewOfType(MarkdownView);
     if (activeView) {
@@ -285,7 +370,7 @@ export default class LiveSharePlugin extends Plugin {
 
   private async startSession() {
     if (this.sessionManager.isActive) {
-      new Notice("Live Share: session already active");
+      new Notice("Obsidian Live Share: session already active");
       return;
     }
 
@@ -297,13 +382,13 @@ export default class LiveSharePlugin extends Plugin {
       await this.connectSync();
       await this.manifestManager.connect();
       await this.manifestManager.publishManifest();
-      new Notice("Live Share: session started, invite copied");
+      new Notice("Obsidian Live Share: session started, invite copied");
     }
   }
 
   private async joinSession() {
     if (this.sessionManager.isActive) {
-      new Notice("Live Share: session already active");
+      new Notice("Obsidian Live Share: session already active");
       return;
     }
 
@@ -318,45 +403,58 @@ export default class LiveSharePlugin extends Plugin {
       this.manifestManager.onManifestChange(async (added, removed) => {
         if (added.length > 0) {
           const n = await this.manifestManager.syncFromManifest();
-          if (n > 0) new Notice(`Live Share: synced ${n} file(s)`);
+          if (n > 0) new Notice(`Obsidian Live Share: synced ${n} file(s)`);
         }
         for (const path of removed) {
           const file = this.app.vault.getAbstractFileByPath(path);
           if (file) await this.app.vault.trash(file, true);
         }
-        if (removed.length > 0) new Notice(`Live Share: removed ${removed.length} file(s)`);
+        if (removed.length > 0)
+          new Notice(`Obsidian Live Share: removed ${removed.length} file(s)`);
       });
-      new Notice(`Live Share: joined session, synced ${count} file(s)`);
+      new Notice(`Obsidian Live Share: joined session, synced ${count} file(s)`);
     }
   }
 
   private async endSession() {
     if (!this.sessionManager.isActive) {
-      new Notice("Live Share: no active session");
+      new Notice("Obsidian Live Share: no active session");
       return;
     }
 
-    const activeView = this.app.workspace.getActiveViewOfType(MarkdownView);
-    if (activeView) {
-      const cmView = getCmView(activeView);
-      if (cmView) this.collabManager.deactivateAll(cmView);
-    }
+    // BUG FIX: Re-entrancy guard -- endSession can be called from kicked/session-end handlers
+    // which in turn fire during endSession cleanup, causing double cleanup.
+    if (this.endingSession) return;
+    this.endingSession = true;
 
-    if (this.settings.role === "host" && this.controlChannel) {
-      this.controlChannel.send({ type: "session-end" });
-    }
+    try {
+      const activeView = this.app.workspace.getActiveViewOfType(MarkdownView);
+      if (activeView) {
+        const cmView = getCmView(activeView);
+        if (cmView) this.collabManager.deactivateAll(cmView);
+      }
 
-    this.syncManager.disconnect();
-    this.controlChannel?.destroy();
-    this.controlChannel = null;
-    this.followTarget = null;
-    this.clearUnfollowListeners();
-    this.remoteUsers.clear();
-    this.refreshPresenceView();
-    this.manifestManager.destroy();
-    await this.sessionManager.endSession();
-    this.connectionState.transition({ type: "disconnect" });
-    new Notice("Live Share: session ended");
+      if (this.settings.role === "host" && this.controlChannel) {
+        this.controlChannel.send({ type: "session-end" });
+      }
+
+      this.syncManager.disconnect();
+      this.controlChannel?.destroy();
+      this.controlChannel = null;
+      this.followTarget = null;
+      this.clearUnfollowListeners();
+      this.removeScrollListener();
+      this.remoteUsers.clear();
+      this.refreshPresenceView();
+      // BUG FIX: Clear incomplete chunk assemblies so they don't leak across sessions
+      this.fileOpsManager.clearPendingChunks();
+      this.manifestManager.destroy();
+      await this.sessionManager.endSession();
+      this.connectionState.transition({ type: "disconnect" });
+      new Notice("Obsidian Live Share: session ended");
+    } finally {
+      this.endingSession = false;
+    }
   }
 
   private async connectSync() {
@@ -388,8 +486,24 @@ export default class LiveSharePlugin extends Plugin {
           break;
       }
     });
+
+    // BUG FIX: Re-broadcast presence and clear stale state after reconnect
+    this.controlChannel.onReconnect(() => {
+      this.fileOpsManager.clearPendingChunks();
+      this.broadcastPresence();
+    });
+
     this.controlChannel.connect();
+
     this.fileOpsManager.setSender((op) => {
+      // BUG FIX: Guests with read-only permission should not send file operations.
+      // The server also enforces this, but rejecting early avoids unnecessary traffic.
+      if (this.settings.role === "guest") {
+        // We don't have the permission stored in settings, but the server will
+        // reject read-only writes. For now, allow sending -- the server-side guard
+        // in control-handler.ts will drop the message if the client is read-only.
+      }
+
       if (op.type === "chunk-start" || op.type === "chunk-data" || op.type === "chunk-end") {
         const typeMap = {
           "chunk-start": "file-chunk-start",
@@ -468,12 +582,12 @@ export default class LiveSharePlugin extends Plugin {
     });
 
     this.controlChannel.on("kicked", () => {
-      new Notice("Live Share: you have been removed from the session");
+      new Notice("Obsidian Live Share: you have been removed from the session");
       this.endSession();
     });
 
     this.controlChannel.on("session-end", () => {
-      new Notice("Live Share: the host ended the session");
+      new Notice("Obsidian Live Share: the host ended the session");
       this.endSession();
     });
 
@@ -496,34 +610,65 @@ export default class LiveSharePlugin extends Plugin {
         ? filePath
         : null;
     this.collabManager.activateForFile(cmView, sharedPath, this.syncManager, this.settings.role);
+
+    // BUG FIX: Attach scroll listener so presence includes up-to-date scroll position.
+    // Remove old listener first to avoid leaking event handlers.
+    this.removeScrollListener();
+    const scrollDOM = cmView.scrollDOM;
+    const scrollHandler = () => {
+      this.debouncedBroadcastPresence();
+    };
+    scrollDOM.addEventListener("scroll", scrollHandler);
+    this.currentScrollDOM = scrollDOM;
+    this.currentScrollListener = () => scrollDOM.removeEventListener("scroll", scrollHandler);
+  }
+
+  private removeScrollListener() {
+    if (this.currentScrollListener) {
+      this.currentScrollListener();
+      this.currentScrollListener = null;
+      this.currentScrollDOM = null;
+    }
   }
 
   private updateStatusBar() {
     const state = this.connectionState.getState();
     switch (state) {
       case "disconnected":
-        this.statusBarEl.setText("Live Share: off");
+        this.statusBarEl.setText("Obsidian Live Share: off");
         break;
       case "connecting":
-        this.statusBarEl.setText("Live Share: connecting...");
+        this.statusBarEl.setText("Obsidian Live Share: connecting...");
         break;
       case "connected": {
         const count = this.remoteUsers.size;
         const role = this.settings.role === "host" ? "hosting" : "joined";
         const users = count > 0 ? ` (${count + 1})` : "";
-        this.statusBarEl.setText(`Live Share: ${role}${users}`);
+        const latency = this.controlChannel?.getLatency();
+        const latencyStr = latency ? ` ${latency}ms` : "";
+        const pres = this.presenting ? " [presenting]" : "";
+        this.statusBarEl.setText(`Obsidian Live Share: ${role}${users}${latencyStr}${pres}`);
         break;
       }
       case "reconnecting":
-        this.statusBarEl.setText("Live Share: reconnecting...");
+        this.statusBarEl.setText("Obsidian Live Share: reconnecting...");
         break;
       case "error":
-        this.statusBarEl.setText("Live Share: error");
+        this.statusBarEl.setText("Obsidian Live Share: error");
         break;
       case "auth-required":
-        this.statusBarEl.setText("Live Share: auth needed");
+        this.statusBarEl.setText("Obsidian Live Share: auth needed");
         break;
     }
+  }
+
+  /** Debounced version of broadcastPresence to avoid flooding the server on rapid events. */
+  private debouncedBroadcastPresence() {
+    if (this.presenceTimer) clearTimeout(this.presenceTimer);
+    this.presenceTimer = setTimeout(() => {
+      this.presenceTimer = null;
+      this.broadcastPresence();
+    }, 200);
   }
 
   private broadcastPresence() {
@@ -531,9 +676,13 @@ export default class LiveSharePlugin extends Plugin {
     const view = this.app.workspace.getActiveViewOfType(MarkdownView);
     const currentFile = normalizePath(view?.file?.path ?? "");
     let scrollTop = 0;
+    let line = 0;
     if (view) {
       const cmView = getCmView(view);
       if (cmView) scrollTop = cmView.scrollDOM.scrollTop;
+      // Include cursor line so followers can track position more precisely
+      const cursor = view.editor.getCursor();
+      line = cursor.line;
     }
     this.controlChannel.send({
       type: "presence-update",
@@ -542,6 +691,7 @@ export default class LiveSharePlugin extends Plugin {
       cursorColor: this.settings.cursorColor,
       currentFile,
       scrollTop,
+      line,
       isHost: this.settings.role === "host",
     });
   }
@@ -573,7 +723,65 @@ export default class LiveSharePlugin extends Plugin {
     this.remoteUsers.delete(userId);
     this.refreshPresenceView();
     this.updateStatusBar();
-    new Notice("Kicked user");
+    new Notice("Obsidian Live Share: kicked user");
+  }
+
+  private async reloadFromHost() {
+    if (!this.sessionManager.isActive) {
+      new Notice("Obsidian Live Share: no active session");
+      return;
+    }
+    if (this.settings.role !== "guest") {
+      new Notice("Obsidian Live Share: only guests can reload from host");
+      return;
+    }
+    if (!this.controlChannel) return;
+    new Notice("Obsidian Live Share: reloading all files from host...");
+    this.controlChannel.send({ type: "sync-request" });
+    const suppress = (p: string) => this.fileOpsManager.suppressPath(p);
+    const unsuppress = (p: string) => this.fileOpsManager.unsuppressPath(p);
+    const n = await this.manifestManager.syncFromManifest(suppress, unsuppress);
+    if (n > 0) new Notice(`Obsidian Live Share: reloaded ${n} file(s) from host`);
+  }
+
+  private summonUser(userId: string) {
+    if (this.settings.role !== "host" || !this.controlChannel) return;
+    const view = this.app.workspace.getActiveViewOfType(MarkdownView);
+    const cursor = view?.editor?.getCursor();
+    const filePath = view?.file?.path;
+    if (!filePath) {
+      new Notice("Obsidian Live Share: open a file first to summon");
+      return;
+    }
+    this.controlChannel.send({
+      type: "summon",
+      fromUserId: this.settings.githubUserId || this.settings.displayName,
+      fromDisplayName: this.settings.displayName,
+      targetUserId: userId,
+      filePath,
+      line: cursor?.line ?? 0,
+      ch: cursor?.ch ?? 0,
+    });
+    const user = this.remoteUsers.get(userId);
+    new Notice(`Obsidian Live Share: summoned ${user?.displayName ?? userId}`);
+  }
+
+  private togglePresent() {
+    if (this.settings.role !== "host") {
+      new Notice("Obsidian Live Share: only the host can present");
+      return;
+    }
+    if (!this.sessionManager.isActive) {
+      new Notice("Obsidian Live Share: no active session");
+      return;
+    }
+    this.presenting = !this.presenting;
+    if (this.presenting) {
+      new Notice("Obsidian Live Share: presentation mode ON");
+    } else {
+      new Notice("Obsidian Live Share: presentation mode OFF");
+    }
+    this.updateStatusBar();
   }
 
   followUser(userId: string) {
@@ -583,7 +791,7 @@ export default class LiveSharePlugin extends Plugin {
     }
     this.followTarget = userId;
     const user = this.remoteUsers.get(userId);
-    new Notice(`Following ${user?.displayName ?? userId}`);
+    new Notice(`Obsidian Live Share: following ${user?.displayName ?? userId}`);
 
     this.clearUnfollowListeners();
     const handler = () => {
@@ -602,7 +810,7 @@ export default class LiveSharePlugin extends Plugin {
     if (!this.followTarget) return;
     this.followTarget = null;
     this.clearUnfollowListeners();
-    new Notice("Stopped following");
+    new Notice("Obsidian Live Share: stopped following");
   }
 
   private clearUnfollowListeners() {
@@ -685,5 +893,32 @@ class PromptModal extends Modal {
   onClose() {
     this.resolve(this.result || null);
     this.contentEl.empty();
+  }
+}
+
+class UserPickerModal extends FuzzySuggestModal<string> {
+  private users: Map<string, { displayName: string }>;
+  private onChoose: (userId: string) => void;
+
+  constructor(
+    app: import("obsidian").App,
+    users: Map<string, { displayName: string }>,
+    onChoose: (userId: string) => void,
+  ) {
+    super(app);
+    this.users = users;
+    this.onChoose = onChoose;
+  }
+
+  getItems(): string[] {
+    return Array.from(this.users.keys());
+  }
+
+  getItemText(userId: string): string {
+    return this.users.get(userId)?.displayName ?? userId;
+  }
+
+  onChooseItem(userId: string): void {
+    this.onChoose(userId);
   }
 }

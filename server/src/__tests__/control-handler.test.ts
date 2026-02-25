@@ -56,7 +56,11 @@ function connectControl(
   });
 }
 
-function waitForMessages(messages: string[], count: number, timeoutMs = 3000): Promise<void> {
+function waitForMessages(
+  messages: string[],
+  count: number,
+  timeoutMs = 3000,
+): Promise<void> {
   if (messages.length >= count) return Promise.resolve();
   return new Promise((resolve, reject) => {
     const start = Date.now();
@@ -85,7 +89,10 @@ beforeEach(async () => {
 
 afterEach(async () => {
   for (const ws of openSockets) {
-    if (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING) {
+    if (
+      ws.readyState === WebSocket.OPEN ||
+      ws.readyState === WebSocket.CONNECTING
+    ) {
       ws.close();
     }
   }
@@ -258,6 +265,14 @@ describe("Control WebSocket handler", () => {
 
     await new Promise((r) => setTimeout(r, 100));
 
+    // C identifies first so the server assigns it as host (fallback: first to identify)
+    sendJSON(clientC.ws, {
+      type: "presence-update",
+      userId: "userC",
+      displayName: "Charlie",
+    });
+    await new Promise((r) => setTimeout(r, 100));
+
     // Set userIds via presence-update
     sendJSON(clientA.ws, {
       type: "presence-update",
@@ -277,7 +292,7 @@ describe("Control WebSocket handler", () => {
     clientB.messages.length = 0;
     clientC.messages.length = 0;
 
-    // C sends summon targeting userA
+    // C (host) sends summon targeting userA
     sendJSON(clientC.ws, {
       type: "summon",
       targetUserId: "userA",
@@ -303,6 +318,14 @@ describe("Control WebSocket handler", () => {
 
     await new Promise((r) => setTimeout(r, 100));
 
+    // C identifies first so the server assigns it as host
+    sendJSON(clientC.ws, {
+      type: "presence-update",
+      userId: "userC",
+      displayName: "Charlie",
+    });
+    await new Promise((r) => setTimeout(r, 100));
+
     // Set userIds
     sendJSON(clientA.ws, {
       type: "presence-update",
@@ -322,7 +345,7 @@ describe("Control WebSocket handler", () => {
     clientB.messages.length = 0;
     clientC.messages.length = 0;
 
-    // C sends summon targeting __all__
+    // C (host) sends summon targeting __all__
     sendJSON(clientC.ws, {
       type: "summon",
       targetUserId: "__all__",
@@ -548,6 +571,16 @@ describe("Control WebSocket handler", () => {
     const clientB = await connectControl(room.id, room.token);
 
     await new Promise((r) => setTimeout(r, 100));
+
+    // A identifies first so the server assigns it as host
+    sendJSON(clientA.ws, {
+      type: "presence-update",
+      userId: "userA",
+      displayName: "Alice",
+    });
+    await new Promise((r) => setTimeout(r, 100));
+    clientA.messages.length = 0;
+    clientB.messages.length = 0;
 
     sendJSON(clientA.ws, { type: "session-end", reason: "host-left" });
 

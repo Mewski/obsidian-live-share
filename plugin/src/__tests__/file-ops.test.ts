@@ -16,6 +16,13 @@ function createMockVault() {
       files.set(path, file);
       return file;
     }),
+    createBinary: vi.fn(async (path: string, _buf: ArrayBuffer) => {
+      const file = { path, extension: path.split(".").pop() || "" };
+      files.set(path, file);
+      return file;
+    }),
+    modify: vi.fn(async () => {}),
+    modifyBinary: vi.fn(async () => {}),
     delete: vi.fn(async (file: { path: string }) => {
       files.delete(file.path);
     }),
@@ -28,6 +35,7 @@ function createMockVault() {
       files.set(newPath, file as { path: string; extension: string });
     }),
     read: vi.fn(async () => "file content"),
+    readBinary: vi.fn(async () => new ArrayBuffer(8)),
   };
 }
 
@@ -114,7 +122,7 @@ describe("FileOpsManager", () => {
       // The onFileCreate during applyRemoteOp should have been suppressed
       expect(sentOps.length).toBe(0);
 
-      // After applyRemoteOp, suppress is off — local events should go through
+      // After applyRemoteOp, suppress is off -- local events should go through
       manager.onFileDelete({ path: "other.md" } as any);
       expect(sentOps.length).toBe(1);
     });
@@ -158,6 +166,325 @@ describe("FileOpsManager", () => {
       // No setSender called
       mgr.onFileDelete({ path: "x.md" } as any);
       // Should not throw, just silently skip
+    });
+  });
+
+  // -----------------------------------------------------------------------
+  // Path safety
+  // -----------------------------------------------------------------------
+  describe("path safety", () => {
+    it("rejects absolute paths starting with /", async () => {
+      await manager.applyRemoteOp({
+        type: "create",
+        path: "/etc/passwd",
+        content: "bad",
+      });
+      expect(vault.create).not.toHaveBeenCalled();
+    });
+
+    it("rejects absolute paths starting with backslash", async () => {
+      await manager.applyRemoteOp({
+        type: "create",
+        path: "\\Windows\\system32\\bad",
+        content: "bad",
+      });
+      expect(vault.create).not.toHaveBeenCalled();
+    });
+
+    it("rejects paths with .. traversal", async () => {
+      await manager.applyRemoteOp({
+        type: "create",
+        path: "shared/../../../etc/passwd",
+        content: "bad",
+      });
+      expect(vault.create).not.toHaveBeenCalled();
+    });
+
+    it("rejects paths with . segment", async () => {
+      await manager.applyRemoteOp({
+        type: "create",
+        path: "shared/./hidden",
+        content: "bad",
+      });
+      expect(vault.create).not.toHaveBeenCalled();
+    });
+
+    it("rejects empty paths", async () => {
+      await manager.applyRemoteOp({
+        type: "create",
+        path: "",
+        content: "bad",
+      });
+      expect(vault.create).not.toHaveBeenCalled();
+    });
+
+    it("rejects rename with unsafe oldPath", async () => {
+      await manager.applyRemoteOp({
+        type: "rename",
+        oldPath: "../escape.md",
+        newPath: "safe.md",
+      });
+      expect(vault.rename).not.toHaveBeenCalled();
+    });
+
+    it("rejects rename with unsafe newPath", async () => {
+      vault.files.set("safe.md", { path: "safe.md", extension: "md" });
+      await manager.applyRemoteOp({
+        type: "rename",
+        oldPath: "safe.md",
+        newPath: "/etc/evil.md",
+      });
+      expect(vault.rename).not.toHaveBeenCalled();
+    });
+  });
+
+  // -----------------------------------------------------------------------
+  // Binary operations
+  // -----------------------------------------------------------------------
+  describe("binary operations", () => {
+    it("creates binary file from base64 content", async () => {
+      await manager.applyRemoteOp({
+        type: "create",
+        path: "image.png",
+        content: "AQID", // base64 for [1, 2, 3]
+        binary: true,
+      });
+      expect(vault.createBinary).toHaveBeenCalled();
+      const [path, buf] = vault.createBinary.mock.calls[0];
+      expect(path).toBe("image.png");
+      expect(buf instanceof ArrayBuffer).toBe(true);
+    });
+
+    it("modifies existing binary file", async () => {
+      const file = { path: "image.png", extension: "png" };
+      vault.files.set("image.png", file);
+
+      await manager.applyRemoteOp({
+        type: "modify",
+        path: "image.png",
+        content: "AQID",
+        binary: true,
+      });
+      expect(vault.modifyBinary).toHaveBeenCalled();
+    });
+  });
+
+  // -----------------------------------------------------------------------
+  // Chunk assembly
+  // -----------------------------------------------------------------------
+  describe("chunk assembly", () => {
+    it("assembles text chunks and creates file", async () => {
+      await manager.applyRemoteOp({
+        type: "chunk-start",
+        path: "big.md",
+        totalSize: 10,
+      });
+      await manager.applyRemoteOp({
+        type: "chunk-data",
+        path: "big.md",
+        index: 0,
+        data: "Hello",
+      });
+      await manager.applyRemoteOp({
+        type: "chunk-data",
+        path: "big.md",
+        index: 1,
+        data: "World",
+      });
+      await manager.applyRemoteOp({
+        type: "chunk-end",
+        path: "big.md",
+      });
+      expect(vault.create).toHaveBeenCalledWith("big.md", "HelloWorld");
+    });
+
+    it("assembles text chunks and modifies existing file", async () => {
+      vault.files.set("big.md", { path: "big.md", extension: "md" });
+
+      await manager.applyRemoteOp({
+        type: "chunk-start",
+        path: "big.md",
+        totalSize: 10,
+      });
+      await manager.applyRemoteOp({
+        type: "chunk-data",
+        path: "big.md",
+        index: 0,
+        data: "Hello",
+      });
+      await manager.applyRemoteOp({
+        type: "chunk-data",
+        path: "big.md",
+        index: 1,
+        data: "World",
+      });
+      await manager.applyRemoteOp({
+        type: "chunk-end",
+        path: "big.md",
+      });
+
+      // modify should be called since the file exists
+      expect(vault.modify).toHaveBeenCalled();
+    });
+
+    it("assembles binary chunks and creates binary file", async () => {
+      await manager.applyRemoteOp({
+        type: "chunk-start",
+        path: "big.png",
+        totalSize: 6,
+        binary: true,
+      });
+      await manager.applyRemoteOp({
+        type: "chunk-data",
+        path: "big.png",
+        index: 0,
+        data: "AQID",
+      });
+      await manager.applyRemoteOp({
+        type: "chunk-data",
+        path: "big.png",
+        index: 1,
+        data: "BAUG",
+      });
+      await manager.applyRemoteOp({
+        type: "chunk-end",
+        path: "big.png",
+      });
+      expect(vault.createBinary).toHaveBeenCalled();
+    });
+
+    it("ignores chunk-end without a matching chunk-start", async () => {
+      await manager.applyRemoteOp({
+        type: "chunk-end",
+        path: "orphan.md",
+      });
+      expect(vault.create).not.toHaveBeenCalled();
+    });
+
+    it("rejects chunk-start for files exceeding MAX_FILE_SIZE (50MB)", async () => {
+      await manager.applyRemoteOp({
+        type: "chunk-start",
+        path: "huge.bin",
+        totalSize: 51 * 1024 * 1024, // > 50MB
+      });
+      await manager.applyRemoteOp({
+        type: "chunk-data",
+        path: "huge.bin",
+        index: 0,
+        data: "some-data",
+      });
+      await manager.applyRemoteOp({
+        type: "chunk-end",
+        path: "huge.bin",
+      });
+      expect(vault.create).not.toHaveBeenCalled();
+      expect(vault.createBinary).not.toHaveBeenCalled();
+    });
+  });
+
+  // -----------------------------------------------------------------------
+  // Error recovery in applyRemoteOp
+  // -----------------------------------------------------------------------
+  describe("error recovery", () => {
+    it("decrements suppressCount even when vault operation throws", async () => {
+      vault.create.mockRejectedValueOnce(new Error("disk full"));
+      const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+      await manager.applyRemoteOp({
+        type: "create",
+        path: "fail.md",
+        content: "data",
+      });
+
+      // After the error, suppressCount should be back to 0, so local events fire
+      manager.onFileDelete({ path: "local.md" } as any);
+      expect(sentOps).toHaveLength(1);
+      expect(sentOps[0].type).toBe("delete");
+
+      consoleSpy.mockRestore();
+    });
+
+    it("continues processing after a failed modify", async () => {
+      const file = { path: "test.md", extension: "md" };
+      vault.files.set("test.md", file);
+      vault.modify.mockRejectedValueOnce(new Error("locked"));
+      const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+      await manager.applyRemoteOp({
+        type: "modify",
+        path: "test.md",
+        content: "updated",
+      });
+
+      expect(consoleSpy).toHaveBeenCalled();
+
+      // Subsequent operations should work
+      await manager.applyRemoteOp({
+        type: "create",
+        path: "next.md",
+        content: "ok",
+      });
+      expect(vault.create).toHaveBeenCalledWith("next.md", "ok");
+
+      consoleSpy.mockRestore();
+    });
+  });
+
+  // -----------------------------------------------------------------------
+  // Modify operations
+  // -----------------------------------------------------------------------
+  describe("modify operations", () => {
+    it("modifies existing text file content", async () => {
+      const file = { path: "doc.md", extension: "md" };
+      vault.files.set("doc.md", file);
+
+      await manager.applyRemoteOp({
+        type: "modify",
+        path: "doc.md",
+        content: "updated content",
+      });
+      expect(vault.modify).toHaveBeenCalledWith(file, "updated content");
+    });
+
+    it("silently ignores modify of nonexistent file", async () => {
+      await manager.applyRemoteOp({
+        type: "modify",
+        path: "missing.md",
+        content: "x",
+      });
+      expect(vault.modify).not.toHaveBeenCalled();
+    });
+  });
+
+  // -----------------------------------------------------------------------
+  // Local event edge cases
+  // -----------------------------------------------------------------------
+  describe("local event edge cases", () => {
+    it("handles binary file create (reads as binary)", async () => {
+      const file = { path: "photo.png", extension: "png" } as any;
+      manager.onFileCreate(file);
+
+      await new Promise((r) => setTimeout(r, 10));
+      expect(sentOps.length).toBe(1);
+      expect(sentOps[0].type).toBe("create");
+      expect((sentOps[0] as any).binary).toBe(true);
+    });
+
+    it("does not broadcast binary modify for text files (they use Yjs)", () => {
+      const file = { path: "notes.md", extension: "md" } as any;
+      manager.onFileModify(file);
+      // onFileModify returns early for text files
+      expect(sentOps.length).toBe(0);
+    });
+
+    it("broadcasts binary modify for binary files", async () => {
+      const file = { path: "image.png", extension: "png" } as any;
+      manager.onFileModify(file);
+
+      await new Promise((r) => setTimeout(r, 10));
+      expect(sentOps.length).toBe(1);
+      expect(sentOps[0].type).toBe("modify");
+      expect((sentOps[0] as any).binary).toBe(true);
     });
   });
 });
