@@ -16,7 +16,6 @@ export class LiveShareSettingTab extends PluginSettingTab {
     const { settings, sessionManager, authManager } = this.plugin;
     const active = sessionManager.isActive;
 
-    // Auth section
     if (authManager.isAuthenticated) {
       new Setting(containerEl)
         .setName("GitHub account")
@@ -40,7 +39,6 @@ export class LiveShareSettingTab extends PluginSettingTab {
         );
     }
 
-    // Connection state
     const connState = this.plugin.connectionState.getState();
     if (active) {
       const role = settings.role === "host" ? "Hosting" : "Joined";
@@ -94,7 +92,7 @@ export class LiveShareSettingTab extends PluginSettingTab {
           .setPlaceholder("#7c3aed")
           .setValue(settings.cursorColor)
           .onChange(async (value) => {
-            if (/^#[0-9a-fA-F]{3,8}$/.test(value)) {
+            if (/^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/.test(value)) {
               settings.cursorColor = value;
               await this.plugin.saveSettings();
             }
@@ -135,7 +133,6 @@ export class LiveShareSettingTab extends PluginSettingTab {
         );
     }
 
-    // File exclusion
     new Setting(containerEl)
       .setName("File exclusion")
       .setDesc(
