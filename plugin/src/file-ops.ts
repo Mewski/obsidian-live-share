@@ -146,7 +146,7 @@ export class FileOpsManager {
             await this.vault.rename(file, op.newPath);
           } else if (file && alreadyExists) {
             // Both sides renamed to the same target -- keep existing, trash source
-            new Notice(`Live Share: rename conflict -- ${op.newPath} already exists`);
+            new Notice(`Live Share: rename conflict — ${op.newPath} already exists`);
             await this.vault.trash(file, true);
           }
           break;

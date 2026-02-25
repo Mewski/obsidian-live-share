@@ -141,7 +141,7 @@ export default class LiveSharePlugin extends Plugin {
 
     this.addCommand({
       id: "end-session",
-      name: "End / leave session",
+      name: "End/leave session",
       callback: async () => {
         if (!this.sessionManager.isActive) {
           new Notice("Live Share: no active session");
@@ -459,7 +459,7 @@ export default class LiveSharePlugin extends Plugin {
         await this.manifestManager.connect();
         await this.manifestManager.publishManifest();
         await this.backgroundSync.startAll("host");
-        new Notice("Live Share: session started, invite copied");
+        new Notice("Live Share: session started — invite copied to clipboard");
       } catch {
         await this.abortSession("Live Share: failed to start session");
       }
@@ -480,7 +480,7 @@ export default class LiveSharePlugin extends Plugin {
       try {
         await this.connectSync();
         await this.manifestManager.connect();
-        const count = await this.manifestManager.syncFromManifest(
+        const syncedCount = await this.manifestManager.syncFromManifest(
           this.suppressPath,
           this.unsuppressPath,
           this.requestBinaryFile,
@@ -488,7 +488,7 @@ export default class LiveSharePlugin extends Plugin {
         );
         await this.backgroundSync.startAll("guest");
         this.registerManifestChangeHandler();
-        new Notice(`Live Share: joined session, synced ${count} file(s)`);
+        new Notice(`Live Share: joined session — synced ${syncedCount} file(s)`);
       } catch {
         await this.abortSession("Live Share: failed to join session");
       }
@@ -641,7 +641,7 @@ export default class LiveSharePlugin extends Plugin {
           this.clearUnfollowListeners();
         }
         if (leavingUser?.isHost && this.settings.role === "guest") {
-          new Notice("Live Share: host disconnected -- your changes may not be saved");
+          new Notice("Live Share: host disconnected — your changes may not be saved");
         }
       }
     });
@@ -669,17 +669,17 @@ export default class LiveSharePlugin extends Plugin {
         this.endSession();
         return;
       }
-      const perm = msg.permission as string | undefined;
-      if (perm === "read-only" || perm === "read-write") {
-        this.settings.permission = perm;
+      const permission = msg.permission as string | undefined;
+      if (permission === "read-only" || permission === "read-write") {
+        this.settings.permission = permission;
         await this.saveSettings();
       }
     });
 
     this.controlChannel.on("permission-update", async (msg) => {
-      const perm = msg.permission as string | undefined;
-      if (perm !== "read-only" && perm !== "read-write") return;
-      this.settings.permission = perm;
+      const permission = msg.permission as string | undefined;
+      if (permission !== "read-only" && permission !== "read-write") return;
+      this.settings.permission = permission;
       await this.saveSettings();
 
       // Detach yCollab from CM BEFORE destroying Y.Docs to prevent the
@@ -711,7 +711,7 @@ export default class LiveSharePlugin extends Plugin {
         await this.backgroundSync.startAll(this.settings.role ?? "guest");
         this.registerManifestChangeHandler();
         this.onActiveFileChange();
-        new Notice(`Live Share: your permission was changed to ${perm}`);
+        new Notice(`Live Share: your permission was changed to ${permission}`);
       } catch {
         new Notice("Live Share: permission changed but sync reconnect failed");
       }
@@ -812,8 +812,8 @@ export default class LiveSharePlugin extends Plugin {
         const users = count > 0 ? ` (${count + 1})` : "";
         const latency = this.controlChannel?.getLatency();
         const latencyStr = latency ? ` ${latency}ms` : "";
-        const pres = this.isPresenting ? " [presenting]" : "";
-        this.statusBarEl.setText(`Live Share: ${role}${users}${latencyStr}${pres}`);
+        const presentingLabel = this.isPresenting ? " [presenting]" : "";
+        this.statusBarEl.setText(`Live Share: ${role}${users}${latencyStr}${presentingLabel}`);
         break;
       }
       case "reconnecting":
@@ -898,27 +898,27 @@ export default class LiveSharePlugin extends Plugin {
     if (this.settings.role !== "host" || !this.controlChannel) return;
     const user = this.remoteUsers.get(userId);
     if (!user) return;
-    const currentPerm = user.permission ?? "read-write";
-    const newPerm = currentPerm === "read-write" ? "read-only" : "read-write";
+    const currentPermission = user.permission ?? "read-write";
+    const newPermission = currentPermission === "read-write" ? "read-only" : "read-write";
     this.controlChannel.send({
       type: "set-permission",
       userId,
-      permission: newPerm,
+      permission: newPermission,
     });
-    user.permission = newPerm;
+    user.permission = newPermission;
     this.refreshPresenceView();
-    new Notice(`Live Share: set ${user.displayName} to ${newPerm}`);
+    new Notice(`Live Share: set ${user.displayName} to ${newPermission}`);
   }
 
   private async reloadFromHost() {
     if (!this.controlChannel) return;
     new Notice("Live Share: reloading all files from host...");
-    const n = await this.manifestManager.syncFromManifest(
+    const syncedCount = await this.manifestManager.syncFromManifest(
       this.suppressPath,
       this.unsuppressPath,
       this.requestBinaryFile,
     );
-    if (n > 0) new Notice(`Live Share: reloaded ${n} file(s) from host`);
+    if (syncedCount > 0) new Notice(`Live Share: reloaded ${syncedCount} file(s) from host`);
   }
 
   private summonUser(userId: string) {
