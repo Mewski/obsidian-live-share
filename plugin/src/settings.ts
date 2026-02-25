@@ -1,7 +1,6 @@
 /** Plugin settings tab UI. */
 import { type App, PluginSettingTab, Setting } from "obsidian";
 import type LiveSharePlugin from "./main";
-import { HEX_COLOR_RE } from "./utils";
 
 export class LiveShareSettingTab extends PluginSettingTab {
   private plugin: LiveSharePlugin;
@@ -92,17 +91,12 @@ export class LiveShareSettingTab extends PluginSettingTab {
 
     new Setting(containerEl)
       .setName("Cursor color")
-      .setDesc("Your cursor color visible to others (hex format, e.g. #7c3aed)")
-      .addText((text) =>
-        text
-          .setPlaceholder("#7c3aed")
-          .setValue(settings.cursorColor)
-          .onChange(async (value) => {
-            if (HEX_COLOR_RE.test(value)) {
-              settings.cursorColor = value;
-              await this.plugin.saveSettings();
-            }
-          }),
+      .setDesc("Your cursor color visible to others")
+      .addColorPicker((color) =>
+        color.setValue(settings.cursorColor).onChange(async (value) => {
+          settings.cursorColor = value;
+          await this.plugin.saveSettings();
+        }),
       );
 
     new Setting(containerEl)
