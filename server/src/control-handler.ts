@@ -3,9 +3,9 @@ import { WebSocket, WebSocketServer } from "ws";
 
 import { verifyJWT } from "./github-auth.js";
 import { clearPermission, clearRoomPermissions, setPermission } from "./permissions.js";
+import type { Permission } from "./persistence.js";
 import { getRoom, removeRoom, touchRoom } from "./rooms.js";
 
-// Message types accepted on the control channel; all others are silently dropped
 const ALLOWED_TYPES = new Set([
   "file-op",
   "file-chunk-start",
@@ -28,8 +28,8 @@ const ALLOWED_TYPES = new Set([
   "pong",
 ]);
 
-const MSG_RATE_WINDOW = 10_000; // 10-second sliding window
-const MSG_RATE_LIMIT = 100; // Max messages per window before disconnect
+const MSG_RATE_WINDOW = 10_000;
+const MSG_RATE_LIMIT = 100;
 
 interface ControlClient {
   ws: WebSocket;
@@ -38,7 +38,7 @@ interface ControlClient {
   displayName: string;
   isHost: boolean;
   isApproved: boolean;
-  permission: "read-write" | "read-only";
+  permission: Permission;
   msgTimestamps: number[];
 }
 
@@ -49,11 +49,7 @@ interface ControlRoom {
 }
 
 export interface ControlWSSOptions {
-  onPermissionChange?: (
-    roomId: string,
-    userId: string,
-    permission: "read-write" | "read-only",
-  ) => void;
+  onPermissionChange?: (roomId: string, userId: string, permission: Permission) => void;
 }
 
 export function createControlWSS(options?: ControlWSSOptions) {
@@ -110,9 +106,7 @@ export function createControlWSS(options?: ControlWSSOptions) {
         const payload = verifyJWT(jwtToken);
         if (payload) verifiedUserId = payload.sub;
       }
-    } catch {
-      // JWT parsing failed; proceed without verified identity
-    }
+    } catch {}
 
     const client: ControlClient = {
       ws,
@@ -168,11 +162,9 @@ export function createControlWSS(options?: ControlWSSOptions) {
       }
 
       if (msg.type === "join-request") {
-        // Lock userId on first identification, same as presence-update
         if (!client.userId) {
           client.userId = typeof msg.userId === "string" ? msg.userId.slice(0, 128) : "";
 
-          // Assign host if not yet assigned
           if (client.verifiedUserId && serverRoom?.hostUserId) {
             client.isHost = client.verifiedUserId === serverRoom.hostUserId;
           } else {
@@ -216,7 +208,7 @@ export function createControlWSS(options?: ControlWSSOptions) {
           if (targetClient) {
             targetClient.isApproved = msg.approved as boolean;
             if (msg.permission) {
-              targetClient.permission = msg.permission as "read-write" | "read-only";
+              targetClient.permission = msg.permission as Permission;
             }
             if (targetClient.isApproved && targetClient.userId) {
               setPermission(roomId, targetClient.userId, targetClient.permission);
@@ -289,7 +281,7 @@ export function createControlWSS(options?: ControlWSSOptions) {
         msg.targetUserId !== "__all__"
       ) {
         const targetUserId = msg.targetUserId;
-        const strData = typeof data === "string" ? data : data.toString("utf-8");
+        const strData = data.toString("utf-8");
         for (const [clientWs, targetClient] of room.clients) {
           if (targetClient.userId === targetUserId && clientWs.readyState === WebSocket.OPEN) {
             clientWs.send(strData);
@@ -300,7 +292,6 @@ export function createControlWSS(options?: ControlWSSOptions) {
 
       if (msg.type === "presence-update") {
         if (msg.userId && !client.userId) {
-          // Lock userId on first identification, cannot be changed later
           client.userId = (msg.userId as string).slice(0, 128);
 
           if (client.verifiedUserId && serverRoom?.hostUserId) {
@@ -330,7 +321,6 @@ export function createControlWSS(options?: ControlWSSOptions) {
       }
       room.clients.delete(ws);
       if (room.clients.size === 0) {
-        // Delay room removal so Yjs clients can persist and disconnect first
         room.cleanupTimer = setTimeout(() => {
           if (room.clients.size === 0) {
             clearRoomPermissions(roomId);

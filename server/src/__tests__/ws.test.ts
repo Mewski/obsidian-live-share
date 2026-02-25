@@ -39,7 +39,6 @@ async function createRoom(name: string): Promise<RoomInfo> {
   return res.json() as Promise<RoomInfo>;
 }
 
-// Connects and collects all messages into a buffer so none are lost
 function connectWs(
   roomId: string,
   token?: string,
@@ -81,7 +80,6 @@ function connectWsRaw(roomId: string, token?: string): Promise<WebSocket> {
   });
 }
 
-// Wait until the messages array has at least `count` entries
 function waitForMessages(messages: Uint8Array[], count: number, timeoutMs = 3000): Promise<void> {
   if (messages.length >= count) return Promise.resolve();
   return new Promise((resolve, reject) => {
@@ -166,7 +164,7 @@ describe("WebSocket handler", () => {
     const room = await createRoom("sync-two");
 
     const clientA = await connectWs(room.id, room.token);
-    await waitForMessages(clientA.messages, 1); // syncStep1
+    await waitForMessages(clientA.messages, 1);
 
     const docA = new Y.Doc();
     const textA = docA.getText("content");
@@ -178,7 +176,7 @@ describe("WebSocket handler", () => {
     sendSyncStep1(clientA.ws, docA);
 
     const clientB = await connectWs(room.id, room.token);
-    await waitForMessages(clientB.messages, 1); // syncStep1
+    await waitForMessages(clientB.messages, 1);
 
     const docB = new Y.Doc();
     const textB = docB.getText("content");
@@ -258,15 +256,13 @@ describe("WebSocket handler", () => {
   it("enforces read-only on Yjs sync updates", async () => {
     const room = await createRoom("read-only-sync");
 
-    // Connect a normal read-write client
     const clientA = await connectWs(room.id, room.token);
-    await waitForMessages(clientA.messages, 1); // syncStep1
+    await waitForMessages(clientA.messages, 1);
 
     const docA = new Y.Doc();
     sendSyncStep1(clientA.ws, docA);
     await new Promise((r) => setTimeout(r, 150));
 
-    // Register read-only permission in the shared store, then connect with userId
     const readOnlyUserId = "ro-user-123";
     setPermission(room.id, readOnlyUserId, "read-only");
     const readOnlyUrl = `ws://localhost:${port}/ws/${room.id}?token=${room.token}&userId=${readOnlyUserId}`;
@@ -291,18 +287,16 @@ describe("WebSocket handler", () => {
       });
       ws.on("error", reject);
     });
-    await waitForMessages(readOnlyClient.messages, 1); // syncStep1
+    await waitForMessages(readOnlyClient.messages, 1);
 
     await new Promise((r) => setTimeout(r, 150));
     const msgCountBefore = clientA.messages.length;
 
-    // Read-only client sends a syncUpdate (should be blocked by the server)
     const roDoc = new Y.Doc();
     roDoc.getText("content").insert(0, "read-only attempt");
     const roUpdate = Y.encodeStateAsUpdate(roDoc);
     sendUpdate(readOnlyClient.ws, roUpdate);
 
-    // Wait and verify the normal client did NOT receive the update
     await new Promise((r) => setTimeout(r, 500));
     expect(clientA.messages.length).toBe(msgCountBefore);
 
@@ -314,7 +308,6 @@ describe("WebSocket handler", () => {
     const room = await createRoom("live-perm-update");
     const userId = "switchable-user";
 
-    // Initially read-write
     setPermission(room.id, userId, "read-write");
 
     const clientA = await connectWs(room.id, room.token);
@@ -344,7 +337,6 @@ describe("WebSocket handler", () => {
     sendSyncStep1(clientA.ws, docA);
     await new Promise((r) => setTimeout(r, 150));
 
-    // clientB sends an update while read-write (should go through)
     const rwDoc = new Y.Doc();
     rwDoc.getText("content").insert(0, "rw-allowed");
     const rwUpdate = Y.encodeStateAsUpdate(rwDoc);
@@ -353,18 +345,8 @@ describe("WebSocket handler", () => {
     await new Promise((r) => setTimeout(r, 500));
     expect(clientA.messages.length).toBeGreaterThan(msgCountBefore);
 
-    // Now change permission to read-only via the shared store + live update
-    // In production this is called by the control handler's onPermissionChange callback
-    // which triggers yjs.updatePermission(). We simulate by importing it from the app.
-    // Since we can't access the yjs instance directly, we use setPermission + a control
-    // channel set-permission message. Instead, let's directly test via the permission store.
     setPermission(room.id, userId, "read-only");
 
-    // The Yjs handler won't pick this up automatically; it requires updatePermission().
-    // In a real scenario, the control handler calls options.onPermissionChange which
-    // calls yjs.updatePermission(). We need to trigger that through the control channel.
-
-    // Connect to control channel as host and send set-permission
     const ctrlHost = await new Promise<WebSocket>((resolve, reject) => {
       const ws = new WebSocket(`ws://localhost:${port}/control/${room.id}?token=${room.token}`);
       ws.on("open", () => {
@@ -375,7 +357,6 @@ describe("WebSocket handler", () => {
     });
     await new Promise((r) => setTimeout(r, 50));
 
-    // Identify as host
     ctrlHost.send(
       JSON.stringify({
         type: "presence-update",
@@ -386,7 +367,6 @@ describe("WebSocket handler", () => {
     );
     await new Promise((r) => setTimeout(r, 100));
 
-    // Set the user to read-only via set-permission (this triggers onPermissionChange → updatePermission)
     ctrlHost.send(
       JSON.stringify({
         type: "set-permission",
@@ -396,7 +376,6 @@ describe("WebSocket handler", () => {
     );
     await new Promise((r) => setTimeout(r, 200));
 
-    // Now clientB sends another update (should be BLOCKED)
     const roDoc = new Y.Doc();
     roDoc.getText("content").insert(0, "should-be-blocked");
     const roUpdate = Y.encodeStateAsUpdate(roDoc);
@@ -441,7 +420,6 @@ describe("WebSocket handler", () => {
     await new Promise((r) => setTimeout(r, 150));
     const msgCountBefore = clientA.messages.length;
 
-    // Read-only client sends a fileOp (should be blocked)
     const encoder = encoding.createEncoder();
     encoding.writeVarUint(encoder, MESSAGE_FILE_OP);
     encoding.writeVarString(encoder, '{"type":"create","path":"hack.md","content":"nope"}');

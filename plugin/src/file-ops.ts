@@ -64,7 +64,6 @@ export class FileOpsManager {
 
   async applyRemoteOp(op: FileOp) {
     const paths = this.getOpPaths(op);
-    // Serialize operations on the same path to prevent interleaving
     const waitFor = paths.map((path) => this.opQueues.get(path)).filter(Boolean) as Promise<void>[];
     if (waitFor.length > 0) await Promise.all(waitFor);
 
@@ -145,7 +144,6 @@ export class FileOpsManager {
             if (dir) await ensureFolder(this.vault, dir);
             await this.vault.rename(file, op.newPath);
           } else if (file && alreadyExists) {
-            // Both sides renamed to the same target: keep existing, trash source
             new Notice(`Live Share: rename conflict, ${op.newPath} already exists`);
             await this.vault.trash(file, true);
           }
@@ -176,7 +174,6 @@ export class FileOpsManager {
           this.pendingChunks.delete(op.path);
           if (!assembly) break;
 
-          // Verify all chunks arrived; sparse array entries would be undefined
           const expectedChunks = Math.ceil(assembly.totalSize / CHUNK_SIZE);
           let chunksValid = true;
           for (let i = 0; i < expectedChunks; i++) {
@@ -217,9 +214,6 @@ export class FileOpsManager {
     } catch {
       new Notice(`Live Share: failed to apply remote ${op.type}`);
     } finally {
-      // Delay unsuppress so that vault events (which fire asynchronously after
-      // the vault operation resolves) still see the path as suppressed.
-      // Uses reference counting so concurrent ops on the same path stay suppressed.
       setTimeout(() => {
         for (const path of paths) this.unsuppressPath(path);
       }, 50);
@@ -258,7 +252,7 @@ export class FileOpsManager {
     if (this.isPathSuppressed(path) || !this.sendOp) return;
     if (!("extension" in file)) return;
     const binary = !isTextFile(file.path);
-    if (!binary) return; // Text files sync via Yjs
+    if (!binary) return;
     try {
       const buf = await this.vault.readBinary(file as TFile);
       if (this.isPathSuppressed(path)) return;

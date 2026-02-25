@@ -2,7 +2,6 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { FileOpsManager } from "../file-ops";
 import type { FileOp } from "../types";
 
-// Minimal Vault mock
 function createMockVault() {
   const files = new Map<string, { path: string; extension: string }>();
 
@@ -125,11 +124,9 @@ describe("FileOpsManager", () => {
     });
 
     it("suppresses local broadcasts during remote apply", async () => {
-      // Make vault.create trigger onFileCreate synchronously (simulating Obsidian behavior)
       vault.create.mockImplementation(async (path: string) => {
         const file = { path, extension: "md" };
         vault.files.set(path, file);
-        // This simulates the vault event firing during the create call
         manager.onFileCreate(file as any);
         return file;
       });
@@ -142,7 +139,6 @@ describe("FileOpsManager", () => {
 
       expect(sentOps.length).toBe(0);
 
-      // Suppression is off after applyRemoteOp: local events should go through
       manager.onFileDelete({ path: "other.md" } as any);
       expect(sentOps.length).toBe(1);
     });
@@ -185,9 +181,6 @@ describe("FileOpsManager", () => {
     });
   });
 
-  // -----------------------------------------------------------------------
-  // Path safety
-  // -----------------------------------------------------------------------
   describe("path safety", () => {
     it("rejects absolute paths starting with /", async () => {
       await manager.applyRemoteOp({
@@ -254,15 +247,12 @@ describe("FileOpsManager", () => {
     });
   });
 
-  // -----------------------------------------------------------------------
-  // Binary operations
-  // -----------------------------------------------------------------------
   describe("binary operations", () => {
     it("creates binary file from base64 content", async () => {
       await manager.applyRemoteOp({
         type: "create",
         path: "image.png",
-        content: "AQID", // base64 for [1, 2, 3]
+        content: "AQID",
         binary: true,
       });
       expect(vault.createBinary).toHaveBeenCalled();
@@ -285,9 +275,6 @@ describe("FileOpsManager", () => {
     });
   });
 
-  // -----------------------------------------------------------------------
-  // Chunk assembly
-  // -----------------------------------------------------------------------
   describe("chunk assembly", () => {
     it("assembles text chunks and creates file", async () => {
       await manager.applyRemoteOp({
@@ -380,7 +367,7 @@ describe("FileOpsManager", () => {
       await manager.applyRemoteOp({
         type: "chunk-start",
         path: "huge.bin",
-        totalSize: 51 * 1024 * 1024, // > 50MB
+        totalSize: 51 * 1024 * 1024,
       });
       await manager.applyRemoteOp({
         type: "chunk-data",
@@ -397,9 +384,6 @@ describe("FileOpsManager", () => {
     });
   });
 
-  // -----------------------------------------------------------------------
-  // Error recovery in applyRemoteOp
-  // -----------------------------------------------------------------------
   describe("error recovery", () => {
     it("decrements suppressCount even when vault operation throws", async () => {
       vault.create.mockRejectedValueOnce(new Error("disk full"));
@@ -435,9 +419,6 @@ describe("FileOpsManager", () => {
     });
   });
 
-  // -----------------------------------------------------------------------
-  // Modify operations
-  // -----------------------------------------------------------------------
   describe("modify operations", () => {
     it("modifies existing text file content", async () => {
       const file = { path: "doc.md", extension: "md" };
@@ -461,9 +442,6 @@ describe("FileOpsManager", () => {
     });
   });
 
-  // -----------------------------------------------------------------------
-  // Local event edge cases
-  // -----------------------------------------------------------------------
   describe("local event edge cases", () => {
     it("handles binary file create (reads as binary)", async () => {
       const file = { path: "photo.png", extension: "png" } as any;

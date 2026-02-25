@@ -105,7 +105,6 @@ export class ManifestManager {
       }
     }
 
-    // Include empty directories so they sync to guests
     for (const item of this.vault.getAllLoadedFiles()) {
       if (!(item instanceof TFolder)) continue;
       if (!item.path || item.path === "/") continue;
@@ -156,8 +155,6 @@ export class ManifestManager {
         continue;
       }
 
-      // When backgroundSync handles text files, skip them here to avoid
-      // redundant temporary WebSocket connections.
       if (options?.skipText && !entry.binary && isTextFile(path)) continue;
 
       const localFile = this.vault.getAbstractFileByPath(path) as TFile | null;

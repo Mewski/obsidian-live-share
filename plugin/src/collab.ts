@@ -5,7 +5,7 @@ import { Notice } from "obsidian";
 import { yCollab } from "y-codemirror.next";
 
 import { type SyncManager, waitForSync } from "./sync";
-import type { SessionRole } from "./types";
+import type { Permission, SessionRole } from "./types";
 
 export class CollabManager {
   private compartment = new Compartment();
@@ -20,7 +20,7 @@ export class CollabManager {
     filePath: string | null,
     syncManager: SyncManager,
     role?: SessionRole,
-    permission?: "read-write" | "read-only",
+    permission?: Permission,
   ) {
     this.currentPath = filePath;
     if (!filePath) {
@@ -41,10 +41,8 @@ export class CollabManager {
       return;
     }
 
-    // If the file switched while we were waiting, bail
     if (this.currentPath !== filePath) return;
 
-    // Only the host seeds content to prevent duplication race
     if (role === "host") {
       const localContent = view.state.doc.toString();
       if (docHandle.text.length === 0 && localContent.length > 0) {

@@ -69,7 +69,6 @@ export function createApp(
       const baseRoomId = fullRoomName.split(":")[0];
       const room = getRoom(baseRoomId);
       const token = url.searchParams.get("token");
-      // Combine room-existence and token checks so they're indistinguishable
       if (!room || !token || !safeTokenCompare(token, room.token)) {
         socket.destroy();
         return;
@@ -135,7 +134,6 @@ export function createApp(
   return { app, server, shutdown };
 }
 
-// Only auto-start when run directly (works on all platforms including Windows)
 const isMain = process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url);
 
 if (isMain) {

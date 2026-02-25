@@ -1,19 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-// ---------------------------------------------------------------------------
-// Mocks
-// ---------------------------------------------------------------------------
-
-// Mock y-codemirror.next
 vi.mock("y-codemirror.next", () => ({
   yCollab: vi.fn((_text: any, _awareness: any) => "yCollab-extension"),
 }));
 
-// Track reconfigure calls
 const reconfigureCalls: unknown[] = [];
 const ofCalls: unknown[] = [];
 
-// Mock @codemirror/state with a proper Compartment class
 vi.mock("@codemirror/state", () => {
   class MockCompartment {
     of(ext: unknown) {
@@ -32,13 +25,11 @@ vi.mock("@codemirror/state", () => {
   };
 });
 
-// Mock sync module
 vi.mock("../sync", () => ({
   waitForSync: vi.fn(async () => {}),
   SyncManager: vi.fn(),
 }));
 
-// Import after mocks are set up
 const { CollabManager } = await import("../collab");
 const { waitForSync } = await import("../sync");
 
@@ -81,9 +72,6 @@ function createMockSyncManager(opts?: {
   };
 }
 
-// ---------------------------------------------------------------------------
-// Tests
-// ---------------------------------------------------------------------------
 describe("CollabManager", () => {
   let collab: InstanceType<typeof CollabManager>;
 

@@ -3,10 +3,10 @@ import { Notice } from "obsidian";
 import type LiveSharePlugin from "./main";
 
 interface InvitePayload {
-  s: string; // serverUrl
-  r: string; // roomId
-  t: string; // token
-  e?: string; // encryptionPassphrase (optional for backward compat)
+  s: string;
+  r: string;
+  t: string;
+  e?: string;
 }
 
 function generatePassphrase(): string {

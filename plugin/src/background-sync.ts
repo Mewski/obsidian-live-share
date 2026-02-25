@@ -31,9 +31,7 @@ export class BackgroundSync {
       if (!isTextFile(path) || entry.binary) continue;
       try {
         await this.subscribe(path);
-      } catch {
-        // Individual file failure should not abort remaining files
-      }
+      } catch {}
     }
   }
 
@@ -52,10 +50,8 @@ export class BackgroundSync {
         return;
       }
 
-      // Re-check after await; another call may have completed first
       if (this.observers.has(path)) return;
 
-      // Re-check text.length after await to avoid double-seeding
       if (this.role === "host" && docHandle.text.length === 0) {
         const file = this.vault.getAbstractFileByPath(path) as TFile | null;
         if (file) {
@@ -102,7 +98,6 @@ export class BackgroundSync {
     const oldActive = this.activeFile;
     this.activeFile = path;
 
-    // Flush old active file to disk so the background observer can take over
     if (oldActive && oldActive !== path) {
       const docHandle = this.syncManager.getDoc(oldActive);
       if (docHandle) {
@@ -119,7 +114,6 @@ export class BackgroundSync {
 
   onFileRemoved(rawPath: string): void {
     const path = normalizePath(rawPath);
-    // Cancel any pending write, do NOT flush (the file is being deleted)
     const timer = this.writeTimers.get(path);
     if (timer) {
       clearTimeout(timer);
@@ -130,7 +124,6 @@ export class BackgroundSync {
       unobserve();
       this.observers.delete(path);
     }
-    // Release the orphaned WebSocket provider
     this.syncManager.releaseDoc(path);
   }
 
@@ -138,7 +131,6 @@ export class BackgroundSync {
     const normOld = normalizePath(oldPath);
     const normNew = normalizePath(newPath);
 
-    // Cancel any pending write for the old path
     const timer = this.writeTimers.get(normOld);
     if (timer) {
       clearTimeout(timer);
@@ -157,9 +149,7 @@ export class BackgroundSync {
     if (isTextFile(normNew)) {
       try {
         await this.subscribe(normNew);
-      } catch {
-        // Non-fatal: file will sync when opened
-      }
+      } catch {}
     }
   }
 
@@ -238,7 +228,6 @@ export class BackgroundSync {
         await this.vault.create(path, content);
       }
     } catch {
-      // File write failed: will retry on next change
     } finally {
       setTimeout(() => {
         this.writtenByUs.delete(path);

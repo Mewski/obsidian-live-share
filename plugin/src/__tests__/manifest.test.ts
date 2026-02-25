@@ -51,7 +51,6 @@ function createVault() {
   };
 }
 
-// Inject a Y.Doc and Y.Map directly onto the manager's private fields.
 function injectManifest(manager: ManifestManager) {
   const doc = new Y.Doc();
   const manifest = doc.getMap<any>("files");
@@ -67,9 +66,6 @@ describe("ManifestManager", () => {
     vault = createVault();
   });
 
-  // -----------------------------------------------------------------------
-  // isSharedPath
-  // -----------------------------------------------------------------------
   describe("isSharedPath", () => {
     describe("without shared folder", () => {
       it("considers all paths shared", () => {
@@ -177,9 +173,6 @@ describe("ManifestManager", () => {
     });
   });
 
-  // -----------------------------------------------------------------------
-  // updateFile
-  // -----------------------------------------------------------------------
   describe("updateFile", () => {
     it("adds a text file entry to the manifest", async () => {
       const manager = new ManifestManager(vault as any, createSettings());
@@ -194,8 +187,8 @@ describe("ManifestManager", () => {
       const entry = manifest.get("notes/hello.md");
       expect(entry).toBeDefined();
       expect(entry.hash).toBeTypeOf("string");
-      expect(entry.hash.length).toBe(64); // SHA-256 hex = 64 chars
-      expect(entry.size).toBe(13); // "Hello, world!".length
+      expect(entry.hash.length).toBe(64);
+      expect(entry.size).toBe(13);
       expect(entry.mtime).toBe(1000);
       expect(entry.binary).toBeUndefined();
     });
@@ -235,12 +228,10 @@ describe("ManifestManager", () => {
 
     it("does nothing if manifest is not initialized", async () => {
       const manager = new ManifestManager(vault as any, createSettings());
-      // Do NOT inject manifest
       const file = {
         path: "notes/hello.md",
         stat: { size: 42, mtime: 1000 },
       } as any;
-      // Should not throw
       await manager.updateFile(file, "Hello, world!");
     });
 
@@ -259,9 +250,6 @@ describe("ManifestManager", () => {
     });
   });
 
-  // -----------------------------------------------------------------------
-  // Hash consistency
-  // -----------------------------------------------------------------------
   describe("hash computation", () => {
     it("produces the same hash for identical text content", async () => {
       const manager = new ManifestManager(vault as any, createSettings());
@@ -336,9 +324,6 @@ describe("ManifestManager", () => {
     });
   });
 
-  // -----------------------------------------------------------------------
-  // removeFile
-  // -----------------------------------------------------------------------
   describe("removeFile", () => {
     it("removes an existing file from the manifest", async () => {
       const manager = new ManifestManager(vault as any, createSettings());
@@ -381,9 +366,6 @@ describe("ManifestManager", () => {
     });
   });
 
-  // -----------------------------------------------------------------------
-  // renameFile
-  // -----------------------------------------------------------------------
   describe("renameFile", () => {
     it("moves the manifest entry from old path to new path", async () => {
       const manager = new ManifestManager(vault as any, createSettings());
@@ -469,9 +451,6 @@ describe("ManifestManager", () => {
     });
   });
 
-  // -----------------------------------------------------------------------
-  // syncFromManifest path validation
-  // -----------------------------------------------------------------------
   describe("syncFromManifest path validation", () => {
     it("rejects paths starting with /", async () => {
       const manager = new ManifestManager(vault as any, createSettings());
@@ -571,9 +550,6 @@ describe("ManifestManager", () => {
     });
   });
 
-  // -----------------------------------------------------------------------
-  // syncFromManifest skipText option
-  // -----------------------------------------------------------------------
   describe("syncFromManifest skipText", () => {
     it("skips text files when skipText is true", async () => {
       const manager = new ManifestManager(vault as any, createSettings());
@@ -592,7 +568,6 @@ describe("ManifestManager", () => {
         skipText: true,
       });
 
-      // Only the binary file should be synced; the .md is skipped
       expect(synced).toBe(1);
       expect(requestBinary).toHaveBeenCalledWith("image.png");
       expect(vault.create).not.toHaveBeenCalled();
@@ -609,14 +584,10 @@ describe("ManifestManager", () => {
         skipText: false,
       });
 
-      // Provider WAS constructed (text file not skipped)
       expect(MockWebsocketProvider).toHaveBeenCalled();
     });
   });
 
-  // -----------------------------------------------------------------------
-  // onManifestChange
-  // -----------------------------------------------------------------------
   describe("onManifestChange", () => {
     it("fires callback with added keys on new entries", () => {
       const manager = new ManifestManager(vault as any, createSettings());
@@ -687,7 +658,7 @@ describe("ManifestManager", () => {
       manager.onManifestChange(() => secondCalls.push(1));
       manifest.set("b.md", { hash: "def", size: 10, mtime: 1000 });
 
-      expect(firstCalls.length).toBe(1); // no new calls
+      expect(firstCalls.length).toBe(1);
       expect(secondCalls.length).toBe(1);
     });
 
@@ -697,9 +668,6 @@ describe("ManifestManager", () => {
     });
   });
 
-  // -----------------------------------------------------------------------
-  // addFolder
-  // -----------------------------------------------------------------------
   describe("addFolder", () => {
     it("adds a directory entry to the manifest", () => {
       const manager = new ManifestManager(vault as any, createSettings());
@@ -741,9 +709,6 @@ describe("ManifestManager", () => {
     });
   });
 
-  // -----------------------------------------------------------------------
-  // syncFromManifest directory entries
-  // -----------------------------------------------------------------------
   describe("syncFromManifest directories", () => {
     it("creates directories from directory entries", async () => {
       const manager = new ManifestManager(vault as any, createSettings());
@@ -795,9 +760,6 @@ describe("ManifestManager", () => {
     });
   });
 
-  // -----------------------------------------------------------------------
-  // destroy
-  // -----------------------------------------------------------------------
   describe("destroy", () => {
     it("cleans up doc, manifest, and observer", () => {
       const manager = new ManifestManager(vault as any, createSettings());

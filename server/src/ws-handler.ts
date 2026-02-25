@@ -7,11 +7,11 @@ import * as syncProtocol from "y-protocols/sync";
 import * as Y from "yjs";
 
 import { getPermission } from "./permissions.js";
-import { type Persistence, getDefaultPersistence } from "./persistence.js";
+import { type Permission, type Persistence, getDefaultPersistence } from "./persistence.js";
 
-const MESSAGE_SYNC = 0; // Yjs sync protocol
-const MESSAGE_AWARENESS = 1; // Awareness state (cursors, presence)
-const MESSAGE_FILE_OP = 2; // Non-Yjs file operations broadcast
+const MESSAGE_SYNC = 0;
+const MESSAGE_AWARENESS = 1;
+const MESSAGE_FILE_OP = 2;
 
 interface RoomState {
   doc: Y.Doc;
@@ -36,7 +36,6 @@ function toUint8Array(raw: Buffer | ArrayBuffer | Buffer[]): Uint8Array {
   return new Uint8Array(buf.buffer, buf.byteOffset, buf.byteLength);
 }
 
-// Yjs sync protocol sub-types (from y-protocols/sync)
 const SYNC_STEP2 = 1;
 const SYNC_UPDATE = 2;
 
@@ -46,8 +45,6 @@ function handleMessage(ws: WebSocket, state: RoomState, data: Uint8Array) {
 
   switch (msgType) {
     case MESSAGE_SYNC: {
-      // Peek at the sync sub-type to enforce read-only permissions.
-      // Step2 and Update carry document mutations; block them for read-only clients.
       const syncType = decoding.peekVarUint(decoder);
       if (state.readOnlyClients.has(ws) && (syncType === SYNC_STEP2 || syncType === SYNC_UPDATE)) {
         break;
@@ -197,8 +194,6 @@ export function createYjsWSS(persist?: Persistence) {
       return existing;
     }
 
-    // Prevent TOCTOU race: reuse pending promise if another connection
-    // is already creating this room
     const pending = pendingRooms.get(roomId);
     if (pending) return pending;
 
@@ -313,12 +308,7 @@ export function createYjsWSS(persist?: Persistence) {
     });
   });
 
-  /** Update read-only status for a userId across all Yjs rooms matching a base room ID. */
-  function updatePermission(
-    baseRoomId: string,
-    userId: string,
-    permission: "read-write" | "read-only",
-  ) {
+  function updatePermission(baseRoomId: string, userId: string, permission: Permission) {
     for (const [rid, state] of roomStates) {
       if (extractBaseRoomId(rid) !== baseRoomId) continue;
       for (const [ws, uid] of state.clientUserIds) {

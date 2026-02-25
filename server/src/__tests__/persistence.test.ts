@@ -28,7 +28,7 @@ describe("persistence", () => {
     const text1 = doc1.getText("content");
     text1.insert(0, "first");
     text1.insert(5, " second");
-    text1.delete(0, 5); // delete "first"
+    text1.delete(0, 5);
 
     const update = Y.encodeStateAsUpdate(doc1);
 
@@ -85,13 +85,11 @@ describe("persistence", () => {
     try {
       persistence = createLevelPersistence(dbPath);
 
-      // Create and persist a doc with content
       const doc1 = new Y.Doc();
       doc1.getText("content").insert(0, "persisted via LevelDB");
       await persistence.persistDoc("test-doc", doc1);
       doc1.destroy();
 
-      // Load into a fresh doc and verify content
       const doc2 = new Y.Doc();
       await persistence.loadDoc("test-doc", doc2);
       expect(doc2.getText("content").toString()).toBe("persisted via LevelDB");

@@ -367,7 +367,6 @@ describe("ControlChannel", () => {
         op: { type: "create", path: "a.md", content: "hello" },
       });
 
-      // Give the async encryptAndSend time to settle
       await new Promise((r) => setTimeout(r, 50));
       expect(ws.sent).toHaveLength(0);
     });

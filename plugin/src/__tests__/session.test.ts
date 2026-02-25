@@ -1,17 +1,5 @@
 import { describe, expect, it } from "vitest";
 
-// The SessionManager.parseInvite() method is private, so we replicate its
-// validation logic here to unit-test the invite format independently of any
-// network calls. The format is:
-//
-//   obsliveshare:{base64(JSON.stringify({ s: serverUrl, r: roomId, t: token }))}
-//
-// Validation rules (from session.ts):
-//   - Must start with "obsliveshare:"
-//   - Base64 payload must decode to valid JSON
-//   - JSON must contain string fields `s`, `r`, `t`
-//   - `s` must be a valid URL with http: or https: protocol (Bug 1.14 fix)
-
 interface InvitePayload {
   s: string;
   r: string;

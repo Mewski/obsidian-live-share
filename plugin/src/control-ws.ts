@@ -91,9 +91,7 @@ export class ControlChannel {
         if (handlers) {
           for (const handler of handlers) handler(msg);
         }
-      } catch {
-        // Malformed JSON; ignore non-parseable messages
-      }
+      } catch {}
     };
 
     this.ws.onclose = () => {
@@ -174,9 +172,7 @@ export class ControlChannel {
           this.ws.send(JSON.stringify(msg));
         }
       }
-    } catch {
-      // Encryption failed; drop the message rather than sending plaintext
-    }
+    } catch {}
   }
 
   private async decryptAndDispatch(msg: ControlMessage): Promise<void> {
@@ -216,9 +212,7 @@ export class ControlChannel {
       if (handlers) {
         for (const handler of handlers) handler(decryptedMsg as ControlMessage);
       }
-    } catch {
-      // Decryption failed; ignore malformed/miskeyed message
-    }
+    } catch {}
   }
 
   on(type: ControlMessageType, handler: Handler): void {

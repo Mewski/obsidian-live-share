@@ -91,7 +91,7 @@ describe("arrayBufferToBase64 / base64ToArrayBuffer", () => {
   });
 
   it("produces valid base64 string", () => {
-    const data = new Uint8Array([72, 101, 108, 108, 111]); // "Hello"
+    const data = new Uint8Array([72, 101, 108, 108, 111]);
     const b64 = arrayBufferToBase64(data.buffer as ArrayBuffer);
     expect(b64).toBe("SGVsbG8=");
   });

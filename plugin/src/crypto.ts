@@ -31,8 +31,6 @@ export class E2ECrypto {
   }
 
   async init(): Promise<void> {
-    // Use a deterministic salt derived from the passphrase so all peers
-    // with the same passphrase derive the same key without a key-exchange step.
     const raw = new TextEncoder().encode(passphraseSaltInput(this.passphrase));
     const hashBuf = await crypto.subtle.digest("SHA-256", raw);
     this.salt = new Uint8Array(hashBuf).slice(0, SALT_BYTES);

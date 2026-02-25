@@ -37,7 +37,6 @@ describe("rooms API", () => {
   let port: number;
 
   beforeEach(async () => {
-    // Each test gets a fresh server but shares the in-memory room store
     const { server: s } = setupApp();
     server = s;
     port = await listen(server);
@@ -133,11 +132,9 @@ describe("rooms API", () => {
     const roomId = create.data.id as string;
     const token = create.data.token as string;
 
-    // Verify room exists
     const before = await req(port, "GET", `/rooms/${roomId}`);
     expect(before.status).toBe(200);
 
-    // Delete with valid bearer token
     const deleteRes = await fetch(`http://localhost:${port}/rooms/${roomId}`, {
       method: "DELETE",
       headers: { Authorization: `Bearer ${token}` },
@@ -146,7 +143,6 @@ describe("rooms API", () => {
     const deleteData = await deleteRes.json();
     expect(deleteData.ok).toBe(true);
 
-    // Verify room is gone
     const after = await req(port, "GET", `/rooms/${roomId}`);
     expect(after.status).toBe(404);
     expect(getRoom(roomId)).toBeUndefined();
@@ -164,7 +160,6 @@ describe("rooms API", () => {
     });
     expect(deleteRes.status).toBe(403);
 
-    // Room should still exist
     const after = await req(port, "GET", `/rooms/${roomId}`);
     expect(after.status).toBe(200);
     expect(getRoom(roomId)).toBeDefined();

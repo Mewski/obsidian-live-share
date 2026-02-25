@@ -75,7 +75,7 @@ describe("ConnectionStateManager", () => {
     it("is NOT called when state does not change (same transition twice)", () => {
       const listener = vi.fn();
 
-      csm.transition({ type: "connect" }); // disconnected -> connecting
+      csm.transition({ type: "connect" });
       csm.onChange(listener);
 
       csm.transition({ type: "connect" });
@@ -92,7 +92,7 @@ describe("ConnectionStateManager", () => {
       unsubscribe();
 
       csm.transition({ type: "connected" });
-      expect(listener).toHaveBeenCalledTimes(1); // still 1, not 2
+      expect(listener).toHaveBeenCalledTimes(1);
     });
 
     it("notifies multiple listeners", () => {
@@ -110,9 +110,6 @@ describe("ConnectionStateManager", () => {
     });
   });
 
-  // -----------------------------------------------------------------------
-  // Transitions from every state
-  // -----------------------------------------------------------------------
   describe("transitions from every state", () => {
     it("error -> connecting via connect event", () => {
       csm.transition({ type: "error", message: "fail" });
@@ -169,9 +166,6 @@ describe("ConnectionStateManager", () => {
     });
   });
 
-  // -----------------------------------------------------------------------
-  // No-op transitions (same state, no listener fire)
-  // -----------------------------------------------------------------------
   describe("no-op transitions", () => {
     it("connecting -> connect event stays connecting (no listener fire)", () => {
       const listener = vi.fn();
@@ -204,9 +198,6 @@ describe("ConnectionStateManager", () => {
     });
   });
 
-  // -----------------------------------------------------------------------
-  // Rapid transitions
-  // -----------------------------------------------------------------------
   describe("rapid transitions", () => {
     it("handles many rapid transitions correctly", () => {
       const listener = vi.fn();

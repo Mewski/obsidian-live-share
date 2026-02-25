@@ -1,5 +1,6 @@
 import { ItemView } from "obsidian";
 
+import type { Permission } from "./types";
 import { HEX_COLOR_RE } from "./utils";
 
 export const PRESENCE_VIEW_TYPE = "live-share-presence";
@@ -12,7 +13,7 @@ export interface PresenceUser {
   scrollTop?: number;
   isHost?: boolean;
   line?: number;
-  permission?: "read-write" | "read-only";
+  permission?: Permission;
 }
 
 export class PresenceView extends ItemView {

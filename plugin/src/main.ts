@@ -27,7 +27,6 @@ import { DEFAULT_SETTINGS, type LiveShareSettings } from "./types";
 import { isTextFile, normalizePath } from "./utils";
 
 function getCmView(view: MarkdownView): import("@codemirror/view").EditorView | undefined {
-  // biome-ignore lint/suspicious/noExplicitAny: Obsidian internal; editor.cm is untyped
   return (view.editor as any).cm as import("@codemirror/view").EditorView | undefined;
 }
 
@@ -51,7 +50,6 @@ export default class LiveSharePlugin extends Plugin {
   private connectionStateUnsub: (() => void) | null = null;
   statusBarEl!: HTMLElement;
 
-  // Prevents re-entrant endSession calls from kicked/session-end handlers.
   private isEndingSession = false;
 
   private requestBinaryFile = (path: string) => {
@@ -425,7 +423,6 @@ export default class LiveSharePlugin extends Plugin {
     this.manifestManager.updateSettings(this.settings);
   }
 
-  /** Tear down partially-initialised connection state after a failure. */
   private async abortSession(message: string) {
     if (this.isEndingSession) return;
     this.isEndingSession = true;
@@ -678,13 +675,10 @@ export default class LiveSharePlugin extends Plugin {
       this.settings.permission = permission;
       await this.saveSettings();
 
-      // Detach yCollab from CM BEFORE destroying Y.Docs to prevent the
-      // editor from writing into a destroyed Y.Text.
       const activeView = this.app.workspace.getActiveViewOfType(MarkdownView);
       const cmView = activeView ? getCmView(activeView) : undefined;
       if (cmView) this.collabManager.deactivateAll(cmView);
 
-      // Remember which file was active so backgroundSync skips it during startAll
       const activeFilePath = activeView?.file?.path ?? null;
       const activeSharedPath =
         activeFilePath &&
@@ -693,7 +687,6 @@ export default class LiveSharePlugin extends Plugin {
           ? activeFilePath
           : null;
 
-      // Recreate Yjs providers so they use the updated permission param
       this.backgroundSync.destroy();
       this.syncManager.disconnect();
       this.manifestManager.destroy();
@@ -702,7 +695,6 @@ export default class LiveSharePlugin extends Plugin {
       try {
         this.syncManager.connect();
         await this.manifestManager.connect();
-        // Set the active file before startAll so it doesn't double-subscribe
         this.backgroundSync.setActiveFile(activeSharedPath);
         await this.backgroundSync.startAll(this.settings.role ?? "guest");
         this.registerManifestChangeHandler();

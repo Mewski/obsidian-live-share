@@ -7,7 +7,6 @@ import { safeTokenCompare } from "./util.js";
 
 export type { Room };
 
-// Rooms with no activity for 24 hours are cleaned up on startup
 const ROOM_MAX_AGE_MS = 24 * 60 * 60 * 1000;
 
 const rooms = new Map<string, Room>();
@@ -67,7 +66,6 @@ export function getRoom(id: string): Room | undefined {
 
 export const roomRouter = Router();
 
-// biome-ignore lint/suspicious/noControlCharactersInRegex: intentional; validates user input
 const CONTROL_CHARS = /[\x00-\x1f\x7f]/;
 
 roomRouter.post("/", async (req, res) => {

@@ -83,10 +83,6 @@ describe("BackgroundSync", () => {
     vi.useRealTimers();
   });
 
-  // -----------------------------------------------------------------------
-  // startAll
-  // -----------------------------------------------------------------------
-
   it("subscribes to all text files from manifest", async () => {
     const entries = new Map([
       ["notes/hello.md", { hash: "abc", size: 5, mtime: 1 }],
@@ -98,7 +94,6 @@ describe("BackgroundSync", () => {
 
     await bg.startAll("host");
 
-    // Should have created docs for 2 text files, not the binary
     expect(syncManager._docs.has("notes/hello.md")).toBe(true);
     expect(syncManager._docs.has("notes/world.md")).toBe(true);
     expect(syncManager._docs.has("images/photo.png")).toBe(false);
@@ -124,7 +119,6 @@ describe("BackgroundSync", () => {
     vault.read.mockResolvedValue("local content");
     bg = new BackgroundSync(vault, syncManager, manifestManager, fileOpsManager);
 
-    // Pre-populate Y.Text
     const { text } = syncManager.getDoc("test.md");
     text.insert(0, "existing remote content");
 
@@ -141,20 +135,14 @@ describe("BackgroundSync", () => {
     vault.read.mockResolvedValue("old content");
     bg = new BackgroundSync(vault, syncManager, manifestManager, fileOpsManager);
 
-    // Pre-populate Y.Text with remote content
     const { text } = syncManager.getDoc("test.md");
     text.insert(0, "remote content");
 
     await bg.startAll("guest");
-    // Flush suppression timer
     vi.advanceTimersByTime(200);
 
     expect(vault.modify).toHaveBeenCalledWith(fakeFile, "remote content");
   });
-
-  // -----------------------------------------------------------------------
-  // setActiveFile
-  // -----------------------------------------------------------------------
 
   it("flushes old active file to disk on switch", async () => {
     const entries = new Map([
@@ -170,24 +158,17 @@ describe("BackgroundSync", () => {
 
     await bg.startAll("host");
 
-    // Simulate content in a.md Y.Doc
     const { text: textA } = syncManager.getDoc("a.md");
     textA.delete(0, textA.length);
     textA.insert(0, "content of A");
 
     bg.setActiveFile("a.md");
-    // a.md is now active, no flush yet
 
-    // Switch to b.md: should flush a.md to disk
     vault.modify.mockClear();
     bg.setActiveFile("b.md");
 
     expect(vault.modify).toHaveBeenCalledWith({ path: "a.md" }, "content of A");
   });
-
-  // -----------------------------------------------------------------------
-  // observer skips active file
-  // -----------------------------------------------------------------------
 
   it("does not write to disk for the active file", async () => {
     const entries = new Map([["test.md", { hash: "abc", size: 5, mtime: 1 }]]);
@@ -200,9 +181,7 @@ describe("BackgroundSync", () => {
     bg.setActiveFile("test.md");
     vault.modify.mockClear();
 
-    // Simulate a remote change
     const { doc } = syncManager.getDoc("test.md");
-    // Apply via a separate doc to simulate a remote transaction
     const remoteDoc = new Y.Doc();
     const remoteText = remoteDoc.getText("content");
     remoteText.insert(0, "remote edit");
@@ -211,13 +190,8 @@ describe("BackgroundSync", () => {
 
     vi.advanceTimersByTime(2000);
 
-    // Active file should NOT be written by background sync
     expect(vault.modify).not.toHaveBeenCalled();
   });
-
-  // -----------------------------------------------------------------------
-  // debounced disk write for background files
-  // -----------------------------------------------------------------------
 
   it("writes remote changes to disk after debounce", async () => {
     const entries = new Map([["bg.md", { hash: "abc", size: 5, mtime: 1 }]]);
@@ -227,11 +201,9 @@ describe("BackgroundSync", () => {
     bg = new BackgroundSync(vault, syncManager, manifestManager, fileOpsManager);
 
     await bg.startAll("guest");
-    // Set a different file as active so bg.md is a background file
     bg.setActiveFile("other.md");
     vault.modify.mockClear();
 
-    // Simulate remote change
     const { doc } = syncManager.getDoc("bg.md");
     const remoteDoc = new Y.Doc();
     const remoteText = remoteDoc.getText("content");
@@ -239,20 +211,13 @@ describe("BackgroundSync", () => {
     Y.applyUpdate(doc, Y.encodeStateAsUpdate(remoteDoc));
     remoteDoc.destroy();
 
-    // Before debounce: no write yet
     expect(vault.modify).not.toHaveBeenCalled();
 
-    // After debounce
     vi.advanceTimersByTime(1100);
-    // Allow async to flush
     await vi.advanceTimersByTimeAsync(0);
 
     expect(vault.modify).toHaveBeenCalledWith({ path: "bg.md" }, "background edit");
   });
-
-  // -----------------------------------------------------------------------
-  // handleLocalTextModify
-  // -----------------------------------------------------------------------
 
   it("host pushes local text changes into Y.Doc", async () => {
     const entries = new Map([["note.md", { hash: "abc", size: 5, mtime: 1 }]]);
@@ -264,7 +229,6 @@ describe("BackgroundSync", () => {
 
     await bg.startAll("host");
 
-    // Now simulate an external edit
     vault.read.mockResolvedValue("updated externally");
     await bg.handleLocalTextModify("note.md");
 
@@ -287,7 +251,6 @@ describe("BackgroundSync", () => {
     await bg.handleLocalTextModify("note.md");
 
     const { text } = syncManager.getDoc("note.md");
-    // Should still be "initial" because active file is skipped
     expect(text.toString()).toBe("initial");
   });
 
@@ -300,7 +263,6 @@ describe("BackgroundSync", () => {
 
     await bg.startAll("host");
 
-    // Trigger a background write to set writtenByUs
     const { doc } = syncManager.getDoc("note.md");
     const remoteDoc = new Y.Doc();
     const remoteText = remoteDoc.getText("content");
@@ -311,20 +273,14 @@ describe("BackgroundSync", () => {
     vi.advanceTimersByTime(1100);
     await vi.advanceTimersByTimeAsync(0);
 
-    // Now writtenByUs should be set (within the 100ms window)
     expect(bg.isWrittenByUs("note.md")).toBe(true);
 
     vault.read.mockResolvedValue("local edit during suppression");
     await bg.handleLocalTextModify("note.md");
 
-    // Should not have pushed local content because writtenByUs
     const { text } = syncManager.getDoc("note.md");
     expect(text.toString()).toBe("from remote");
   });
-
-  // -----------------------------------------------------------------------
-  // onFileAdded / onFileRemoved
-  // -----------------------------------------------------------------------
 
   it("onFileAdded subscribes a new text file", async () => {
     vault.getAbstractFileByPath.mockReturnValue(null);
@@ -349,7 +305,6 @@ describe("BackgroundSync", () => {
 
     bg.onFileRemoved("rm.md");
 
-    // Simulate remote change (should NOT trigger a write)
     vault.modify.mockClear();
     const { doc } = syncManager.getDoc("rm.md");
     const remoteDoc = new Y.Doc();
@@ -364,10 +319,6 @@ describe("BackgroundSync", () => {
     expect(vault.modify).not.toHaveBeenCalled();
   });
 
-  // -----------------------------------------------------------------------
-  // destroy
-  // -----------------------------------------------------------------------
-
   it("destroy flushes pending writes and cleans up", async () => {
     const entries = new Map([["flush.md", { hash: "abc", size: 5, mtime: 1 }]]);
     manifestManager = createManifestManager(entries);
@@ -378,7 +329,6 @@ describe("BackgroundSync", () => {
     await bg.startAll("guest");
     vault.modify.mockClear();
 
-    // Simulate remote change: starts debounce timer
     const { doc } = syncManager.getDoc("flush.md");
     const remoteDoc = new Y.Doc();
     const remoteText = remoteDoc.getText("content");
@@ -386,7 +336,6 @@ describe("BackgroundSync", () => {
     Y.applyUpdate(doc, Y.encodeStateAsUpdate(remoteDoc));
     remoteDoc.destroy();
 
-    // Destroy before debounce fires: should flush immediately
     bg.destroy();
 
     expect(vault.modify).toHaveBeenCalledWith({ path: "flush.md" }, "pending content");

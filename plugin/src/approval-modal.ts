@@ -1,5 +1,7 @@
 import { type App, Modal } from "obsidian";
 
+import type { Permission } from "./types";
+
 export interface JoinRequest {
   userId: string;
   displayName: string;
@@ -8,13 +10,13 @@ export interface JoinRequest {
 
 export class ApprovalModal extends Modal {
   private request: JoinRequest;
-  private onDecision: (approved: boolean, permission: "read-write" | "read-only") => void;
+  private onDecision: (approved: boolean, permission: Permission) => void;
   private hasDecided = false;
 
   constructor(
     app: App,
     request: JoinRequest,
-    onDecision: (approved: boolean, permission: "read-write" | "read-only") => void,
+    onDecision: (approved: boolean, permission: Permission) => void,
   ) {
     super(app);
     this.request = request;

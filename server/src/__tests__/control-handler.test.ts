@@ -155,7 +155,7 @@ describe("Control WebSocket handler", () => {
 
     sendJSON(host.ws, { type: "kick", userId: "guest-1" });
 
-    await waitForMessages(guest.messages, 2); // presence-update from host + kicked message
+    await waitForMessages(guest.messages, 2);
 
     const kicked = guest.messages.find((m) => {
       const parsed = JSON.parse(m);
@@ -194,7 +194,7 @@ describe("Control WebSocket handler", () => {
 
     sendJSON(host.ws, { type: "kick", userId: "guest-1" });
 
-    await waitForMessages(guest.messages, 2); // presence from host + kicked
+    await waitForMessages(guest.messages, 2);
 
     const kickedMsg = guest.messages.find((m) => {
       const parsed = JSON.parse(m);
@@ -346,7 +346,6 @@ describe("Control WebSocket handler", () => {
     const serverRoom = getRoom(room.id);
     expect(serverRoom).toBeDefined();
 
-    // Connect host first with read-write, then switch to read-only for the guest
     serverRoom!.defaultPermission = "read-write";
     const host = await connectControl(room.id, room.token);
     await new Promise((r) => setTimeout(r, 50));
@@ -405,8 +404,6 @@ describe("Control WebSocket handler", () => {
 
     await new Promise((r) => setTimeout(r, 300));
 
-    // Room cleanup is delayed (35s) to let Yjs clients persist first.
-    // Verify a new connection still works during the grace period.
     const lateComer = await connectControl(room.id, room.token);
     expect(lateComer.ws.readyState).toBe(WebSocket.OPEN);
     lateComer.ws.close();
@@ -437,7 +434,7 @@ describe("Control WebSocket handler", () => {
       displayName: "Guest",
     });
 
-    await waitForMessages(guest.messages, 1 + 1); // presence from host + join-response
+    await waitForMessages(guest.messages, 1 + 1);
     const joinResponse = guest.messages.find((m) => {
       const parsed = JSON.parse(m);
       return parsed.type === "join-response";
@@ -542,7 +539,6 @@ describe("Control WebSocket handler", () => {
       client.ws.on("close", (code: number) => resolve(code));
     });
 
-    // Send 101 messages rapidly to exceed the 100 per 10s limit
     for (let i = 0; i < 101; i++) {
       if (client.ws.readyState === WebSocket.OPEN) {
         sendJSON(client.ws, { type: "ping", timestamp: Date.now() });
@@ -556,13 +552,11 @@ describe("Control WebSocket handler", () => {
   it("cleans up pending approval on client disconnect", async () => {
     const room = await createRoom("ctrl-pending-cleanup");
 
-    // Enable requireApproval on the room
     const { getRoom } = await import("../rooms.js");
     const serverRoom = getRoom(room.id);
     expect(serverRoom).toBeDefined();
     serverRoom!.requireApproval = true;
 
-    // Connect host
     const host = await connectControl(room.id, room.token);
     await new Promise((r) => setTimeout(r, 50));
 
@@ -574,11 +568,9 @@ describe("Control WebSocket handler", () => {
     });
     await new Promise((r) => setTimeout(r, 100));
 
-    // Connect guest
     const guest = await connectControl(room.id, room.token);
     await new Promise((r) => setTimeout(r, 50));
 
-    // Guest sends join-request (room requires approval so it goes pending)
     host.messages.length = 0;
     sendJSON(guest.ws, {
       type: "join-request",
@@ -586,20 +578,17 @@ describe("Control WebSocket handler", () => {
       displayName: "PendingGuest",
     });
 
-    // Host should receive the join-request
     await waitForMessages(host.messages, 1);
     const joinReq = JSON.parse(host.messages[0]);
     expect(joinReq.type).toBe("join-request");
     expect(joinReq.userId).toBe("guest-pending");
 
-    // Guest disconnects before host approves
     const guestClosed = new Promise<void>((resolve) => {
       guest.ws.on("close", () => resolve());
     });
     guest.ws.close();
     await guestClosed;
 
-    // Now host tries to approve the already-disconnected guest
     host.messages.length = 0;
     sendJSON(host.ws, {
       type: "join-response",
@@ -608,9 +597,7 @@ describe("Control WebSocket handler", () => {
       permission: "read-write",
     });
 
-    // No crash, and nothing should happen since the guest WS is gone
     await new Promise((r) => setTimeout(r, 300));
-    // The server should not have thrown; test passes if we reach here
   });
 
   it("host can change guest permission via set-permission", async () => {
@@ -637,7 +624,6 @@ describe("Control WebSocket handler", () => {
     guest.messages.length = 0;
     host.messages.length = 0;
 
-    // Host changes guest to read-only
     sendJSON(host.ws, {
       type: "set-permission",
       userId: "guest-1",
@@ -649,7 +635,6 @@ describe("Control WebSocket handler", () => {
     expect(permMsg.type).toBe("permission-update");
     expect(permMsg.permission).toBe("read-only");
 
-    // Now guest's file-ops should be blocked
     guest.messages.length = 0;
     host.messages.length = 0;
 
@@ -663,7 +648,6 @@ describe("Control WebSocket handler", () => {
     await new Promise((r) => setTimeout(r, 300));
     expect(host.messages.length).toBe(0);
 
-    // Host changes guest back to read-write
     sendJSON(host.ws, {
       type: "set-permission",
       userId: "guest-1",
@@ -675,7 +659,6 @@ describe("Control WebSocket handler", () => {
     expect(permMsg2.type).toBe("permission-update");
     expect(permMsg2.permission).toBe("read-write");
 
-    // Now file-ops should go through
     guest.messages.length = 0;
     host.messages.length = 0;
 
@@ -716,7 +699,6 @@ describe("Control WebSocket handler", () => {
     host.messages.length = 0;
     guest.messages.length = 0;
 
-    // Guest tries to change host's permission (should be ignored)
     sendJSON(guest.ws, {
       type: "set-permission",
       userId: "host-1",
@@ -724,7 +706,6 @@ describe("Control WebSocket handler", () => {
     });
 
     await new Promise((r) => setTimeout(r, 300));
-    // Host should not receive a permission-update
     const permMsg = host.messages.find((m) => {
       const parsed = JSON.parse(m);
       return parsed.type === "permission-update";
@@ -740,7 +721,6 @@ describe("Control WebSocket handler", () => {
     expect(serverRoom).toBeDefined();
     serverRoom!.requireApproval = true;
 
-    // Connect host and identify
     const host = await connectControl(room.id, room.token);
     await new Promise((r) => setTimeout(r, 50));
     sendJSON(host.ws, {
@@ -751,7 +731,6 @@ describe("Control WebSocket handler", () => {
     });
     await new Promise((r) => setTimeout(r, 100));
 
-    // Connect guest: sends join-request but is NOT approved yet
     const guest = await connectControl(room.id, room.token);
     await new Promise((r) => setTimeout(r, 50));
     sendJSON(guest.ws, {
@@ -761,7 +740,6 @@ describe("Control WebSocket handler", () => {
     });
     await new Promise((r) => setTimeout(r, 100));
 
-    // Guest tries to send file-op while unapproved (should be blocked)
     host.messages.length = 0;
     sendJSON(guest.ws, {
       type: "file-op",
@@ -781,7 +759,6 @@ describe("Control WebSocket handler", () => {
   it("userId cannot be changed via second join-request", async () => {
     const room = await createRoom("ctrl-userid-lock");
 
-    // First client becomes host via join-request
     const host = await connectControl(room.id, room.token);
     await new Promise((r) => setTimeout(r, 50));
     sendJSON(host.ws, {
@@ -791,7 +768,6 @@ describe("Control WebSocket handler", () => {
     });
     await new Promise((r) => setTimeout(r, 100));
 
-    // Second client sends join-request with "original-id"
     const guest = await connectControl(room.id, room.token);
     await new Promise((r) => setTimeout(r, 50));
     sendJSON(guest.ws, {
@@ -801,7 +777,6 @@ describe("Control WebSocket handler", () => {
     });
     await new Promise((r) => setTimeout(r, 100));
 
-    // Guest sends another join-request trying to change userId
     sendJSON(guest.ws, {
       type: "join-request",
       userId: "spoofed-id",
@@ -809,12 +784,10 @@ describe("Control WebSocket handler", () => {
     });
     await new Promise((r) => setTimeout(r, 100));
 
-    // Host kicks "spoofed-id" (should NOT affect guest, userId is still "original-id")
     sendJSON(host.ws, { type: "kick", userId: "spoofed-id" });
     await new Promise((r) => setTimeout(r, 300));
     expect(guest.ws.readyState).toBe(WebSocket.OPEN);
 
-    // Host kicks "original-id" (SHOULD kick the guest)
     const guestClosed = new Promise<void>((resolve) => {
       guest.ws.on("close", () => resolve());
     });
@@ -829,7 +802,6 @@ describe("Control WebSocket handler", () => {
     const client = await connectControl(room.id, room.token);
     await new Promise((r) => setTimeout(r, 50));
 
-    // Send join-request (not presence-update): should become host
     sendJSON(client.ws, {
       type: "join-request",
       userId: "first-user",
@@ -837,7 +809,6 @@ describe("Control WebSocket handler", () => {
     });
     await new Promise((r) => setTimeout(r, 100));
 
-    // Connect a second client
     const guest = await connectControl(room.id, room.token);
     await new Promise((r) => setTimeout(r, 50));
     sendJSON(guest.ws, {
@@ -847,7 +818,6 @@ describe("Control WebSocket handler", () => {
     });
     await new Promise((r) => setTimeout(r, 100));
 
-    // First client should be able to kick (proves they are host)
     const guestClosed = new Promise<void>((resolve) => {
       guest.ws.on("close", () => resolve());
     });
@@ -879,7 +849,6 @@ describe("Control WebSocket handler", () => {
     await new Promise((r) => setTimeout(r, 100));
     guest.messages.length = 0;
 
-    // Host sends invalid permission value
     sendJSON(host.ws, {
       type: "set-permission",
       userId: "guest-1",
@@ -887,7 +856,6 @@ describe("Control WebSocket handler", () => {
     });
 
     await new Promise((r) => setTimeout(r, 300));
-    // Guest should not receive anything
     expect(guest.messages.length).toBe(0);
   });
 });
