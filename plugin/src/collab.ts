@@ -54,9 +54,7 @@ export class CollabManager {
       }
     }
 
-    const extensions: Extension[] = [
-      yCollab(docHandle.text, docHandle.provider.awareness),
-    ];
+    const extensions: Extension[] = [yCollab(docHandle.text, docHandle.provider.awareness)];
     if (permission === "read-only") {
       extensions.push(EditorState.readOnly.of(true));
     }

@@ -56,11 +56,7 @@ function connectControl(
   });
 }
 
-function waitForMessages(
-  messages: string[],
-  count: number,
-  timeoutMs = 3000,
-): Promise<void> {
+function waitForMessages(messages: string[], count: number, timeoutMs = 3000): Promise<void> {
   if (messages.length >= count) return Promise.resolve();
   return new Promise((resolve, reject) => {
     const start = Date.now();
@@ -89,10 +85,7 @@ beforeEach(async () => {
 
 afterEach(async () => {
   for (const ws of openSockets) {
-    if (
-      ws.readyState === WebSocket.OPEN ||
-      ws.readyState === WebSocket.CONNECTING
-    ) {
+    if (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING) {
       ws.close();
     }
   }
