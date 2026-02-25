@@ -37,7 +37,6 @@ function toUint8Array(raw: Buffer | ArrayBuffer | Buffer[]): Uint8Array {
   return new Uint8Array(buf.buffer, buf.byteOffset, buf.byteLength);
 }
 
-const syncStep1 = 0;
 const syncStep2 = 1;
 const syncUpdate = 2;
 
