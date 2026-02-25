@@ -28,6 +28,12 @@ jobs:
           npm ci
           npm run build
 
+      - name: Package
+        run: |
+          mkdir obsidian-live-share
+          cp main.js manifest.json styles.css obsidian-live-share/
+          zip -r obsidian-live-share.zip obsidian-live-share
+
       - name: Create release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -37,4 +43,4 @@ jobs:
             --title="$tag" \
             --generate-notes \
             --repo="$GITHUB_REPOSITORY" \
-            main.js manifest.json styles.css
+            main.js manifest.json styles.css obsidian-live-share.zip
