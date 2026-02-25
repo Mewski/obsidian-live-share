@@ -1,6 +1,6 @@
 {
   "name": "obsidian-live-share",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "private": true,
   "main": "main.js",
   "scripts": {
