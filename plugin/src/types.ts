@@ -1,3 +1,4 @@
+/** Shared TypeScript types and default settings. */
 export type SessionRole = "host" | "guest" | null;
 
 export interface LiveShareSettings {

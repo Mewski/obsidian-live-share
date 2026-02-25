@@ -4,5 +4,6 @@ data/
 dist/
 node_modules/
 result/
-main.js
 *.tsbuildinfo
+.envrc
+main.js

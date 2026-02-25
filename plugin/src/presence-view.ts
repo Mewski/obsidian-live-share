@@ -1,3 +1,4 @@
+/** Sidebar panel showing connected users with follow, kick, and summon controls. */
 import { ItemView, WorkspaceLeaf } from "obsidian";
 
 export const PRESENCE_VIEW_TYPE = "live-share-presence";
@@ -44,22 +45,16 @@ export class PresenceView extends ItemView {
     this.summonHandler = handler;
   }
 
-  setFollowedUser(userId: string | null) {
-    this.followedUserId = userId;
-    this.render();
-  }
-
   setIsHost(isHost: boolean) {
     this.isHost = isHost;
     this.render();
   }
 
-  updateUsers(users: Map<string, PresenceUser>) {
-    this.users = users;
-    this.render();
-  }
-
-  updateState(users: Map<string, PresenceUser>, isHost: boolean, followedUserId: string | null) {
+  updateState(
+    users: Map<string, PresenceUser>,
+    isHost: boolean,
+    followedUserId: string | null,
+  ) {
     this.users = users;
     this.isHost = isHost;
     this.followedUserId = followedUserId;
@@ -97,7 +92,9 @@ export class PresenceView extends ItemView {
 
       const dot = item.createEl("span", { cls: "live-share-presence-dot" });
       if (
-        /^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/.test(user.cursorColor)
+        /^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/.test(
+          user.cursorColor,
+        )
       ) {
         dot.style.backgroundColor = user.cursorColor;
       }
@@ -126,7 +123,9 @@ export class PresenceView extends ItemView {
 
       const followBtn = actions.createEl("button", {
         text: "Follow",
-        cls: isFollowed ? "live-share-presence-follow is-active" : "live-share-presence-follow",
+        cls: isFollowed
+          ? "live-share-presence-follow is-active"
+          : "live-share-presence-follow",
       });
       followBtn.addEventListener("click", () => {
         this.onFollowRequest?.(userId);

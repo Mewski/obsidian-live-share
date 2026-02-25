@@ -1,3 +1,4 @@
+/** Plugin entry point: commands, session lifecycle, and vault event handlers. */
 import {
   FuzzySuggestModal,
   MarkdownView,
@@ -17,7 +18,11 @@ import { ExclusionManager } from "./exclusion";
 import { FileOpsManager } from "./file-ops";
 import { type FocusRequest, showFocusNotification } from "./focus-notification";
 import { ManifestManager } from "./manifest";
-import { PRESENCE_VIEW_TYPE, type PresenceUser, PresenceView } from "./presence-view";
+import {
+  PRESENCE_VIEW_TYPE,
+  type PresenceUser,
+  PresenceView,
+} from "./presence-view";
 import { SessionManager } from "./session";
 import { LiveShareSettingTab } from "./settings";
 import { SyncManager } from "./sync";
@@ -25,9 +30,13 @@ import { DEFAULT_SETTINGS, type LiveShareSettings } from "./types";
 import { isTextFile, normalizePath } from "./utils";
 
 /** Extract the CM6 EditorView from an Obsidian MarkdownView (untyped internal). */
-function getCmView(view: MarkdownView): import("@codemirror/view").EditorView | undefined {
+function getCmView(
+  view: MarkdownView,
+): import("@codemirror/view").EditorView | undefined {
   // biome-ignore lint/suspicious/noExplicitAny: Obsidian internal -- editor.cm is untyped
-  return (view.editor as any).cm as import("@codemirror/view").EditorView | undefined;
+  return (view.editor as any).cm as
+    | import("@codemirror/view").EditorView
+    | undefined;
 }
 
 export default class LiveSharePlugin extends Plugin {
@@ -71,12 +80,16 @@ export default class LiveSharePlugin extends Plugin {
     await this.exclusionManager.loadConfig(this.app.vault);
     this.manifestManager.setExclusionManager(this.exclusionManager);
     this.connectionState = new ConnectionStateManager();
-    this.connectionStateUnsub = this.connectionState.onChange(() => this.updateStatusBar());
+    this.connectionStateUnsub = this.connectionState.onChange(() =>
+      this.updateStatusBar(),
+    );
 
     this.registerEditorExtension(this.collabManager.getBaseExtension());
 
     this.statusBarEl = this.addStatusBarItem();
-    this.statusBarEl.addEventListener("click", () => this.activatePresenceView());
+    this.statusBarEl.addEventListener("click", () =>
+      this.activatePresenceView(),
+    );
     this.statusBarEl.addClass("live-share-status-bar");
     this.updateStatusBar();
 
@@ -213,11 +226,13 @@ export default class LiveSharePlugin extends Plugin {
         this.onActiveFileChange();
         this.debouncedBroadcastPresence();
         if (this.presenting && this.controlChannel) {
-          const activeView = this.app.workspace.getActiveViewOfType(MarkdownView);
+          const activeView =
+            this.app.workspace.getActiveViewOfType(MarkdownView);
           if (activeView?.file) {
             this.controlChannel.send({
               type: "focus-request",
-              fromUserId: this.settings.githubUserId || this.settings.displayName,
+              fromUserId:
+                this.settings.githubUserId || this.settings.displayName,
               fromDisplayName: this.settings.displayName,
               filePath: activeView.file.path,
               line: activeView.editor?.getCursor()?.line ?? 0,
@@ -316,7 +331,8 @@ export default class LiveSharePlugin extends Plugin {
             const file = this.app.vault.getAbstractFileByPath(path);
             if (file) await this.app.vault.trash(file, true);
           }
-          if (removed.length > 0) new Notice(`Live Share: removed ${removed.length} file(s)`);
+          if (removed.length > 0)
+            new Notice(`Live Share: removed ${removed.length} file(s)`);
         });
       }
     }
@@ -392,7 +408,8 @@ export default class LiveSharePlugin extends Plugin {
           const file = this.app.vault.getAbstractFileByPath(path);
           if (file) await this.app.vault.trash(file, true);
         }
-        if (removed.length > 0) new Notice(`Live Share: removed ${removed.length} file(s)`);
+        if (removed.length > 0)
+          new Notice(`Live Share: removed ${removed.length} file(s)`);
       });
       new Notice(`Live Share: joined session, synced ${count} file(s)`);
     }
@@ -476,7 +493,11 @@ export default class LiveSharePlugin extends Plugin {
     this.controlChannel.connect();
 
     this.fileOpsManager.setSender((op) => {
-      if (op.type === "chunk-start" || op.type === "chunk-data" || op.type === "chunk-end") {
+      if (
+        op.type === "chunk-start" ||
+        op.type === "chunk-data" ||
+        op.type === "chunk-end"
+      ) {
         const typeMap = {
           "chunk-start": "file-chunk-start",
           "chunk-data": "file-chunk-data",
@@ -497,7 +518,11 @@ export default class LiveSharePlugin extends Plugin {
       if (paths.some((p) => !this.manifestManager.isSharedPath(p))) return;
       this.fileOpsManager.applyRemoteOp(op);
     });
-    for (const chunkType of ["file-chunk-start", "file-chunk-data", "file-chunk-end"] as const) {
+    for (const chunkType of [
+      "file-chunk-start",
+      "file-chunk-data",
+      "file-chunk-end",
+    ] as const) {
       this.controlChannel.on(chunkType, (msg) => {
         const path = msg.path as string;
         if (!path || !this.manifestManager.isSharedPath(path)) return;
@@ -536,14 +561,18 @@ export default class LiveSharePlugin extends Plugin {
 
     this.controlChannel.on("join-request", (msg) => {
       if (this.settings.role !== "host") return;
-      new ApprovalModal(this.app, msg as unknown as JoinRequest, (approved, permission) => {
-        this.controlChannel?.send({
-          type: "join-response",
-          userId: msg.userId as string,
-          approved,
-          permission,
-        });
-      }).open();
+      new ApprovalModal(
+        this.app,
+        msg as unknown as JoinRequest,
+        (approved, permission) => {
+          this.controlChannel?.send({
+            type: "join-response",
+            userId: msg.userId as string,
+            approved,
+            permission,
+          });
+        },
+      ).open();
     });
 
     this.controlChannel.on("focus-request", (msg) => {
@@ -578,10 +607,17 @@ export default class LiveSharePlugin extends Plugin {
 
     const filePath = file?.path ?? null;
     const sharedPath =
-      filePath && this.manifestManager.isSharedPath(filePath) && isTextFile(filePath)
+      filePath &&
+      this.manifestManager.isSharedPath(filePath) &&
+      isTextFile(filePath)
         ? filePath
         : null;
-    this.collabManager.activateForFile(cmView, sharedPath, this.syncManager, this.settings.role);
+    this.collabManager.activateForFile(
+      cmView,
+      sharedPath,
+      this.syncManager,
+      this.settings.role,
+    );
 
     this.removeScrollListener();
     const scrollDOM = cmView.scrollDOM;
@@ -590,7 +626,8 @@ export default class LiveSharePlugin extends Plugin {
     };
     scrollDOM.addEventListener("scroll", scrollHandler);
     this.currentScrollDOM = scrollDOM;
-    this.currentScrollListener = () => scrollDOM.removeEventListener("scroll", scrollHandler);
+    this.currentScrollListener = () =>
+      scrollDOM.removeEventListener("scroll", scrollHandler);
   }
 
   private removeScrollListener() {
@@ -617,7 +654,9 @@ export default class LiveSharePlugin extends Plugin {
         const latency = this.controlChannel?.getLatency();
         const latencyStr = latency ? ` ${latency}ms` : "";
         const pres = this.presenting ? " [presenting]" : "";
-        this.statusBarEl.setText(`Live Share: ${role}${users}${latencyStr}${pres}`);
+        this.statusBarEl.setText(
+          `Live Share: ${role}${users}${latencyStr}${pres}`,
+        );
         break;
       }
       case "reconnecting":
@@ -681,7 +720,11 @@ export default class LiveSharePlugin extends Plugin {
     const leaves = this.app.workspace.getLeavesOfType(PRESENCE_VIEW_TYPE);
     for (const leaf of leaves) {
       const view = leaf.view as PresenceView;
-      view.updateState(this.remoteUsers, this.settings.role === "host", this.followTarget);
+      view.updateState(
+        this.remoteUsers,
+        this.settings.role === "host",
+        this.followTarget,
+      );
     }
   }
 
@@ -768,7 +811,9 @@ export default class LiveSharePlugin extends Plugin {
     const events = ["keydown", "mousedown", "wheel"] as const;
     for (const evt of events) {
       document.addEventListener(evt, handler);
-      this.unfollowListeners.push(() => document.removeEventListener(evt, handler));
+      this.unfollowListeners.push(() =>
+        document.removeEventListener(evt, handler),
+      );
     }
 
     if (user) this.applyFollowState(user);

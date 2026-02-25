@@ -1,3 +1,4 @@
+/** GitHub OAuth token handling and JWT parsing. */
 import { Notice } from "obsidian";
 import type LiveSharePlugin from "./main";
 
@@ -19,14 +20,18 @@ export class AuthManager {
       const parts = jwt.split(".");
       if (parts.length !== 3) throw new Error("Invalid JWT");
       const payload = JSON.parse(atob(parts[1]));
-      if (!payload.sub || !payload.username) throw new Error("Invalid JWT payload");
+      if (!payload.sub || !payload.username)
+        throw new Error("Invalid JWT payload");
 
       this.plugin.settings.jwt = jwt;
       this.plugin.settings.githubUserId = payload.sub;
-      this.plugin.settings.displayName = payload.displayName || payload.username;
+      this.plugin.settings.displayName =
+        payload.displayName || payload.username;
       this.plugin.settings.avatarUrl = payload.avatar || "";
       await this.plugin.saveSettings();
-      new Notice(`Live Share: authenticated as ${this.plugin.settings.displayName}`);
+      new Notice(
+        `Live Share: authenticated as ${this.plugin.settings.displayName}`,
+      );
       return true;
     } catch {
       new Notice("Live Share: invalid auth token");

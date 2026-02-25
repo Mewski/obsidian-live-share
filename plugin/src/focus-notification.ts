@@ -1,3 +1,4 @@
+/** "Look here" notification with a "Go to" button for focus/summon requests. */
 import { MarkdownView, Notice, TFile } from "obsidian";
 import type LiveSharePlugin from "./main";
 
@@ -8,7 +9,10 @@ export interface FocusRequest {
   ch: number;
 }
 
-export function showFocusNotification(plugin: LiveSharePlugin, req: FocusRequest) {
+export function showFocusNotification(
+  plugin: LiveSharePlugin,
+  req: FocusRequest,
+) {
   const fragment = document.createDocumentFragment();
   fragment.createEl("span", {
     text: `Live Share: ${req.fromDisplayName} wants your attention at ${req.filePath}:${req.line + 1}`,

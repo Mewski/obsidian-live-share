@@ -1,3 +1,4 @@
+/** CodeMirror 6 Yjs integration for real-time collaborative editing. */
 import { Compartment } from "@codemirror/state";
 import type { Extension } from "@codemirror/state";
 import type { EditorView } from "@codemirror/view";
@@ -53,7 +54,9 @@ export class CollabManager {
     }
 
     view.dispatch({
-      effects: this.compartment.reconfigure(yCollab(result.text, result.provider.awareness)),
+      effects: this.compartment.reconfigure(
+        yCollab(result.text, result.provider.awareness),
+      ),
     });
   }
 

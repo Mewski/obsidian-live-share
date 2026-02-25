@@ -1,3 +1,4 @@
+/** LevelDB persistence for Y.Docs and room metadata. */
 import { Level } from "level";
 import * as Y from "yjs";
 
@@ -35,7 +36,9 @@ export interface Persistence {
   close(): Promise<void>;
 }
 
-export function createLevelPersistence(dbPath = "./data/yjs-docs"): Persistence {
+export function createLevelPersistence(
+  dbPath = "./data/yjs-docs",
+): Persistence {
   const db = new Level(dbPath, { valueEncoding: "buffer" });
 
   return {
@@ -78,7 +81,10 @@ export function createLevelPersistence(dbPath = "./data/yjs-docs"): Persistence 
     },
 
     async saveRoom(room: Room): Promise<void> {
-      await db.put(`room:${room.id}`, Buffer.from(JSON.stringify(room)) as unknown as string);
+      await db.put(
+        `room:${room.id}`,
+        Buffer.from(JSON.stringify(room)) as unknown as string,
+      );
     },
 
     async deleteRoom(id: string): Promise<void> {

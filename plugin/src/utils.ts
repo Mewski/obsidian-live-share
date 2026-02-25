@@ -1,3 +1,9 @@
+/** Path normalization, URL conversion, file type detection, and base64 helpers. */
+import { TFolder, type Vault } from "obsidian";
+
+export const HEX_COLOR_RE =
+  /^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/;
+
 export function normalizePath(p: string): string {
   return p.replace(/\\/g, "/");
 }
@@ -87,4 +93,18 @@ export function base64ToArrayBuffer(b64: string): ArrayBuffer {
     bytes[i] = binary.charCodeAt(i);
   }
   return bytes.buffer as ArrayBuffer;
+}
+
+export async function ensureFolder(vault: Vault, path: string): Promise<void> {
+  const existing = vault.getAbstractFileByPath(path);
+  if (existing instanceof TFolder) return;
+  const parts = path.split("/");
+  let current = "";
+  for (const part of parts) {
+    current = current ? `${current}/${part}` : part;
+    const folder = vault.getAbstractFileByPath(current);
+    if (!folder) {
+      await vault.createFolder(current);
+    }
+  }
 }

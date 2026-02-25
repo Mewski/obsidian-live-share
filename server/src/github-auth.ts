@@ -1,3 +1,4 @@
+/** GitHub OAuth flow, JWT signing, and verification. */
 import { Router } from "express";
 import jwt from "jsonwebtoken";
 

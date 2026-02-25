@@ -9,9 +9,14 @@ const SALT_BYTES = 16;
 const IV_BYTES = 12;
 const PBKDF2_ITERATIONS = 100_000;
 
-async function deriveKey(passphrase: string, salt: Uint8Array): Promise<CryptoKey> {
+async function deriveKey(
+  passphrase: string,
+  salt: Uint8Array,
+): Promise<CryptoKey> {
   const raw = new TextEncoder().encode(passphrase);
-  const base = await crypto.subtle.importKey("raw", raw, "PBKDF2", false, ["deriveKey"]);
+  const base = await crypto.subtle.importKey("raw", raw, "PBKDF2", false, [
+    "deriveKey",
+  ]);
   return crypto.subtle.deriveKey(
     {
       name: "PBKDF2",
@@ -39,7 +44,7 @@ export class E2ECrypto {
   async init(): Promise<void> {
     // Use a deterministic salt derived from the passphrase so all peers
     // with the same passphrase derive the same key without a key-exchange step.
-    const raw = new TextEncoder().encode(passphrase_salt_input(this.passphrase));
+    const raw = new TextEncoder().encode(passphraseSaltInput(this.passphrase));
     const hashBuf = await crypto.subtle.digest("SHA-256", raw);
     this.salt = new Uint8Array(hashBuf).slice(0, SALT_BYTES);
     this.key = await deriveKey(this.passphrase, this.salt);
@@ -68,7 +73,11 @@ export class E2ECrypto {
     if (!this.key) throw new Error("E2E not initialised");
     const iv = data.slice(0, IV_BYTES);
     const ciphertext = data.slice(IV_BYTES);
-    const plaintext = await crypto.subtle.decrypt({ name: "AES-GCM", iv }, this.key, ciphertext);
+    const plaintext = await crypto.subtle.decrypt(
+      { name: "AES-GCM", iv },
+      this.key,
+      ciphertext,
+    );
     return new Uint8Array(plaintext);
   }
 
@@ -85,7 +94,7 @@ export class E2ECrypto {
   }
 }
 
-function passphrase_salt_input(passphrase: string): string {
+function passphraseSaltInput(passphrase: string): string {
   return `obsidian-live-share-salt:${passphrase}`;
 }
 

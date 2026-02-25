@@ -1,3 +1,4 @@
+/** Timing-safe token comparison. */
 import { createHmac, timingSafeEqual } from "node:crypto";
 
 const COMPARE_KEY = "live-share-token-compare";

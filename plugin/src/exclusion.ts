@@ -1,3 +1,4 @@
+/** File exclusion patterns loaded from `.liveshare.json`. */
 import { minimatch } from "minimatch";
 import { Notice } from "obsidian";
 import type { TFile, Vault } from "obsidian";
@@ -28,9 +29,5 @@ export class ExclusionManager {
 
   isExcluded(path: string): boolean {
     return this.patterns.some((pattern) => minimatch(path, pattern));
-  }
-
-  isIncluded(path: string): boolean {
-    return !this.isExcluded(path);
   }
 }

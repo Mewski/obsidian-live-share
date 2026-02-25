@@ -1,3 +1,4 @@
+/** Room creation/join, invite link encoding/parsing, and session state. */
 import { Notice } from "obsidian";
 import type LiveSharePlugin from "./main";
 

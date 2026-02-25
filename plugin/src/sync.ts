@@ -1,9 +1,13 @@
+/** Per-file Y.Doc and WebsocketProvider management. */
 import { WebsocketProvider } from "y-websocket";
 import * as Y from "yjs";
 import type { LiveShareSettings } from "./types";
 import { normalizePath, toWsUrl } from "./utils";
 
-export function waitForSync(provider: WebsocketProvider, timeoutMs = 10_000): Promise<void> {
+export function waitForSync(
+  provider: WebsocketProvider,
+  timeoutMs = 10_000,
+): Promise<void> {
   if (provider.synced) return Promise.resolve();
   return new Promise((resolve, reject) => {
     const timer = setTimeout(() => {
@@ -33,7 +37,9 @@ export class SyncManager {
     this.settings = settings;
   }
 
-  getDoc(rawPath: string): { doc: Y.Doc; text: Y.Text; provider: WebsocketProvider } | null {
+  getDoc(
+    rawPath: string,
+  ): { doc: Y.Doc; text: Y.Text; provider: WebsocketProvider } | null {
     if (!this.connected || !this.settings.roomId) return null;
 
     const filePath = normalizePath(rawPath);

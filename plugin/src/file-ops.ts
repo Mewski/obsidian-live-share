@@ -1,7 +1,14 @@
-import { Notice, TFolder } from "obsidian";
+/** Remote file operation application, path suppression, and chunked binary transfer. */
+import { Notice } from "obsidian";
 import type { TAbstractFile, TFile, Vault } from "obsidian";
 import type { FileOp } from "./types";
-import { arrayBufferToBase64, base64ToArrayBuffer, isTextFile, normalizePath } from "./utils";
+import {
+  arrayBufferToBase64,
+  base64ToArrayBuffer,
+  ensureFolder,
+  isTextFile,
+  normalizePath,
+} from "./utils";
 
 const CHUNK_SIZE = 512 * 1024;
 const MAX_FILE_SIZE = 50 * 1024 * 1024;
@@ -60,7 +67,9 @@ export class FileOpsManager {
   async applyRemoteOp(op: FileOp) {
     const paths = this.getOpPaths(op);
     // Serialize operations on the same path to prevent interleaving
-    const waitFor = paths.map((p) => this.opQueues.get(p)).filter(Boolean) as Promise<void>[];
+    const waitFor = paths
+      .map((p) => this.opQueues.get(p))
+      .filter(Boolean) as Promise<void>[];
     if (waitFor.length > 0) await Promise.all(waitFor);
 
     const promise = this.applyRemoteOpInner(op);
@@ -259,7 +268,12 @@ export class FileOpsManager {
   onFileRename(file: TAbstractFile, oldPath: string) {
     const newPath = normalizePath(file.path);
     const oldNorm = normalizePath(oldPath);
-    if (this.isPathSuppressed(newPath) || this.isPathSuppressed(oldNorm) || !this.sendOp) return;
+    if (
+      this.isPathSuppressed(newPath) ||
+      this.isPathSuppressed(oldNorm) ||
+      !this.sendOp
+    )
+      return;
     this.sendOp({ type: "rename", oldPath: oldNorm, newPath });
   }
 
