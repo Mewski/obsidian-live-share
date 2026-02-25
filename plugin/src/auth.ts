@@ -10,14 +10,11 @@ export class AuthManager {
 
   async authenticate(): Promise<boolean> {
     const serverUrl = this.plugin.settings.serverUrl.replace(/\/+$/, "");
-    // Open browser for GitHub OAuth
     window.open(`${serverUrl}/auth/github?state=${Date.now()}`);
 
-    // User copies the JWT from the browser and pastes it here
     const jwt = await this.plugin.promptText("Paste your auth token");
     if (!jwt) return false;
 
-    // Decode the JWT payload (not verifying — server will verify)
     try {
       const parts = jwt.split(".");
       if (parts.length !== 3) throw new Error("Invalid JWT");

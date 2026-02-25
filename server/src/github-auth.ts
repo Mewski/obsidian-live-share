@@ -40,7 +40,6 @@ export function verifyJWT(token: string): JWTPayload | null {
 export function createAuthRouter(): Router {
   const router = Router();
 
-  // Step 1: Redirect to GitHub
   router.get("/github", (req, res) => {
     const state = (req.query.state as string) || "";
     const params = new URLSearchParams({
@@ -51,7 +50,6 @@ export function createAuthRouter(): Router {
     res.redirect(`https://github.com/login/oauth/authorize?${params}`);
   });
 
-  // Step 2: GitHub callback
   router.get("/github/callback", async (req, res) => {
     const code = req.query.code as string;
     if (!code) {
@@ -59,7 +57,6 @@ export function createAuthRouter(): Router {
       return;
     }
 
-    // Exchange code for access token
     let tokenRes: Response;
     try {
       tokenRes = await fetch("https://github.com/login/oauth/access_token", {
@@ -93,7 +90,6 @@ export function createAuthRouter(): Router {
       return;
     }
 
-    // Fetch user info
     let userRes: Response;
     try {
       userRes = await fetch("https://api.github.com/user", {
@@ -115,7 +111,6 @@ export function createAuthRouter(): Router {
     const ghUser = (await userRes.json()) as GitHubUser;
     const displayName = ghUser.name || ghUser.login;
 
-    // Create JWT
     const payload: Omit<JWTPayload, "iat" | "exp"> = {
       sub: String(ghUser.id),
       username: ghUser.login,
@@ -132,7 +127,6 @@ export function createAuthRouter(): Router {
       .replace(/>/g, "&gt;")
       .replace(/"/g, "&quot;");
 
-    // Return a page that shows the token and tries to open Obsidian
     res.send(`<!DOCTYPE html>
 <html><head><title>Live Share Auth</title></head>
 <body style="font-family:system-ui;max-width:500px;margin:60px auto;text-align:center">

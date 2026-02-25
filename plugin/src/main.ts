@@ -201,7 +201,6 @@ export default class LiveSharePlugin extends Plugin {
       }),
     );
 
-    // Watch for .liveshare.json changes
     this.registerEvent(
       this.app.vault.on("modify", (file: TAbstractFile) => {
         if (file.path === ".liveshare.json") {
@@ -216,7 +215,6 @@ export default class LiveSharePlugin extends Plugin {
 
     this.addSettingTab(new LiveShareSettingTab(this.app, this));
 
-    // Auto-reconnect if session was active
     if (this.settings.roomId && this.settings.token && this.settings.role) {
       this.connectSync()
         .then(() => this.manifestManager.connect())
@@ -248,7 +246,6 @@ export default class LiveSharePlugin extends Plugin {
     this.connectionStateUnsub?.();
     this.connectionStateUnsub = null;
 
-    // Deactivate collab for any active editor
     const activeView = this.app.workspace.getActiveViewOfType(MarkdownView);
     if (activeView) {
       const cmView = getCmView(activeView);
@@ -322,14 +319,12 @@ export default class LiveSharePlugin extends Plugin {
       return;
     }
 
-    // Deactivate collab extensions before disconnecting
     const activeView = this.app.workspace.getActiveViewOfType(MarkdownView);
     if (activeView) {
       const cmView = getCmView(activeView);
       if (cmView) this.collabManager.deactivateAll(cmView);
     }
 
-    // Notify guests before disconnecting
     if (this.settings.role === "host" && this.controlChannel) {
       this.controlChannel.send({ type: "session-end" });
     }
@@ -351,20 +346,17 @@ export default class LiveSharePlugin extends Plugin {
     this.connectionState.transition({ type: "connect" });
     this.syncManager.connect();
 
-    // Destroy existing control channel to prevent handler accumulation
     if (this.controlChannel) {
       this.controlChannel.destroy();
       this.controlChannel = null;
     }
 
-    // Initialize E2E encryption if a passphrase is configured
     let e2e: E2ECrypto | undefined;
     if (this.settings.encryptionPassphrase) {
       e2e = new E2ECrypto(this.settings.encryptionPassphrase);
       await e2e.init();
     }
 
-    // Set up control channel for file ops
     this.controlChannel = new ControlChannel(this.settings, e2e);
     this.controlChannel.onStateChange((controlState) => {
       switch (controlState) {
@@ -385,7 +377,6 @@ export default class LiveSharePlugin extends Plugin {
     });
     this.controlChannel.on("file-op", (msg) => {
       const op = msg.op as import("./types").FileOp;
-      // Validate paths are within shared scope
       const paths = [
         "path" in op ? op.path : null,
         "oldPath" in op ? op.oldPath : null,
@@ -416,7 +407,6 @@ export default class LiveSharePlugin extends Plugin {
       }
     });
 
-    // Host: handle join requests from guests
     this.controlChannel.on("join-request", (msg) => {
       if (this.settings.role !== "host") return;
       new ApprovalModal(this.app, msg as unknown as JoinRequest, (approved, permission) => {
@@ -429,7 +419,6 @@ export default class LiveSharePlugin extends Plugin {
       }).open();
     });
 
-    // Handle focus requests and summons
     this.controlChannel.on("focus-request", (msg) => {
       showFocusNotification(this, msg as unknown as FocusRequest);
     });
@@ -437,19 +426,16 @@ export default class LiveSharePlugin extends Plugin {
       showFocusNotification(this, msg as unknown as FocusRequest);
     });
 
-    // Guest: handle kicked
     this.controlChannel.on("kicked", () => {
       new Notice("Live Share: you have been removed from the session");
       this.endSession();
     });
 
-    // Guest: handle host ending session
     this.controlChannel.on("session-end", () => {
       new Notice("Live Share: the host ended the session");
       this.endSession();
     });
 
-    // Send initial presence with isHost flag
     this.broadcastPresence();
 
     this.onActiveFileChange();
@@ -555,7 +541,6 @@ export default class LiveSharePlugin extends Plugin {
     const user = this.remoteUsers.get(userId);
     new Notice(`Following ${user?.displayName ?? userId}`);
 
-    // Register unfollow-on-interaction listeners
     this.clearUnfollowListeners();
     const handler = () => {
       if (!this.followSuppressUnfollow) this.unfollowUser();
@@ -566,7 +551,6 @@ export default class LiveSharePlugin extends Plugin {
       this.unfollowListeners.push(() => document.removeEventListener(evt, handler));
     }
 
-    // Apply immediately if we have state
     if (user) this.applyFollowState(user);
   }
 
@@ -587,7 +571,6 @@ export default class LiveSharePlugin extends Plugin {
 
     this.followSuppressUnfollow = true;
 
-    // Open their file if different
     const currentView = this.app.workspace.getActiveViewOfType(MarkdownView);
     if (currentView?.file?.path !== user.currentFile) {
       const file = this.app.vault.getAbstractFileByPath(user.currentFile);
@@ -596,7 +579,6 @@ export default class LiveSharePlugin extends Plugin {
       }
     }
 
-    // Scroll to their position
     if (user.scrollTop !== undefined) {
       const view = this.app.workspace.getActiveViewOfType(MarkdownView);
       if (view) {

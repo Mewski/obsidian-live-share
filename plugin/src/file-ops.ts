@@ -16,21 +16,17 @@ export class FileOpsManager {
     this.sendOp = fn;
   }
 
-  // Validate that a path is safe (no traversal, no absolute paths)
   private isPathSafe(path: string): boolean {
     if (!path || path.startsWith("/") || path.startsWith("\\")) return false;
     const segments = path.split(/[\\/]/);
     return !segments.some((s) => s === ".." || s === ".");
   }
 
-  // Called when a remote file op is received -- apply locally without re-broadcasting
   async applyRemoteOp(op: FileOp) {
-    // Normalize all paths to forward slashes (cross-platform safety)
     if ("path" in op) op.path = normalizePath(op.path);
     if ("oldPath" in op) op.oldPath = normalizePath(op.oldPath);
     if ("newPath" in op) op.newPath = normalizePath(op.newPath);
 
-    // Validate all paths in the operation
     if ("path" in op && !this.isPathSafe(op.path)) return;
     if ("oldPath" in op && !this.isPathSafe(op.oldPath)) return;
     if ("newPath" in op && !this.isPathSafe(op.newPath)) return;
@@ -68,7 +64,6 @@ export class FileOpsManager {
     }
   }
 
-  // Vault event handlers -- broadcast local changes
   onFileCreate(file: TAbstractFile) {
     if (this.suppressCount > 0 || !this.sendOp) return;
     if ("extension" in file) {

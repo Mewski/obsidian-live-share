@@ -128,13 +128,11 @@ export class ManifestManager {
     }
   }
 
-  // Host: scan vault and populate manifest with complete data
   async publishManifest(): Promise<void> {
     if (!this.manifest || !this.doc) return;
 
     const files = this.getSharedFiles();
 
-    // Compute all hashes FIRST to avoid publishing incomplete entries
     const entries = new Map<string, FileEntry>();
     for (const file of files) {
       const content = await this.vault.read(file);
@@ -145,22 +143,18 @@ export class ManifestManager {
       });
     }
 
-    // Single transaction with complete data
     this.doc.transact(() => {
-      // Remove entries no longer on disk
       for (const key of this.manifest?.keys() ?? []) {
         if (!entries.has(key)) {
           this.manifest?.delete(key);
         }
       }
-      // Set all entries with computed hashes
       for (const [path, entry] of entries) {
         this.manifest?.set(path, entry);
       }
     });
   }
 
-  // Guest: sync files from manifest to local vault
   async syncFromManifest(): Promise<number> {
     if (!this.manifest || !this.doc) return 0;
 
@@ -181,7 +175,6 @@ export class ManifestManager {
       }
 
       if (needsSync) {
-        // Open the per-file Y.Doc to get its content
         const fileDoc = new Y.Doc();
         const roomName = `${this.settings.roomId}:${encodeURIComponent(path)}`;
         const wsUrl = toWsUrl(this.settings.serverUrl);
@@ -205,7 +198,6 @@ export class ManifestManager {
         const content = text.toString();
 
         if (content.length > 0) {
-          // Ensure parent folders exist
           const dir = path.substring(0, path.lastIndexOf("/"));
           if (dir) await this.ensureFolder(dir);
 
@@ -225,11 +217,9 @@ export class ManifestManager {
     return synced;
   }
 
-  // Watch manifest for changes (guest uses this to discover new files)
   onManifestChange(callback: (added: string[], removed: string[]) => void): void {
     if (!this.manifest) return;
 
-    // Clean up any existing observer to prevent memory leaks
     if (this.observer && this.manifest) {
       this.manifest.unobserve(this.observer);
     }
@@ -248,7 +238,6 @@ export class ManifestManager {
     this.manifest.observe(this.observer);
   }
 
-  // Host: update manifest when a file is created/modified
   updateFile(file: TFile, content: string): void {
     if (!this.manifest || !this.isSharedPath(file.path)) return;
     this.manifest.set(normalizePath(file.path), {
@@ -258,13 +247,11 @@ export class ManifestManager {
     });
   }
 
-  // Host: remove file from manifest
   removeFile(path: string): void {
     if (!this.manifest) return;
     this.manifest.delete(normalizePath(path));
   }
 
-  // Host: rename file in manifest, release stale Yjs doc
   renameFile(oldPath: string, newPath: string, syncManager?: SyncManager): void {
     if (!this.manifest) return;
     const normOld = normalizePath(oldPath);
@@ -274,7 +261,6 @@ export class ManifestManager {
       this.manifest.delete(normOld);
       this.manifest.set(normNew, entry);
     }
-    // Release the old Yjs doc so it will be re-created under the new key
     if (syncManager) {
       syncManager.releaseDoc(normOld);
     }
@@ -316,7 +302,6 @@ export class ManifestManager {
   private async ensureFolder(path: string): Promise<void> {
     const existing = this.vault.getAbstractFileByPath(path);
     if (existing instanceof TFolder) return;
-    // Create folder recursively
     const parts = path.split("/");
     let current = "";
     for (const part of parts) {

@@ -81,7 +81,7 @@ roomRouter.get("/:id", (req, res) => {
   res.json({ name: room.name, createdAt: room.createdAt });
 });
 
-roomRouter.delete("/:id", (req, res) => {
+roomRouter.delete("/:id", async (req, res) => {
   const auth = req.headers.authorization;
   if (!auth?.startsWith("Bearer ")) {
     res.status(401).json({ error: "missing token" });
@@ -101,7 +101,7 @@ roomRouter.delete("/:id", (req, res) => {
   }
 
   rooms.delete(req.params.id);
-  _persistence.deleteRoom(req.params.id);
+  await _persistence.deleteRoom(req.params.id);
 
   res.json({ ok: true });
 });

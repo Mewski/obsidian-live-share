@@ -73,7 +73,6 @@ export function createControlWSS() {
     const room = getOrCreateRoom(roomId);
     const serverRoom = getRoom(roomId);
 
-    // Create client entry — will be populated by first message
     const client: ControlClient = {
       ws,
       userId: "",
@@ -120,7 +119,6 @@ export function createControlWSS() {
         return;
       }
 
-      // Handle join-request from guest
       if (msg.type === "join-request") {
         client.userId = (msg.userId as string) || "";
         client.displayName = (msg.displayName as string) || "";
@@ -129,7 +127,6 @@ export function createControlWSS() {
           client.approved = false;
           room.pendingApprovals.set(client.userId, ws);
 
-          // Forward to host for approval
           const host = findHost(room);
           if (host) {
             sendTo(host.ws, {
@@ -140,7 +137,6 @@ export function createControlWSS() {
             });
           }
         } else {
-          // Auto-approve
           client.approved = true;
           sendTo(ws, {
             type: "join-response",
@@ -151,7 +147,6 @@ export function createControlWSS() {
         return;
       }
 
-      // Handle join-response from host
       if (msg.type === "join-response" && client.isHost) {
         const targetUserId = msg.userId as string;
         const targetWs = room.pendingApprovals.get(targetUserId);
@@ -173,7 +168,6 @@ export function createControlWSS() {
         return;
       }
 
-      // Handle kick from host
       if (msg.type === "kick" && client.isHost) {
         const targetUserId = msg.userId as string;
         for (const [clientWs, c] of room.clients) {
@@ -185,15 +179,12 @@ export function createControlWSS() {
         return;
       }
 
-      // Read-only clients can't send file ops
       if (msg.type === "file-op" && client.permission === "read-only") {
         return;
       }
 
-      // Only broadcast from approved clients (except join-request handled above)
       if (!client.approved) return;
 
-      // Handle summon — route to specific user or broadcast
       if (msg.type === "summon" && msg.targetUserId !== "__all__") {
         const targetUserId = msg.targetUserId as string;
         for (const [clientWs, c] of room.clients) {
@@ -221,7 +212,6 @@ export function createControlWSS() {
         if (msg.displayName) client.displayName = msg.displayName as string;
       }
 
-      // Broadcast to all other approved clients
       broadcast(room, data, ws);
     });
 
@@ -229,7 +219,6 @@ export function createControlWSS() {
       const closingClient = room.clients.get(ws);
       if (closingClient) {
         room.pendingApprovals.delete(closingClient.userId);
-        // Notify remaining clients about departure
         if (closingClient.userId) {
           const leaveMsg = JSON.stringify({
             type: "presence-leave",

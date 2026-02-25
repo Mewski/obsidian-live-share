@@ -72,7 +72,9 @@ export class PresenceView extends ItemView {
       const item = list.createEl("div", { cls: "live-share-presence-item" });
 
       const dot = item.createEl("span", { cls: "live-share-presence-dot" });
-      if (/^#[0-9a-fA-F]{3,8}$/.test(user.cursorColor)) {
+      if (
+        /^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/.test(user.cursorColor)
+      ) {
         dot.style.backgroundColor = user.cursorColor;
       }
 

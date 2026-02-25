@@ -45,7 +45,6 @@ export function createApp(
   const yjs = createYjsWSS(persistence);
   const control = createControlWSS();
 
-  // Health check
   app.get("/healthz", (_req, res) => {
     const stats = yjs.getStats();
     res.json({
@@ -59,7 +58,6 @@ export function createApp(
   server.on("upgrade", (req, socket, head) => {
     const url = new URL(req.url || "", `http://${req.headers.host}`);
 
-    // Route: /ws/<roomName> → Yjs WSS
     const wsMatch = url.pathname.match(/^\/ws\/(.+)$/);
     if (wsMatch) {
       const fullRoomName = wsMatch[1];
@@ -90,7 +88,6 @@ export function createApp(
       return;
     }
 
-    // Route: /control/<roomId> → Control WSS
     const ctrlMatch = url.pathname.match(/^\/control\/(.+)$/);
     if (ctrlMatch) {
       const roomId = ctrlMatch[1];
@@ -167,7 +164,6 @@ if (isMain) {
         console.log(`live-share server on :${port}`);
       });
 
-      // Graceful shutdown
       const onSignal = () => {
         shutdown().then(() => process.exit(0));
       };

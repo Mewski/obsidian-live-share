@@ -6,18 +6,6 @@ Obsidian Live Share is a two-part system: a **relay server** and an **Obsidian p
 
 ## Channels
 
-```
-                      Server
-                    +--------+
-                    |        |
-  Client A ------->| Yjs WS |<------- Client B
-  (host)     ws:// | binary  |  ws://  (guest)
-                    |        |
-  Client A ------->| Control |<------- Client B
-             ws:// | JSON    |  ws://
-                    +--------+
-```
-
 Each session uses two WebSocket channels:
 
 1. **Yjs sync channel** (`/ws/:roomId`) -- Binary Yjs protocol for document sync and awareness (cursors). One Y.Doc per file, keyed as `roomId:filePath`. The manifest doc (file inventory) is at `roomId:__manifest__`.

@@ -51,7 +51,6 @@ export class SessionManager {
     settings.roomId = data.id;
     settings.token = data.token;
     settings.role = "host";
-    // Generate a random encryption passphrase for this session
     settings.encryptionPassphrase = generatePassphrase();
     await this.plugin.saveSettings();
 

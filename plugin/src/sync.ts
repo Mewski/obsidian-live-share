@@ -33,7 +33,6 @@ export class SyncManager {
     this.settings = settings;
   }
 
-  // Get or create a Y.Doc + provider for a file path
   getDoc(rawPath: string): { doc: Y.Doc; text: Y.Text; provider: WebsocketProvider } | null {
     if (!this.connected || !this.settings.roomId) return null;
 
@@ -47,7 +46,6 @@ export class SyncManager {
     }
 
     if (!provider) {
-      // Room name = roomId:encodedFilePath to scope per file
       const roomName = `${this.settings.roomId}:${encodeURIComponent(filePath)}`;
       const wsUrl = toWsUrl(this.settings.serverUrl);
       const params: Record<string, string> = { token: this.settings.token };
@@ -67,7 +65,6 @@ export class SyncManager {
     return { doc, text, provider };
   }
 
-  // Clean up a specific file's doc + provider
   releaseDoc(rawPath: string) {
     const filePath = normalizePath(rawPath);
     const provider = this.providers.get(filePath);

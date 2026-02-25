@@ -113,7 +113,6 @@ export function createYjsWSS(persist?: Persistence) {
         }
       }
 
-      // Debounced persistence on every update (crash recovery)
       if (state.persistTimer) clearTimeout(state.persistTimer);
       state.persistTimer = setTimeout(() => {
         p.persistDoc(roomId, doc).catch((err) => {
@@ -256,7 +255,6 @@ export function createYjsWSS(persist?: Persistence) {
     ws.on("close", () => {
       state.clients.delete(ws);
 
-      // Remove the correct awareness clientIDs for this connection
       const clientIds = state.clientAwarenessIds.get(ws);
       if (clientIds && clientIds.size > 0) {
         awarenessProtocol.removeAwarenessStates(state.awareness, Array.from(clientIds), null);
