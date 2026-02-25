@@ -6,7 +6,7 @@ import { yCollab } from "y-codemirror.next";
 
 import { type SyncManager, waitForSync } from "./sync";
 import type { Permission, SessionRole } from "./types";
-import { normalizeLineEndings } from "./utils";
+import { applyMinimalYTextUpdate, normalizeLineEndings } from "./utils";
 
 export interface CursorUser {
   name: string;
@@ -78,13 +78,7 @@ export class CollabManager {
 
     if (role === "host") {
       const localContent = normalizeLineEndings(view.state.doc.toString());
-      const remoteContent = docHandle.text.toString();
-      if (localContent !== remoteContent) {
-        docHandle.doc.transact(() => {
-          docHandle.text.delete(0, docHandle.text.length);
-          docHandle.text.insert(0, localContent);
-        });
-      }
+      applyMinimalYTextUpdate(docHandle.doc, docHandle.text, localContent);
     }
 
     this.currentProvider = docHandle.provider;

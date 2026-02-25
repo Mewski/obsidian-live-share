@@ -7,7 +7,41 @@ export function normalizePath(filePath: string): string {
 }
 
 export function normalizeLineEndings(content: string): string {
-  return content.replace(/\r\n/g, "\n");
+  return content.replace(/\r\n|\r/g, "\n");
+}
+
+export function applyMinimalYTextUpdate(
+  doc: { transact: (fn: () => void) => void },
+  text: {
+    toString: () => string;
+    delete: (pos: number, len: number) => void;
+    insert: (pos: number, s: string) => void;
+    length: number;
+  },
+  newContent: string,
+): void {
+  const oldContent = text.toString();
+  if (oldContent === newContent) return;
+
+  let prefix = 0;
+  const minLen = Math.min(oldContent.length, newContent.length);
+  while (prefix < minLen && oldContent[prefix] === newContent[prefix]) prefix++;
+
+  let oldSuffix = oldContent.length;
+  let newSuffix = newContent.length;
+  while (
+    oldSuffix > prefix &&
+    newSuffix > prefix &&
+    oldContent[oldSuffix - 1] === newContent[newSuffix - 1]
+  ) {
+    oldSuffix--;
+    newSuffix--;
+  }
+
+  doc.transact(() => {
+    if (oldSuffix > prefix) text.delete(prefix, oldSuffix - prefix);
+    if (newSuffix > prefix) text.insert(prefix, newContent.slice(prefix, newSuffix));
+  });
 }
 
 export function toWsUrl(httpUrl: string): string {

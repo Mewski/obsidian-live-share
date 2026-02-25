@@ -159,7 +159,7 @@ describe("CollabManager", () => {
 
       await collab.activateForFile(view as any, "test.md", syncManager as any, "host");
 
-      expect(syncManager._text.delete).toHaveBeenCalledWith(0, 42);
+      expect(syncManager._text.delete).toHaveBeenCalledWith(0, 6);
       expect(syncManager._text.insert).toHaveBeenCalledWith(0, "local content");
     });
 

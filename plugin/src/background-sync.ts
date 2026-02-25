@@ -6,7 +6,13 @@ import type { FileOpsManager } from "./file-ops";
 import type { ManifestManager } from "./manifest";
 import { type SyncManager, waitForSync } from "./sync";
 import type { SessionRole } from "./types";
-import { ensureFolder, isTextFile, normalizeLineEndings, normalizePath } from "./utils";
+import {
+  applyMinimalYTextUpdate,
+  ensureFolder,
+  isTextFile,
+  normalizeLineEndings,
+  normalizePath,
+} from "./utils";
 
 const DEBOUNCE_MS = 1000;
 
@@ -53,17 +59,11 @@ export class BackgroundSync {
 
       if (this.observers.has(path)) return;
 
-      if (this.role === "host") {
+      if (this.role === "host" && path !== this.activeFile) {
         const file = this.vault.getAbstractFileByPath(path) as TFile | null;
         if (file) {
           const content = normalizeLineEndings(await this.vault.read(file));
-          const remoteContent = docHandle.text.toString();
-          if (content !== remoteContent) {
-            docHandle.doc.transact(() => {
-              docHandle.text.delete(0, docHandle.text.length);
-              docHandle.text.insert(0, content);
-            });
-          }
+          applyMinimalYTextUpdate(docHandle.doc, docHandle.text, content);
         }
       } else if (this.role === "guest" && docHandle.text.length > 0) {
         const file = this.vault.getAbstractFileByPath(path) as TFile | null;
@@ -173,13 +173,9 @@ export class BackgroundSync {
     if (!file) return;
 
     const localContent = normalizeLineEndings(await this.vault.read(file));
-    const remoteContent = docHandle.text.toString();
-    if (localContent === remoteContent) return;
+    if (localContent === docHandle.text.toString()) return;
 
-    docHandle.doc.transact(() => {
-      docHandle.text.delete(0, docHandle.text.length);
-      docHandle.text.insert(0, localContent);
-    });
+    applyMinimalYTextUpdate(docHandle.doc, docHandle.text, localContent);
 
     if (this.role === "host") {
       await this.manifestManager.updateFile(file, localContent);
