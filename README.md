@@ -140,13 +140,13 @@ See [Server Setup](docs/server.md) for TLS, OAuth, persistence, and deployment d
 # Server
 cd server
 npm run dev          # Dev server with auto-reload
-npm test             # 58 tests
+npm test             # 63 tests
 npm run lint         # Biome linter
 
 # Plugin
 cd plugin
 npm run dev          # Watch mode (esbuild)
-npm test             # 202 tests
+npm test             # 220 tests
 npm run lint         # Biome linter
 ```
 
@@ -167,6 +167,12 @@ See [Security](docs/security.md) for the full threat model.
 - [Server Setup](docs/server.md) -- Installation, configuration, and deployment
 - [Plugin Usage](docs/plugin.md) -- Commands, features, and configuration
 - [Security](docs/security.md) -- Encryption, authentication, and threat model
+
+## Disclosures
+
+**Network use.** This plugin requires a relay server to function. All real-time sync, file transfer, and presence data is sent over WebSocket connections to a server URL you configure in settings (default: `localhost:4321`). You can self-host the included server or use a shared instance. File content can optionally be end-to-end encrypted (AES-256-GCM) so the server cannot read it; see the [Security](#security) section. GitHub avatar images are loaded over HTTPS when GitHub authentication is used.
+
+**Optional account.** GitHub OAuth login is available but not required. Without it, the plugin generates a local anonymous ID. When enabled, the server must be configured with GitHub OAuth credentials, and authentication is handled via your browser. The resulting JWT token is stored locally in plugin settings.
 
 ## Known Limitations
 
