@@ -37,13 +37,6 @@ describe("ConnectionStateManager", () => {
       expect(csm.getState()).toBe("error");
     });
 
-    it("transitions to reconnecting on reconnecting event", () => {
-      csm.transition({ type: "connect" });
-      csm.transition({ type: "connected" });
-      csm.transition({ type: "reconnecting", attempt: 1 });
-      expect(csm.getState()).toBe("reconnecting");
-    });
-
     it("transitions to auth-required on auth-expired event", () => {
       csm.transition({ type: "connect" });
       csm.transition({ type: "connected" });
@@ -135,25 +128,6 @@ describe("ConnectionStateManager", () => {
       expect(csm.getState()).toBe("disconnected");
     });
 
-    it("reconnecting -> connected via connected event", () => {
-      csm.transition({ type: "connect" });
-      csm.transition({ type: "connected" });
-      csm.transition({ type: "reconnecting", attempt: 1 });
-      expect(csm.getState()).toBe("reconnecting");
-
-      csm.transition({ type: "connected" });
-      expect(csm.getState()).toBe("connected");
-    });
-
-    it("reconnecting -> error via error event", () => {
-      csm.transition({ type: "connect" });
-      csm.transition({ type: "connected" });
-      csm.transition({ type: "reconnecting", attempt: 1 });
-
-      csm.transition({ type: "error", message: "network down" });
-      expect(csm.getState()).toBe("error");
-    });
-
     it("auth-required -> connecting via connect event", () => {
       csm.transition({ type: "connect" });
       csm.transition({ type: "connected" });
@@ -240,8 +214,6 @@ describe("ConnectionStateManager", () => {
 
       csm.transition({ type: "connect" });
       csm.transition({ type: "connected" });
-      csm.transition({ type: "reconnecting", attempt: 1 });
-      csm.transition({ type: "connected" });
       csm.transition({ type: "error", message: "oops" });
       csm.transition({ type: "connect" });
       csm.transition({ type: "connected" });
@@ -249,7 +221,7 @@ describe("ConnectionStateManager", () => {
       csm.transition({ type: "disconnect" });
 
       expect(csm.getState()).toBe("disconnected");
-      expect(listener).toHaveBeenCalledTimes(9);
+      expect(listener).toHaveBeenCalledTimes(7);
     });
   });
 });

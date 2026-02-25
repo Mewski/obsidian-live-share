@@ -417,92 +417,47 @@ describe("ControlChannel", () => {
     });
   });
 
-  describe("reconnection scheduling", () => {
-    it("schedules reconnect on close when not destroyed", () => {
-      vi.useFakeTimers();
+  describe("disconnect behavior", () => {
+    it("fires disconnected immediately when WebSocket closes", async () => {
       channel = new CC(createSettings());
-      const ws = connectAndGetWs(channel);
-      ws.onopen?.();
-
       const stateCallback = vi.fn();
       channel.onStateChange(stateCallback);
 
-      ws.readyState = MockWebSocket.CLOSED;
-      ws.onclose?.();
-
-      expect(stateCallback).toHaveBeenCalledWith("reconnecting");
-      expect((channel as any).reconnectTimer).not.toBeNull();
-      expect((channel as any).reconnectAttempt).toBe(1);
-
-      vi.useRealTimers();
-    });
-
-    it("does not double-schedule reconnect if timer already set", () => {
-      vi.useFakeTimers();
-      channel = new CC(createSettings());
       const ws = connectAndGetWs(channel);
-      ws.onopen?.();
-
-      ws.readyState = MockWebSocket.CLOSED;
-      ws.onclose?.();
-
-      const timer1 = (channel as any).reconnectTimer;
-      ws.onclose?.();
-      const timer2 = (channel as any).reconnectTimer;
-
-      expect(timer1).toBe(timer2);
-
-      vi.useRealTimers();
-    });
-
-    it("resets reconnect delay on successful connection", () => {
-      vi.useFakeTimers();
-      channel = new CC(createSettings());
-      const ws = connectAndGetWs(channel);
-      ws.onopen?.();
-
-      ws.readyState = MockWebSocket.CLOSED;
-      ws.onclose?.();
-
-      vi.advanceTimersByTime(1500);
-
-      const ws2 = (channel as any).ws as MockWebSocket;
-      ws2.onopen?.();
-
-      expect((channel as any).reconnectDelay).toBe(1000);
-      expect((channel as any).reconnectAttempt).toBe(0);
-
-      vi.useRealTimers();
-    });
-
-    it("does not schedule reconnect if destroyed", () => {
-      channel = new CC(createSettings());
-      const ws = connectAndGetWs(channel);
-
-      channel.destroy();
-
-      expect((channel as any).reconnectTimer).toBeNull();
-    });
-
-    it("fires disconnected after max reconnect attempts", () => {
-      channel = new CC(createSettings());
-      const ws = connectAndGetWs(channel);
-      ws.onopen?.();
-
-      const stateCallback = vi.fn();
-      channel.onStateChange(stateCallback);
-
-      const maxAttempts = (CC as any).MAX_RECONNECT_ATTEMPTS as number;
-
-      // Simulate being at the limit — next close will exceed MAX
-      (channel as any).reconnectAttempt = maxAttempts;
+      await vi.waitFor(() => expect(stateCallback).toHaveBeenCalledWith("connected"));
+      stateCallback.mockClear();
 
       ws.readyState = MockWebSocket.CLOSED;
       ws.onclose?.();
 
       expect(stateCallback).toHaveBeenCalledWith("disconnected");
       expect((channel as any).destroyed).toBe(true);
-      expect((channel as any).reconnectTimer).toBeNull();
+    });
+
+    it("does not fire disconnected twice if already destroyed", async () => {
+      channel = new CC(createSettings());
+      const stateCallback = vi.fn();
+      channel.onStateChange(stateCallback);
+
+      const ws = connectAndGetWs(channel);
+      await vi.waitFor(() => expect(stateCallback).toHaveBeenCalledWith("connected"));
+      stateCallback.mockClear();
+
+      ws.readyState = MockWebSocket.CLOSED;
+      ws.onclose?.();
+      ws.onclose?.();
+
+      expect(stateCallback).toHaveBeenCalledTimes(1);
+    });
+
+    it("drops messages when WebSocket is not open", () => {
+      channel = new CC(createSettings());
+      const ws = connectAndGetWs(channel);
+      ws.readyState = MockWebSocket.CLOSED;
+
+      channel.send({ type: "presence-update" });
+
+      expect(ws.sent).toHaveLength(0);
     });
   });
 

@@ -69,6 +69,14 @@ export class ManifestManager {
       params,
     });
 
+    const onDisconnect = (event: { status: string }) => {
+      if (event.status === "disconnected") {
+        this.provider?.off("status", onDisconnect);
+        this.provider?.destroy();
+      }
+    };
+    this.provider.on("status", onDisconnect);
+
     this.manifest = this.doc.getMap("files");
     try {
       await waitForSync(this.provider);

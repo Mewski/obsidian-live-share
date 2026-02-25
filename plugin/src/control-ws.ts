@@ -33,21 +33,10 @@ type Handler = (msg: ControlMessage) => void;
 export class ControlChannel {
   private ws: WebSocket | null = null;
   private handlers = new Map<ControlMessageType, Handler[]>();
-  private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
-  private reconnectDelay = 1000;
   private settings: LiveShareSettings;
   private destroyed = false;
-  private reconnectAttempt = 0;
   private e2e: E2ECrypto | null = null;
-  private stateChangeCallback:
-    | ((state: "connected" | "disconnected" | "reconnecting") => void)
-    | null = null;
-
-  private sendQueue: ControlMessage[] = [];
-  private reconnectCallback: (() => void) | null = null;
-
-  private hasConnected = false;
-  private static MAX_RECONNECT_ATTEMPTS = 20;
+  private stateChangeCallback: ((state: "connected" | "disconnected") => void) | null = null;
 
   private latencyMs = 0;
   private pingTimer: ReturnType<typeof setInterval> | null = null;
@@ -58,12 +47,8 @@ export class ControlChannel {
     this.e2e = e2e ?? null;
   }
 
-  onStateChange(callback: (state: "connected" | "disconnected" | "reconnecting") => void) {
+  onStateChange(callback: (state: "connected" | "disconnected") => void) {
     this.stateChangeCallback = callback;
-  }
-
-  onReconnect(callback: () => void) {
-    this.reconnectCallback = callback;
   }
 
   getLatency(): number {
@@ -79,18 +64,8 @@ export class ControlChannel {
     this.ws = new WebSocket(url);
 
     this.ws.onopen = () => {
-      const wasReconnect = this.hasConnected;
-      this.hasConnected = true;
-      this.reconnectDelay = 1000;
-      this.reconnectAttempt = 0;
       this.stateChangeCallback?.("connected");
-
-      this.flushQueue();
       this.startPing();
-
-      if (wasReconnect) {
-        this.reconnectCallback?.();
-      }
     };
 
     this.ws.onmessage = (event) => {
@@ -122,7 +97,8 @@ export class ControlChannel {
     this.ws.onclose = () => {
       this.stopPing();
       if (!this.destroyed) {
-        this.scheduleReconnect();
+        this.destroyed = true;
+        this.stateChangeCallback?.("disconnected");
       }
     };
 
@@ -130,34 +106,13 @@ export class ControlChannel {
   }
 
   send(msg: ControlMessage): void {
-    if (this.ws?.readyState !== WebSocket.OPEN) {
-      // Queue messages instead of silently dropping them.
-      // Presence updates are ephemeral -- only keep the latest one.
-      if (msg.type === "presence-update") {
-        const idx = this.sendQueue.findIndex((m) => m.type === "presence-update");
-        if (idx >= 0) {
-          this.sendQueue[idx] = msg;
-        } else {
-          this.sendQueue.push(msg);
-        }
-      } else {
-        this.sendQueue.push(msg);
-      }
-      return;
-    }
+    if (this.ws?.readyState !== WebSocket.OPEN) return;
     const encryptable =
       msg.type === "file-op" || msg.type === "file-chunk-data" || msg.type === "file-chunk-end";
     if (this.e2e?.enabled && encryptable) {
       this.encryptAndSend(msg);
     } else {
       this.ws.send(JSON.stringify(msg));
-    }
-  }
-
-  private flushQueue(): void {
-    const queue = this.sendQueue.splice(0);
-    for (const msg of queue) {
-      this.send(msg);
     }
   }
 
@@ -207,26 +162,26 @@ export class ControlChannel {
   private async decryptAndDispatch(msg: ControlMessage): Promise<void> {
     if (!this.e2e) return;
     try {
-      let decMsg: ControlMessage;
+      let decryptedMsg: ControlMessage;
       if (msg.type === "file-chunk-data" && typeof msg.data === "string") {
         const decrypted = await this.e2e.decryptString(msg.data as string);
-        decMsg = { ...msg, data: decrypted, encrypted: undefined };
+        decryptedMsg = { ...msg, data: decrypted, encrypted: undefined };
       } else {
         const op = msg.op as Record<string, unknown> | undefined;
         if (op && typeof op.content === "string") {
           const decrypted = await this.e2e.decryptString(op.content);
-          decMsg = {
+          decryptedMsg = {
             ...msg,
             op: { ...op, content: decrypted },
             encrypted: undefined,
           };
         } else {
-          decMsg = msg;
+          decryptedMsg = msg;
         }
       }
-      const handlers = this.handlers.get(decMsg.type as ControlMessageType);
+      const handlers = this.handlers.get(decryptedMsg.type as ControlMessageType);
       if (handlers) {
-        for (const handler of handlers) handler(decMsg as ControlMessage);
+        for (const handler of handlers) handler(decryptedMsg as ControlMessage);
       }
     } catch {
       // decryption failed -- ignore malformed/miskeyed message
@@ -254,33 +209,10 @@ export class ControlChannel {
     this.destroyed = true;
     this.stateChangeCallback?.("disconnected");
     this.stopPing();
-    if (this.reconnectTimer) {
-      clearTimeout(this.reconnectTimer);
-      this.reconnectTimer = null;
-    }
     if (this.ws) {
       this.ws.close();
       this.ws = null;
     }
     this.handlers.clear();
-    this.sendQueue.length = 0;
-    this.reconnectCallback = null;
-  }
-
-  private scheduleReconnect(): void {
-    if (this.reconnectTimer) return;
-    this.reconnectAttempt++;
-    if (this.reconnectAttempt > ControlChannel.MAX_RECONNECT_ATTEMPTS) {
-      this.destroyed = true;
-      this.stateChangeCallback?.("disconnected");
-      return;
-    }
-    this.stateChangeCallback?.("reconnecting");
-    const jitter = this.reconnectDelay * 0.2 * (Math.random() * 2 - 1);
-    this.reconnectTimer = setTimeout(() => {
-      this.reconnectTimer = null;
-      this.reconnectDelay = Math.min(this.reconnectDelay * 2, 30000);
-      this.connect();
-    }, this.reconnectDelay + jitter);
   }
 }

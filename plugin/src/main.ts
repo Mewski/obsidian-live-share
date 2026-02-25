@@ -557,28 +557,15 @@ export default class LiveSharePlugin extends Plugin {
 
     this.controlChannel = new ControlChannel(this.settings, e2e);
     this.controlChannel.onStateChange((controlState) => {
-      switch (controlState) {
-        case "connected":
-          this.connectionState.transition({ type: "connected" });
-          break;
-        case "reconnecting":
-          this.connectionState.transition({ type: "reconnecting", attempt: 0 });
-          break;
-        case "disconnected":
-          this.connectionState.transition({ type: "disconnect" });
-          // If the control channel gave up reconnecting (not our own destroy),
-          // tear down the session so stale settings don't persist.
-          if (this.sessionManager.isActive && !this.isEndingSession) {
-            new Notice("Live Share: connection lost, session ended");
-            this.endSession();
-          }
-          break;
+      if (controlState === "connected") {
+        this.connectionState.transition({ type: "connected" });
+      } else {
+        this.connectionState.transition({ type: "disconnect" });
+        if (this.sessionManager.isActive && !this.isEndingSession) {
+          new Notice("Live Share: connection lost, session ended");
+          this.endSession();
+        }
       }
-    });
-
-    this.controlChannel.onReconnect(() => {
-      this.fileOpsManager.clearPendingChunks();
-      this.broadcastPresence();
     });
 
     this.controlChannel.connect();
@@ -816,9 +803,6 @@ export default class LiveSharePlugin extends Plugin {
         this.statusBarEl.setText(`Live Share: ${role}${users}${latencyStr}${presentingLabel}`);
         break;
       }
-      case "reconnecting":
-        this.statusBarEl.setText("Live Share: reconnecting...");
-        break;
       case "error":
         this.statusBarEl.setText("Live Share: error");
         break;

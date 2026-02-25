@@ -47,15 +47,13 @@ export class LiveShareSettingTab extends PluginSettingTab {
       const stateLabel =
         connectionState === "connected"
           ? "Connected"
-          : connectionState === "reconnecting"
-            ? "Reconnecting..."
-            : connectionState === "connecting"
-              ? "Connecting..."
-              : connectionState === "error"
-                ? "Error"
-                : connectionState === "auth-required"
-                  ? "Auth required"
-                  : connectionState;
+          : connectionState === "connecting"
+            ? "Connecting..."
+            : connectionState === "error"
+              ? "Error"
+              : connectionState === "auth-required"
+                ? "Auth required"
+                : connectionState;
       new Setting(containerEl)
         .setName("Session active")
         .setDesc(`${role} — Room: ${settings.roomId} — ${stateLabel}`);
