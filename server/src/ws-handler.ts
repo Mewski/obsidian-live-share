@@ -12,6 +12,7 @@ import { WebSocket, WebSocketServer } from "ws";
 import * as awarenessProtocol from "y-protocols/awareness";
 import * as syncProtocol from "y-protocols/sync";
 import * as Y from "yjs";
+
 import { type Persistence, getDefaultPersistence } from "./persistence.js";
 
 const messageSync = 0;

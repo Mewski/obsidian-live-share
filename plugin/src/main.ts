@@ -14,6 +14,7 @@ import {
   type TAbstractFile,
   TFile,
 } from "obsidian";
+
 import { ApprovalModal, type JoinRequest } from "./approval-modal";
 import { AuthManager } from "./auth";
 import { CollabManager } from "./collab";

@@ -6,6 +6,7 @@
  */
 
 import { ItemView, WorkspaceLeaf } from "obsidian";
+
 import { HEX_COLOR_RE } from "./utils";
 
 export const PRESENCE_VIEW_TYPE = "live-share-presence";

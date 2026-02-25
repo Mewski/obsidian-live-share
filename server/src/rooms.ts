@@ -7,6 +7,7 @@
 
 import { Router } from "express";
 import { nanoid } from "nanoid";
+
 import { type Persistence, type Room, noopPersistence } from "./persistence.js";
 import { safeTokenCompare } from "./util.js";
 

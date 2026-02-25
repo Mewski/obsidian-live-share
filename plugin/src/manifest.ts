@@ -9,6 +9,7 @@ import type { TFile, Vault } from "obsidian";
 import { Notice } from "obsidian";
 import { WebsocketProvider } from "y-websocket";
 import * as Y from "yjs";
+
 import type { ExclusionManager } from "./exclusion";
 import { type SyncManager, waitForSync } from "./sync";
 import type { LiveShareSettings } from "./types";

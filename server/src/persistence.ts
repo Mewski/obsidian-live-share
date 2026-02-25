@@ -1,4 +1,10 @@
-/** LevelDB persistence for Y.Docs and room metadata. */
+/**
+ * LevelDB persistence for Y.Docs and room metadata.
+ *
+ * Stores Y.Doc state as binary updates and room metadata as JSON. Provides
+ * atomic get/set/delete operations and a close method for graceful shutdown.
+ */
+
 import { Level } from "level";
 import * as Y from "yjs";
 

@@ -7,6 +7,7 @@
 
 import type { IncomingMessage } from "node:http";
 import { WebSocket, WebSocketServer } from "ws";
+
 import { verifyJWT } from "./github-auth.js";
 import { getRoom, removeRoom, touchRoom } from "./rooms.js";
 

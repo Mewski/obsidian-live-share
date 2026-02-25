@@ -6,18 +6,19 @@
  */
 
 import { Notice } from "obsidian";
-import type LiveSharePlugin from "./main";
 
-function generatePassphrase(): string {
-  const bytes = crypto.getRandomValues(new Uint8Array(16));
-  return Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
-}
+import type LiveSharePlugin from "./main";
 
 interface InvitePayload {
   s: string; // serverUrl
   r: string; // roomId
   t: string; // token
   e?: string; // encryptionPassphrase (optional for backward compat)
+}
+
+function generatePassphrase(): string {
+  const bytes = crypto.getRandomValues(new Uint8Array(16));
+  return Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
 }
 
 export class SessionManager {
