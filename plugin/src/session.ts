@@ -104,9 +104,7 @@ export class SessionManager {
           method: "DELETE",
           headers: { Authorization: `Bearer ${settings.token}` },
         });
-      } catch {
-        // Best effort
-      }
+      } catch {}
     }
 
     settings.roomId = "";

@@ -239,9 +239,7 @@ export default class LiveSharePlugin extends Plugin {
               ? await this.app.vault.read(file)
               : await this.app.vault.readBinary(file);
             await this.manifestManager.updateFile(file, content);
-          } catch {
-            // file may have been deleted before we could read it
-          }
+          } catch {}
         }
       }),
     );
@@ -294,9 +292,7 @@ export default class LiveSharePlugin extends Plugin {
             try {
               const buf = await this.app.vault.readBinary(file);
               await this.manifestManager.updateFile(file, buf);
-            } catch {
-              // file may have been deleted before we could read it
-            }
+            } catch {}
           }
         }
       }),

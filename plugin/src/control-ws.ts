@@ -118,9 +118,7 @@ export class ControlChannel {
         if (handlers) {
           for (const h of handlers) h(msg);
         }
-      } catch {
-        // ignore malformed messages
-      }
+      } catch {}
     };
 
     this.ws.onclose = () => {

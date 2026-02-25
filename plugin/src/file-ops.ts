@@ -228,9 +228,7 @@ export class FileOpsManager {
         if (this.isPathSuppressed(path)) return;
         this.sendFileContent(path, content, false);
       }
-    } catch {
-      // file may have been deleted before we could read it
-    }
+    } catch {}
   }
 
   async onFileModify(file: TAbstractFile) {
@@ -249,9 +247,7 @@ export class FileOpsManager {
       } else {
         this.sendOp?.({ type: "modify", path, content, binary: true });
       }
-    } catch {
-      // file may have been deleted before we could read it
-    }
+    } catch {}
   }
 
   onFileDelete(file: TAbstractFile) {
