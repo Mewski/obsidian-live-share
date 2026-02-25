@@ -52,7 +52,7 @@ export class BackgroundSync {
         return;
       }
 
-      // Re-check after await — another call may have completed first
+      // Re-check after await; another call may have completed first
       if (this.observers.has(path)) return;
 
       // Re-check text.length after await to avoid double-seeding
@@ -119,7 +119,7 @@ export class BackgroundSync {
 
   onFileRemoved(rawPath: string): void {
     const path = normalizePath(rawPath);
-    // Cancel any pending write — do NOT flush (the file is being deleted)
+    // Cancel any pending write, do NOT flush (the file is being deleted)
     const timer = this.writeTimers.get(path);
     if (timer) {
       clearTimeout(timer);
@@ -158,7 +158,7 @@ export class BackgroundSync {
       try {
         await this.subscribe(normNew);
       } catch {
-        // Non-fatal — file will sync when opened
+        // Non-fatal: file will sync when opened
       }
     }
   }
@@ -238,7 +238,7 @@ export class BackgroundSync {
         await this.vault.create(path, content);
       }
     } catch {
-      // File write failed — will retry on next change
+      // File write failed: will retry on next change
     } finally {
       setTimeout(() => {
         this.writtenByUs.delete(path);

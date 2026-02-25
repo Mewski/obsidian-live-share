@@ -142,7 +142,7 @@ describe("FileOpsManager", () => {
 
       expect(sentOps.length).toBe(0);
 
-      // Suppression is off after applyRemoteOp — local events should go through
+      // Suppression is off after applyRemoteOp: local events should go through
       manager.onFileDelete({ path: "other.md" } as any);
       expect(sentOps.length).toBe(1);
     });
@@ -176,7 +176,9 @@ describe("FileOpsManager", () => {
 
     it("broadcasts file rename", () => {
       manager.onFileRename({ path: "new-name.md" } as any, "old-name.md");
-      expect(sentOps).toEqual([{ type: "rename", oldPath: "old-name.md", newPath: "new-name.md" }]);
+      expect(sentOps).toEqual([
+        { type: "rename", oldPath: "old-name.md", newPath: "new-name.md" },
+      ]);
     });
 
     it("does not broadcast when no sender is set", () => {

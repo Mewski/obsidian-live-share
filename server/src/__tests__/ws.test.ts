@@ -82,7 +82,11 @@ function connectWsRaw(roomId: string, token?: string): Promise<WebSocket> {
 }
 
 // Wait until the messages array has at least `count` entries
-function waitForMessages(messages: Uint8Array[], count: number, timeoutMs = 3000): Promise<void> {
+function waitForMessages(
+  messages: Uint8Array[],
+  count: number,
+  timeoutMs = 3000,
+): Promise<void> {
   if (messages.length >= count) return Promise.resolve();
   return new Promise((resolve, reject) => {
     const start = Date.now();
@@ -121,7 +125,10 @@ beforeEach(async () => {
 
 afterEach(async () => {
   for (const ws of openSockets) {
-    if (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING) {
+    if (
+      ws.readyState === WebSocket.OPEN ||
+      ws.readyState === WebSocket.CONNECTING
+    ) {
       ws.close();
     }
   }
@@ -296,7 +303,7 @@ describe("WebSocket handler", () => {
     await new Promise((r) => setTimeout(r, 150));
     const msgCountBefore = clientA.messages.length;
 
-    // Read-only client sends a syncUpdate — should be blocked by the server
+    // Read-only client sends a syncUpdate (should be blocked by the server)
     const roDoc = new Y.Doc();
     roDoc.getText("content").insert(0, "read-only attempt");
     const roUpdate = Y.encodeStateAsUpdate(roDoc);
@@ -329,7 +336,8 @@ describe("WebSocket handler", () => {
       const messages: Uint8Array[] = [];
       ws.on("message", (data: Buffer | ArrayBuffer | Buffer[]) => {
         if (Buffer.isBuffer(data)) messages.push(new Uint8Array(data));
-        else if (data instanceof ArrayBuffer) messages.push(new Uint8Array(data));
+        else if (data instanceof ArrayBuffer)
+          messages.push(new Uint8Array(data));
         else messages.push(new Uint8Array(Buffer.concat(data as Buffer[])));
       });
       ws.on("open", () => {
@@ -344,7 +352,7 @@ describe("WebSocket handler", () => {
     sendSyncStep1(clientA.ws, docA);
     await new Promise((r) => setTimeout(r, 150));
 
-    // clientB sends an update while read-write — should go through
+    // clientB sends an update while read-write (should go through)
     const rwDoc = new Y.Doc();
     rwDoc.getText("content").insert(0, "rw-allowed");
     const rwUpdate = Y.encodeStateAsUpdate(rwDoc);
@@ -360,13 +368,15 @@ describe("WebSocket handler", () => {
     // channel set-permission message. Instead, let's directly test via the permission store.
     setPermission(room.id, userId, "read-only");
 
-    // The Yjs handler won't pick this up automatically — it requires updatePermission().
+    // The Yjs handler won't pick this up automatically; it requires updatePermission().
     // In a real scenario, the control handler calls options.onPermissionChange which
     // calls yjs.updatePermission(). We need to trigger that through the control channel.
 
     // Connect to control channel as host and send set-permission
     const ctrlHost = await new Promise<WebSocket>((resolve, reject) => {
-      const ws = new WebSocket(`ws://localhost:${port}/control/${room.id}?token=${room.token}`);
+      const ws = new WebSocket(
+        `ws://localhost:${port}/control/${room.id}?token=${room.token}`,
+      );
       ws.on("open", () => {
         openSockets.push(ws);
         resolve(ws);
@@ -396,7 +406,7 @@ describe("WebSocket handler", () => {
     );
     await new Promise((r) => setTimeout(r, 200));
 
-    // Now clientB sends another update — should be BLOCKED
+    // Now clientB sends another update (should be BLOCKED)
     const roDoc = new Y.Doc();
     roDoc.getText("content").insert(0, "should-be-blocked");
     const roUpdate = Y.encodeStateAsUpdate(roDoc);
@@ -427,7 +437,8 @@ describe("WebSocket handler", () => {
       const messages: Uint8Array[] = [];
       ws.on("message", (data: Buffer | ArrayBuffer | Buffer[]) => {
         if (Buffer.isBuffer(data)) messages.push(new Uint8Array(data));
-        else if (data instanceof ArrayBuffer) messages.push(new Uint8Array(data));
+        else if (data instanceof ArrayBuffer)
+          messages.push(new Uint8Array(data));
         else messages.push(new Uint8Array(Buffer.concat(data as Buffer[])));
       });
       ws.on("open", () => {
@@ -441,10 +452,13 @@ describe("WebSocket handler", () => {
     await new Promise((r) => setTimeout(r, 150));
     const msgCountBefore = clientA.messages.length;
 
-    // Read-only client sends a fileOp — should be blocked
+    // Read-only client sends a fileOp (should be blocked)
     const encoder = encoding.createEncoder();
     encoding.writeVarUint(encoder, MESSAGE_FILE_OP);
-    encoding.writeVarString(encoder, '{"type":"create","path":"hack.md","content":"nope"}');
+    encoding.writeVarString(
+      encoder,
+      '{"type":"create","path":"hack.md","content":"nope"}',
+    );
     roClient.ws.send(encoding.toUint8Array(encoder));
 
     await new Promise((r) => setTimeout(r, 500));

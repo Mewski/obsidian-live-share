@@ -56,7 +56,11 @@ function connectControl(
   });
 }
 
-function waitForMessages(messages: string[], count: number, timeoutMs = 3000): Promise<void> {
+function waitForMessages(
+  messages: string[],
+  count: number,
+  timeoutMs = 3000,
+): Promise<void> {
   if (messages.length >= count) return Promise.resolve();
   return new Promise((resolve, reject) => {
     const start = Date.now();
@@ -85,7 +89,10 @@ beforeEach(async () => {
 
 afterEach(async () => {
   for (const ws of openSockets) {
-    if (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING) {
+    if (
+      ws.readyState === WebSocket.OPEN ||
+      ws.readyState === WebSocket.CONNECTING
+    ) {
       ws.close();
     }
   }
@@ -751,7 +758,7 @@ describe("Control WebSocket handler", () => {
     });
     await new Promise((r) => setTimeout(r, 100));
 
-    // Connect guest — sends join-request but is NOT approved yet
+    // Connect guest: sends join-request but is NOT approved yet
     const guest = await connectControl(room.id, room.token);
     await new Promise((r) => setTimeout(r, 50));
     sendJSON(guest.ws, {
@@ -761,7 +768,7 @@ describe("Control WebSocket handler", () => {
     });
     await new Promise((r) => setTimeout(r, 100));
 
-    // Guest tries to send file-op while unapproved — should be blocked
+    // Guest tries to send file-op while unapproved (should be blocked)
     host.messages.length = 0;
     sendJSON(guest.ws, {
       type: "file-op",
@@ -809,12 +816,12 @@ describe("Control WebSocket handler", () => {
     });
     await new Promise((r) => setTimeout(r, 100));
 
-    // Host kicks "spoofed-id" — should NOT affect guest (userId is still "original-id")
+    // Host kicks "spoofed-id" (should NOT affect guest, userId is still "original-id")
     sendJSON(host.ws, { type: "kick", userId: "spoofed-id" });
     await new Promise((r) => setTimeout(r, 300));
     expect(guest.ws.readyState).toBe(WebSocket.OPEN);
 
-    // Host kicks "original-id" — SHOULD kick the guest
+    // Host kicks "original-id" (SHOULD kick the guest)
     const guestClosed = new Promise<void>((resolve) => {
       guest.ws.on("close", () => resolve());
     });
@@ -829,7 +836,7 @@ describe("Control WebSocket handler", () => {
     const client = await connectControl(room.id, room.token);
     await new Promise((r) => setTimeout(r, 50));
 
-    // Send join-request (not presence-update) — should become host
+    // Send join-request (not presence-update): should become host
     sendJSON(client.ws, {
       type: "join-request",
       userId: "first-user",

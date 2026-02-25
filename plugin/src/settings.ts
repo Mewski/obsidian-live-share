@@ -56,7 +56,7 @@ export class LiveShareSettingTab extends PluginSettingTab {
                 : connectionState;
       new Setting(containerEl)
         .setName("Session active")
-        .setDesc(`${role} — Room: ${settings.roomId} — ${stateLabel}`);
+        .setDesc(`${role} | Room: ${settings.roomId} | ${stateLabel}`);
     }
 
     new Setting(containerEl)
@@ -136,8 +136,8 @@ export class LiveShareSettingTab extends PluginSettingTab {
         .setName("End-to-end encryption")
         .setDesc(
           settings.encryptionPassphrase
-            ? "Active — file content in control messages is encrypted"
-            : "Inactive — no encryption passphrase set",
+            ? "Active: file content in control messages is encrypted"
+            : "Inactive: no encryption passphrase set",
         );
     }
 

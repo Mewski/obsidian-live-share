@@ -18,7 +18,9 @@ vi.mock("y-websocket", () => ({
   WebsocketProvider: MockWebsocketProvider,
 }));
 
-function createSettings(overrides: Partial<LiveShareSettings> = {}): LiveShareSettings {
+function createSettings(
+  overrides: Partial<LiveShareSettings> = {},
+): LiveShareSettings {
   return {
     serverUrl: "http://localhost:3000",
     roomId: "test-room",
@@ -146,7 +148,9 @@ describe("ManifestManager", () => {
         manager.setExclusionManager(exclusion);
 
         expect(manager.isSharedPath(".obsidian/config")).toBe(false);
-        expect(manager.isSharedPath(".obsidian/plugins/foo/main.js")).toBe(false);
+        expect(manager.isSharedPath(".obsidian/plugins/foo/main.js")).toBe(
+          false,
+        );
         expect(manager.isSharedPath(".liveshare.json")).toBe(false);
         expect(manager.isSharedPath(".trash/deleted.md")).toBe(false);
       });
@@ -221,7 +225,10 @@ describe("ManifestManager", () => {
     });
 
     it("does not add entry for files outside the shared folder", async () => {
-      const manager = new ManifestManager(vault as any, createSettings({ sharedFolder: "shared" }));
+      const manager = new ManifestManager(
+        vault as any,
+        createSettings({ sharedFolder: "shared" }),
+      );
       const { manifest } = injectManifest(manager);
 
       const file = {
@@ -463,7 +470,11 @@ describe("ManifestManager", () => {
       await manager.updateFile(file, "content");
 
       const mockSyncManager = { releaseDoc: vi.fn() };
-      manager.renameFile("folder\\old.md", "folder\\new.md", mockSyncManager as any);
+      manager.renameFile(
+        "folder\\old.md",
+        "folder\\new.md",
+        mockSyncManager as any,
+      );
 
       expect(mockSyncManager.releaseDoc).toHaveBeenCalledWith("folder/old.md");
     });
@@ -543,7 +554,11 @@ describe("ManifestManager", () => {
       });
 
       const requestBinary = vi.fn();
-      const synced = await manager.syncFromManifest(undefined, undefined, requestBinary);
+      const synced = await manager.syncFromManifest(
+        undefined,
+        undefined,
+        requestBinary,
+      );
 
       expect(synced).toBe(1);
       expect(requestBinary).toHaveBeenCalledWith("file..name.png");
@@ -564,7 +579,11 @@ describe("ManifestManager", () => {
       });
 
       const requestBinary = vi.fn();
-      const synced = await manager.syncFromManifest(undefined, undefined, requestBinary);
+      const synced = await manager.syncFromManifest(
+        undefined,
+        undefined,
+        requestBinary,
+      );
 
       expect(synced).toBe(1);
       expect(requestBinary).toHaveBeenCalledWith("safe-binary.png");
@@ -588,9 +607,14 @@ describe("ManifestManager", () => {
       });
 
       const requestBinary = vi.fn();
-      const synced = await manager.syncFromManifest(undefined, undefined, requestBinary, {
-        skipText: true,
-      });
+      const synced = await manager.syncFromManifest(
+        undefined,
+        undefined,
+        requestBinary,
+        {
+          skipText: true,
+        },
+      );
 
       // Only the binary file should be synced; the .md is skipped
       expect(synced).toBe(1);
@@ -609,7 +633,7 @@ describe("ManifestManager", () => {
         skipText: false,
       });
 
-      // Provider WAS constructed — text file not skipped
+      // Provider WAS constructed (text file not skipped)
       expect(MockWebsocketProvider).toHaveBeenCalled();
     });
   });
@@ -730,7 +754,10 @@ describe("ManifestManager", () => {
     });
 
     it("respects sharedFolder setting", () => {
-      const manager = new ManifestManager(vault as any, createSettings({ sharedFolder: "shared" }));
+      const manager = new ManifestManager(
+        vault as any,
+        createSettings({ sharedFolder: "shared" }),
+      );
       const { manifest } = injectManifest(manager);
 
       manager.addFolder("outside");
