@@ -30,9 +30,9 @@ jobs:
 
       - name: Package
         run: |
-          mkdir obsidian-live-share
-          cp main.js manifest.json styles.css obsidian-live-share/
-          zip -r obsidian-live-share.zip obsidian-live-share
+          mkdir live-share
+          cp main.js manifest.json styles.css live-share/
+          zip -r live-share.zip live-share
 
       - name: Create release
         env:
@@ -43,4 +43,4 @@ jobs:
             --title="$tag" \
             --generate-notes \
             --repo="$GITHUB_REPOSITORY" \
-            main.js manifest.json styles.css obsidian-live-share.zip
+            main.js manifest.json styles.css live-share.zip
