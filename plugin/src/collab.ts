@@ -1,6 +1,6 @@
 /** CodeMirror 6 Yjs integration for real-time collaborative editing. */
 
-import { Compartment } from "@codemirror/state";
+import { Compartment, EditorState } from "@codemirror/state";
 import type { Extension } from "@codemirror/state";
 import type { EditorView } from "@codemirror/view";
 import { Notice } from "obsidian";
@@ -26,6 +26,7 @@ export class CollabManager {
     filePath: string | null,
     syncManager: SyncManager,
     role?: SessionRole,
+    permission?: "read-write" | "read-only",
   ) {
     this.currentPath = filePath;
     if (!filePath) {
@@ -59,8 +60,12 @@ export class CollabManager {
       }
     }
 
+    const extensions: Extension[] = [yCollab(result.text, result.provider.awareness)];
+    if (permission === "read-only") {
+      extensions.push(EditorState.readOnly.of(true));
+    }
     view.dispatch({
-      effects: this.compartment.reconfigure(yCollab(result.text, result.provider.awareness)),
+      effects: this.compartment.reconfigure(extensions),
     });
   }
 

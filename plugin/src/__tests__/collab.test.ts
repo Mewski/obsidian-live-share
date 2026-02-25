@@ -25,7 +25,11 @@ vi.mock("@codemirror/state", () => {
       return { type: "reconfigure", value: ext };
     }
   }
-  return { Compartment: MockCompartment };
+  const readOnlyFacet = { of: (val: boolean) => ({ readOnly: val }) };
+  return {
+    Compartment: MockCompartment,
+    EditorState: { readOnly: readOnlyFacet },
+  };
 });
 
 // Mock sync module
@@ -176,7 +180,42 @@ describe("CollabManager", () => {
       await collab.activateForFile(view as any, "test.md", syncManager as any, "host");
 
       expect(view.dispatch).toHaveBeenCalled();
-      expect(reconfigureCalls).toContainEqual("yCollab-extension");
+      expect(reconfigureCalls).toContainEqual(["yCollab-extension"]);
+    });
+
+    it("adds readOnly extension for read-only permission", async () => {
+      const view = createMockView();
+      const syncManager = createMockSyncManager({ textLength: 5 });
+
+      await collab.activateForFile(
+        view as any,
+        "test.md",
+        syncManager as any,
+        "guest",
+        "read-only",
+      );
+
+      expect(view.dispatch).toHaveBeenCalled();
+      const lastReconfigure = reconfigureCalls[reconfigureCalls.length - 1] as unknown[];
+      expect(lastReconfigure).toHaveLength(2);
+      expect(lastReconfigure[0]).toBe("yCollab-extension");
+      expect(lastReconfigure[1]).toEqual({ readOnly: true });
+    });
+
+    it("does not add readOnly extension for read-write permission", async () => {
+      const view = createMockView();
+      const syncManager = createMockSyncManager({ textLength: 5 });
+
+      await collab.activateForFile(
+        view as any,
+        "test.md",
+        syncManager as any,
+        "guest",
+        "read-write",
+      );
+
+      expect(view.dispatch).toHaveBeenCalled();
+      expect(reconfigureCalls).toContainEqual(["yCollab-extension"]);
     });
 
     it("bails out if file switched during sync wait", async () => {
@@ -198,7 +237,9 @@ describe("CollabManager", () => {
       resolveWait();
       await promise;
 
-      const yCollabDispatches = reconfigureCalls.filter((c) => c === "yCollab-extension");
+      const yCollabDispatches = reconfigureCalls.filter(
+        (c) => Array.isArray(c) && c.includes("yCollab-extension"),
+      );
       expect(yCollabDispatches).toHaveLength(0);
     });
   });

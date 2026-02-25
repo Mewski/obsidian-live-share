@@ -755,7 +755,13 @@ export default class LiveSharePlugin extends Plugin {
         ? filePath
         : null;
     this.backgroundSync.setActiveFile(sharedPath);
-    this.collabManager.activateForFile(cmView, sharedPath, this.syncManager, this.settings.role);
+    this.collabManager.activateForFile(
+      cmView,
+      sharedPath,
+      this.syncManager,
+      this.settings.role,
+      this.settings.permission,
+    );
 
     this.removeScrollListener();
     const scrollDOM = cmView.scrollDOM;
