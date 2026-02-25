@@ -14,6 +14,9 @@ Real-time collaborative editing for [Obsidian](https://obsidian.md). Share your 
 - **Focus and summon** -- Request attention or navigate specific participants to your location
 - **Host-only controls** -- Summon, kick, presentation mode, and session end are host-only (enforced server-side)
 - **Guest approval** -- Optionally require host approval with read-write, read-only, or deny
+- **Read-only enforcement** -- Read-only guests are blocked from editing server-side on both Yjs and control channels
+- **Confirmation dialogs** -- End session and kick actions ask for confirmation before proceeding
+- **Host disconnect notice** -- Guests are notified when the host leaves the session
 - **Reload from host** -- Guests can re-download all files from the host
 - **File exclusion** -- Configure `.liveshare.json` to exclude files from sharing
 - **Latency monitoring** -- Ping/pong latency shown in the status bar
@@ -60,9 +63,10 @@ Open Obsidian, go to **Settings > Community Plugins**, and enable **Live Share**
 Open **Settings > Live Share** and set:
 
 - **Server URL** -- `http://localhost:4321` (or your deployed server URL)
-- **Display name** -- Your name shown to collaborators
+- **Display name** -- Your name shown to collaborators (defaults to "Anonymous" if blank)
 - **Cursor color** -- Pick your cursor color using the color picker
 - **Shared folder** -- Subfolder to share (leave empty for the whole vault)
+- **Require approval** -- Require host approval for guests to join (off by default)
 
 ### 4. Start Collaborating
 
@@ -82,7 +86,7 @@ Open **Settings > Live Share** and set:
 |---------|-------------|--------|
 | Start session | Create a room and start hosting | Anyone |
 | Join session | Join via invite link | Anyone |
-| End session | Disconnect from the session | Host broadcasts end to all |
+| End session | Disconnect from the session (asks for confirmation) | Host broadcasts end to all |
 | Copy invite link | Copy invite link to clipboard | Anyone in session |
 | Show collaborators panel | Open the presence sidebar | Anyone |
 | Focus participants here | Send "look here" request to all | Anyone |

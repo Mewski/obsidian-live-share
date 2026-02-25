@@ -8,7 +8,7 @@ Obsidian Live Share is a two-part system: a **relay server** and an **Obsidian p
 
 Each session uses two WebSocket channels:
 
-1. **Yjs sync channel** (`/ws/:roomId`) -- Binary Yjs protocol for document sync and awareness (cursors). One Y.Doc per file, keyed as `roomId:filePath`. The manifest doc (file inventory) is at `roomId:__manifest__`.
+1. **Yjs sync channel** (`/ws/:roomId`) -- Binary Yjs protocol for document sync and awareness (cursors). One Y.Doc per file, keyed as `roomId:filePath`. The manifest doc (file inventory) is at `roomId:__manifest__`. Read-only clients are blocked from sending document updates (sync step2/update) server-side.
 
 2. **Control channel** (`/control/:roomId`) -- JSON messages for file operations (create/delete/rename/modify), presence updates, follow mode, focus/summon requests, guest approval, kick, ping/pong latency, and session lifecycle.
 
@@ -16,7 +16,7 @@ Each session uses two WebSocket channels:
 
 1. Host starts a session, creating a room on the server via `POST /rooms`
 2. Host's plugin scans the vault and publishes a manifest (file list with hashes) to a shared Y.Map
-3. Guest joins via invite link, receives the manifest, and pulls files via per-file Yjs docs
+3. Guest joins via invite link, receives the manifest, and pulls text files via per-file Yjs docs. Binary files are requested from the host via `sync-request` and delivered as chunked file operations.
 4. Both open the same file: Yjs syncs document content character-by-character in real-time
 5. File creates/deletes/renames are broadcast via the control channel with per-path suppression to prevent echo
 6. Presence (who's online, current file, scroll position, cursor line) is broadcast via debounced control messages
@@ -67,14 +67,17 @@ Each session uses two WebSocket channels:
 | Type | Direction | Description |
 |------|-----------|-------------|
 | `file-op` | Bidirectional | File create/modify/delete/rename |
-| `file-chunk-start/data/end` | Bidirectional | Chunked binary file transfer |
+| `file-chunk-start` | Bidirectional | Start chunked binary file transfer with total size |
+| `file-chunk-data` | Bidirectional | Individual chunk of binary file data |
+| `file-chunk-end` | Bidirectional | Signal end of chunked binary file transfer |
 | `presence-update` | Client -> All | Current file, scroll position, cursor line |
 | `presence-leave` | Server -> All | User disconnected |
 | `focus-request` | Client -> All | "Look here" notification |
 | `summon` | Host -> Target(s) | Navigate user(s) to host's cursor |
 | `join-request` | Guest -> Host | Request to join (when approval required) |
 | `join-response` | Host -> Guest | Approve/deny with permission level |
-| `kick` / `kicked` | Host -> Guest | Remove participant |
+| `kick` | Host -> Server | Request to remove a participant |
+| `kicked` | Server -> Guest | Notification that you were removed |
 | `session-end` | Host -> All | Host ended the session |
 | `sync-request` | Guest -> Host | Request full file resync |
 | `ping` / `pong` | Client <-> Server | Latency measurement (30s interval) |

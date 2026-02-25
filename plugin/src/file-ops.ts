@@ -164,6 +164,8 @@ export class FileOpsManager {
             new Notice(`Live Share: incoming ${op.path} exceeds 50 MB limit, skipping`);
             break;
           }
+          // Discard any in-progress assembly for this path (concurrent transfer)
+          this.pendingChunks.delete(op.path);
           this.pendingChunks.set(op.path, {
             chunks: [],
             totalSize: op.totalSize,

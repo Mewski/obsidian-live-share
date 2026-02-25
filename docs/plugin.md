@@ -26,9 +26,10 @@ Open **Settings > Live Share**:
 | Setting | Description |
 |---------|-------------|
 | **Server URL** | URL of your server (e.g. `http://localhost:4321`) |
-| **Display name** | Your name shown to collaborators |
+| **Display name** | Your name shown to collaborators (whitespace-only names default to "Anonymous") |
 | **Cursor color** | Pick your cursor color using the color picker |
 | **Shared folder** | Subfolder to share (leave empty for the whole vault) |
+| **Require approval** | When enabled, guests must be approved by the host before joining. The host can grant read-write or read-only access, or deny the request. |
 
 When a session is active, the settings page also shows the connection state, room ID, token, and encryption status.
 
@@ -42,7 +43,7 @@ All commands are accessible via the command palette (Ctrl/Cmd+P, then type "Live
 |---------|-------------|
 | **Start session** | Create a new room and start hosting. Generates an E2E encryption passphrase and automatically copies the invite link to your clipboard. |
 | **Join session** | Paste an invite link to join an existing session. Files sync automatically from the host. |
-| **End session** | Leave the session. If you're the host, all participants are disconnected. |
+| **End session** | Leave the session (asks for confirmation). If you're the host, all participants are disconnected. |
 | **Copy invite link** | Copy the current session's invite link to share with others. |
 
 ### Collaboration
@@ -72,7 +73,7 @@ The collaborators panel (right sidebar) shows each connected user with:
 - **Current file** they're viewing
 - **Follow button** -- Click to follow their navigation and scroll. Click again to unfollow. Any keyboard, mouse, or scroll interaction automatically unfollows.
 - **Summon button** (host only) -- Navigate that specific user to your cursor
-- **Kick button** (host only) -- Remove the user from the session
+- **Kick button** (host only) -- Remove the user from the session (asks for confirmation)
 
 ## Status Bar
 
@@ -85,6 +86,19 @@ The status bar shows the current connection state:
 - `Live Share: reconnecting...` -- Connection lost, reconnecting
 
 Click the status bar to open the collaborators panel.
+
+## Permissions
+
+When **Require approval** is enabled and a guest joins, the host sees a modal to approve or deny the request. Approved guests receive either **read-write** or **read-only** access:
+
+- **Read-write** -- Full editing, file creation, deletion, and rename
+- **Read-only** -- Can view all shared files but cannot modify content. Enforced server-side on both Yjs document updates and control channel file operations.
+
+When approval is disabled (default), all guests join with read-write access.
+
+## Host Disconnect
+
+If the host disconnects, all guests are notified with a "host has left" notice. The session effectively ends since the host is the source of truth for file operations.
 
 ## File Exclusion
 

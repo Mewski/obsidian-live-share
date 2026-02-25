@@ -187,24 +187,22 @@ export class ManifestManager {
         const text = fileDoc.getText("content");
         const content = text.toString();
 
-        if (content.length > 0) {
-          const dir = path.substring(0, path.lastIndexOf("/"));
-          if (dir) await ensureFolder(this.vault, dir);
+        const dir = path.substring(0, path.lastIndexOf("/"));
+        if (dir) await ensureFolder(this.vault, dir);
 
-          suppress?.(path);
-          try {
-            if (localFile) {
-              await this.vault.modify(localFile, content);
-            } else {
-              await this.vault.create(path, content);
-            }
-          } finally {
-            if (unsuppress) {
-              setTimeout(() => unsuppress(path), 50);
-            }
+        suppress?.(path);
+        try {
+          if (localFile) {
+            await this.vault.modify(localFile, content);
+          } else {
+            await this.vault.create(path, content);
           }
-          synced++;
+        } finally {
+          if (unsuppress) {
+            setTimeout(() => unsuppress(path), 50);
+          }
         }
+        synced++;
       } catch {
         // sync timed out or vault write failed -- skip this file
       } finally {

@@ -70,7 +70,7 @@ When auth is disabled (default), anyone with a room token can connect.
 
 | Endpoint | Method | Description |
 |----------|--------|-------------|
-| `POST /rooms` | Create | Create a new room. Body: `{ "hostUserId": "..." }`. A random room name is auto-generated. |
+| `POST /rooms` | Create | Create a new room. Body: `{ "hostUserId": "...", "requireApproval": false }`. A random room name is auto-generated. |
 | `POST /rooms/:id/join` | Join | Join a room. Body: `{ "token": "..." }` |
 | `GET /rooms/:id` | Info | Get room name and creation time |
 | `DELETE /rooms/:id` | Delete | Delete a room. Header: `Authorization: Bearer <token>` |

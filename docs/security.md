@@ -52,7 +52,7 @@ Host-only operations enforced server-side:
 | Per-path suppression | Ref-counted suppression prevents vault events from echoing remote operations |
 | Avatar URL validation | Only `https:` URLs are rendered as avatar images in the approval modal |
 | Cursor color validation | Only valid hex color values (`#rgb`, `#rrggbb`, etc.) are applied |
-| Read-only enforcement | Server-side: file operations from read-only clients are silently dropped |
+| Read-only enforcement | Server-side: Yjs sync writes (step2/update) and file operations from read-only clients are silently dropped |
 | Host-only enforcement | Server-side: summon, session-end, and kick from non-host clients are dropped |
 | File deletion safety | Remote deletions use Obsidian's trash (recoverable), not permanent delete |
 | Message type whitelist | The control handler only processes known message types |
@@ -62,6 +62,9 @@ Host-only operations enforced server-side:
 | HTML escaping | OAuth callback page escapes display names for safe HTML rendering |
 | Server URL validation | Invite link parser validates the server URL protocol (`http:` or `https:` only) |
 | Room name validation | Auto-generated room names are validated; control characters are rejected |
+| Guest approval | Optional host approval gate for join requests with per-guest permission assignment |
+| Confirmation dialogs | Destructive actions (end session, kick) require user confirmation |
+| Display name sanitization | Empty/whitespace-only display names default to "Anonymous" |
 | Chunk validation | Chunked file assembly verifies all chunks arrived before writing to disk |
 
 ## Threat Model
@@ -73,7 +76,7 @@ Host-only operations enforced server-side:
 | Path traversal via malicious file ops | Client and server-side path validation |
 | XSS via avatar URLs | Only `https:` URLs allowed, HTML escaping in OAuth page |
 | Message flooding | WebSocket rate limiting (100 msgs/10s), connection closed on violation |
-| Unauthorized edits by read-only guests | Server-side enforcement: file ops dropped |
+| Unauthorized edits by read-only guests | Server-side enforcement: Yjs writes and file ops dropped |
 | Guest impersonating host | Server determines host via JWT or first-to-identify; `isHost` in messages is ignored |
 | Incomplete chunk injection | Chunk assembly validates all expected chunks are present |
 | Re-entrant session cleanup | Guard prevents double cleanup from concurrent kicked/session-end handlers |
