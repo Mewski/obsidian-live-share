@@ -682,6 +682,21 @@ export default class LiveSharePlugin extends Plugin {
       this.settings.permission = perm;
       await this.saveSettings();
 
+      // Detach yCollab from CM BEFORE destroying Y.Docs to prevent the
+      // editor from writing into a destroyed Y.Text.
+      const activeView = this.app.workspace.getActiveViewOfType(MarkdownView);
+      const cmView = activeView ? getCmView(activeView) : undefined;
+      if (cmView) this.collabManager.deactivateAll(cmView);
+
+      // Remember which file was active so backgroundSync skips it during startAll
+      const activeFilePath = activeView?.file?.path ?? null;
+      const activeSharedPath =
+        activeFilePath &&
+        this.manifestManager.isSharedPath(activeFilePath) &&
+        isTextFile(activeFilePath)
+          ? activeFilePath
+          : null;
+
       // Reconnect Yjs providers so they use the updated permission param
       this.backgroundSync.destroy();
       this.syncManager.disconnect();
@@ -691,6 +706,8 @@ export default class LiveSharePlugin extends Plugin {
       try {
         this.syncManager.connect();
         await this.manifestManager.connect();
+        // Set the active file before startAll so it doesn't double-subscribe
+        this.backgroundSync.setActiveFile(activeSharedPath);
         await this.backgroundSync.startAll(this.settings.role ?? "guest");
         this.registerManifestChangeHandler();
         this.onActiveFileChange();
