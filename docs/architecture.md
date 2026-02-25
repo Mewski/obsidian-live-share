@@ -38,7 +38,7 @@ Each session uses two WebSocket channels:
 | Component | File | Responsibility |
 |-----------|------|----------------|
 | Main plugin | `main.ts` | Commands, vault event handlers, session lifecycle, presentation mode |
-| Control channel | `control-ws.ts` | WebSocket client with reconnect, send queue, ping/pong latency |
+| Control channel | `control-ws.ts` | WebSocket client with ping/pong latency, E2E encryption |
 | File operations | `file-ops.ts` | Remote op application, per-path suppression, chunked transfer |
 | Collaboration | `collab.ts` | CodeMirror 6 Yjs integration, per-file activation |
 | Sync manager | `sync.ts` | Per-file Y.Doc and WebsocketProvider management |
@@ -60,7 +60,7 @@ Each session uses two WebSocket channels:
 - **Host determination** -- Server-side, not client-side. JWT-verified identity is preferred; fallback without JWT: first connected client becomes host.
 - **LevelDB persistence** -- Server persists Y.Doc state with 5-second debounce after edits. Rooms are cleaned up 30 seconds after the last client disconnects.
 - **Forward-slash path normalization** -- All file paths are normalized to `/` separators for cross-platform compatibility.
-- **Send queue with presence dedup** -- Messages sent while disconnected are queued and flushed on reconnect. Queued presence updates are deduplicated (only the latest is kept).
+- **Fail-fast connections** -- When a WebSocket connection drops, the session ends immediately and all resources are cleaned up. No automatic reconnection or message queuing.
 
 ## Control Message Types
 

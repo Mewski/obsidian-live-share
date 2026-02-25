@@ -406,10 +406,10 @@ describe("Control WebSocket handler", () => {
     await new Promise((r) => setTimeout(r, 300));
 
     // Room cleanup is delayed (35s) to let Yjs clients persist first.
-    // Verify reconnection still works during the grace period.
-    const reconnected = await connectControl(room.id, room.token);
-    expect(reconnected.ws.readyState).toBe(WebSocket.OPEN);
-    reconnected.ws.close();
+    // Verify a new connection still works during the grace period.
+    const lateComer = await connectControl(room.id, room.token);
+    expect(lateComer.ws.readyState).toBe(WebSocket.OPEN);
+    lateComer.ws.close();
   });
 
   it("auto-approves join-request when room does not require approval", async () => {

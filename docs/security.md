@@ -6,11 +6,11 @@ When a host starts a session, a random 128-bit passphrase is generated and embed
 
 **What is encrypted:**
 - File content in `file-op` messages (text of created/modified files)
-- Chunk data in `file-chunk-data` messages (binary file transfers)
+- Chunk data and file paths in `file-chunk-start`, `file-chunk-data`, and `file-chunk-end` messages (binary file transfers)
 
 **What is NOT encrypted:**
-- Yjs CRDT sync data -- the server processes sync protocol messages for persistence, late-join support, and reconnection recovery
-- Control message metadata (message types, file paths, presence info)
+- Yjs CRDT sync data -- the server processes sync protocol messages for persistence and late-join support
+- Control message metadata (message types, presence info, non-chunk file paths)
 
 **Key derivation:**
 1. A deterministic salt is derived from the passphrase via SHA-256 (first 16 bytes)

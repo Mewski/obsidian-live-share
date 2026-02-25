@@ -21,7 +21,7 @@ Real-time collaborative editing for [Obsidian](https://obsidian.md). Share your 
 - **Reload from host** -- Guests can re-download all files from the host
 - **File exclusion** -- Configure `.liveshare.json` to exclude files from sharing
 - **Latency monitoring** -- Ping/pong latency shown in the status bar
-- **Connection resilience** -- Automatic reconnect with exponential backoff, message queuing during disconnection
+- **Fail-fast connections** -- Connection drops immediately end the session and clean up all resources
 
 ## Quick Start
 
@@ -176,7 +176,7 @@ See [Security](docs/security.md) for the full threat model.
 
 ## Known Limitations
 
-- **No offline merge** -- File-level operations (create/delete/rename) don't have conflict resolution when reconnecting after offline edits. Text content merges automatically via Yjs.
+- **No offline merge** -- File-level operations (create/delete/rename) don't have conflict resolution across separate sessions. Text content merges automatically via Yjs within a session.
 - **Single host** -- If the host disconnects, the session ends for all participants.
 - **E2E scope** -- File content in control messages is end-to-end encrypted. Real-time Yjs sync data is processed by the server for persistence and late-join support. Use TLS (`wss://`) to encrypt all traffic in transit.
 

@@ -397,7 +397,7 @@ describe("ControlChannel", () => {
       expect((channel as any).ws).toBeNull();
     });
 
-    it("does not reconnect after destroy", () => {
+    it("does not connect after destroy", () => {
       channel = new CC(createSettings());
       connectAndGetWs(channel);
       channel.destroy();

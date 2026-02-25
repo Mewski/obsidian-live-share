@@ -72,7 +72,7 @@ The collaborators panel (right sidebar) shows each connected user with:
 - **Display name** with a "Host" badge if applicable
 - **Current file** they're viewing
 - **Follow button** -- Click to follow their navigation and scroll. Click again to unfollow. Any keyboard, mouse, or scroll interaction automatically unfollows.
-- **Permission toggle** (host only) -- Toggle a guest between read-write and read-only. Takes effect immediately; the guest's providers reconnect with the new permission.
+- **Permission toggle** (host only) -- Toggle a guest between read-write and read-only. Takes effect immediately; the guest's providers are recreated with the new permission.
 - **Summon button** (host only) -- Navigate that specific user to your cursor
 - **Kick button** (host only) -- Remove the user from the session (asks for confirmation)
 
@@ -84,8 +84,6 @@ The status bar shows the current connection state:
 - `Live Share: hosting (3) 42ms` -- Hosting with 3 total users, 42ms latency
 - `Live Share: joined (2) 38ms` -- Joined with 2 total users, 38ms latency
 - `Live Share: hosting (3) 42ms [presenting]` -- Presentation mode active
-- `Live Share: reconnecting...` -- Connection lost, reconnecting
-
 Click the status bar to open the collaborators panel.
 
 ## Permissions
@@ -97,7 +95,7 @@ When **Require approval** is enabled and a guest joins, the host sees a modal to
 
 When approval is disabled (default), all guests join with read-write access.
 
-The host can change a guest's permission at any time via the permission toggle button in the presence panel. The change takes effect immediately -- the guest's sync providers reconnect with the new permission level.
+The host can change a guest's permission at any time via the permission toggle button in the presence panel. The change takes effect immediately -- the guest's sync providers are recreated with the new permission level.
 
 ## Host Disconnect
 

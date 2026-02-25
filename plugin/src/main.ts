@@ -386,7 +386,7 @@ export default class LiveSharePlugin extends Plugin {
           this.registerManifestChangeHandler();
         }
       } catch {
-        await this.abortSession("Live Share: failed to reconnect to previous session");
+        await this.abortSession("Live Share: failed to resume previous session");
       }
     }
   }
@@ -409,6 +409,7 @@ export default class LiveSharePlugin extends Plugin {
       if (cmView) this.collabManager.deactivateAll(cmView);
     }
 
+    this.fileOpsManager.clearPendingChunks();
     this.backgroundSync.destroy();
     this.manifestManager.destroy();
     this.syncManager.destroy();
@@ -434,6 +435,17 @@ export default class LiveSharePlugin extends Plugin {
       this.syncManager.disconnect();
       this.controlChannel?.destroy();
       this.controlChannel = null;
+      this.isPresenting = false;
+      this.followTarget = null;
+      this.clearUnfollowListeners();
+      this.removeScrollListener();
+      if (this.presenceTimer) {
+        clearTimeout(this.presenceTimer);
+        this.presenceTimer = null;
+      }
+      this.remoteUsers.clear();
+      this.refreshPresenceView();
+      this.fileOpsManager.clearPendingChunks();
       this.manifestManager.destroy();
       this.connectionState.transition({ type: "disconnect" });
     } finally {
@@ -681,7 +693,7 @@ export default class LiveSharePlugin extends Plugin {
           ? activeFilePath
           : null;
 
-      // Reconnect Yjs providers so they use the updated permission param
+      // Recreate Yjs providers so they use the updated permission param
       this.backgroundSync.destroy();
       this.syncManager.disconnect();
       this.manifestManager.destroy();
@@ -697,7 +709,7 @@ export default class LiveSharePlugin extends Plugin {
         this.onActiveFileChange();
         new Notice(`Live Share: your permission was changed to ${permission}`);
       } catch {
-        new Notice("Live Share: permission changed but sync reconnect failed");
+        new Notice("Live Share: permission changed but sync restart failed");
       }
     });
 
