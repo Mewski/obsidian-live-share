@@ -113,4 +113,60 @@ describe("rooms API", () => {
   it("getRoom returns undefined for unknown id", () => {
     expect(getRoom("nope")).toBeUndefined();
   });
+
+  it("stores requireApproval from request body", async () => {
+    const { status, data } = await req(port, "POST", "/rooms", {
+      name: "approval-room",
+      requireApproval: true,
+    });
+    expect(status).toBe(201);
+
+    const room = getRoom(data.id as string);
+    expect(room).toBeDefined();
+    expect(room?.requireApproval).toBe(true);
+  });
+
+  it("deletes a room with valid auth", async () => {
+    const create = await req(port, "POST", "/rooms", { name: "delete-me" });
+    expect(create.status).toBe(201);
+
+    const roomId = create.data.id as string;
+    const token = create.data.token as string;
+
+    // Verify room exists
+    const before = await req(port, "GET", `/rooms/${roomId}`);
+    expect(before.status).toBe(200);
+
+    // Delete with valid bearer token
+    const deleteRes = await fetch(`http://localhost:${port}/rooms/${roomId}`, {
+      method: "DELETE",
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    expect(deleteRes.status).toBe(200);
+    const deleteData = await deleteRes.json();
+    expect(deleteData.ok).toBe(true);
+
+    // Verify room is gone
+    const after = await req(port, "GET", `/rooms/${roomId}`);
+    expect(after.status).toBe(404);
+    expect(getRoom(roomId)).toBeUndefined();
+  });
+
+  it("rejects delete with wrong token", async () => {
+    const create = await req(port, "POST", "/rooms", { name: "no-delete" });
+    expect(create.status).toBe(201);
+
+    const roomId = create.data.id as string;
+
+    const deleteRes = await fetch(`http://localhost:${port}/rooms/${roomId}`, {
+      method: "DELETE",
+      headers: { Authorization: "Bearer wrong-token-value" },
+    });
+    expect(deleteRes.status).toBe(403);
+
+    // Room should still exist
+    const after = await req(port, "GET", `/rooms/${roomId}`);
+    expect(after.status).toBe(200);
+    expect(getRoom(roomId)).toBeDefined();
+  });
 });

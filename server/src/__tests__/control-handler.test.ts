@@ -527,4 +527,86 @@ describe("Control WebSocket handler", () => {
     await new Promise((r) => setTimeout(r, 300));
     expect(clientB.messages.length).toBe(0);
   });
+
+  it("disconnects client exceeding rate limit", async () => {
+    const room = await createRoom("ctrl-rate-limit");
+
+    const client = await connectControl(room.id, room.token);
+
+    await new Promise((r) => setTimeout(r, 50));
+
+    const closedPromise = new Promise<number>((resolve) => {
+      client.ws.on("close", (code: number) => resolve(code));
+    });
+
+    // Send 101 messages rapidly to exceed the 100 per 10s limit
+    for (let i = 0; i < 101; i++) {
+      if (client.ws.readyState === WebSocket.OPEN) {
+        sendJSON(client.ws, { type: "ping", timestamp: Date.now() });
+      }
+    }
+
+    const closeCode = await closedPromise;
+    expect(closeCode).toBe(1008);
+  });
+
+  it("cleans up pending approval on client disconnect", async () => {
+    const room = await createRoom("ctrl-pending-cleanup");
+
+    // Enable requireApproval on the room
+    const { getRoom } = await import("../rooms.js");
+    const serverRoom = getRoom(room.id);
+    expect(serverRoom).toBeDefined();
+    serverRoom!.requireApproval = true;
+
+    // Connect host
+    const host = await connectControl(room.id, room.token);
+    await new Promise((r) => setTimeout(r, 50));
+
+    sendJSON(host.ws, {
+      type: "presence-update",
+      userId: "host-1",
+      displayName: "Host",
+      isHost: true,
+    });
+    await new Promise((r) => setTimeout(r, 100));
+
+    // Connect guest
+    const guest = await connectControl(room.id, room.token);
+    await new Promise((r) => setTimeout(r, 50));
+
+    // Guest sends join-request (room requires approval so it goes pending)
+    host.messages.length = 0;
+    sendJSON(guest.ws, {
+      type: "join-request",
+      userId: "guest-pending",
+      displayName: "PendingGuest",
+    });
+
+    // Host should receive the join-request
+    await waitForMessages(host.messages, 1);
+    const joinReq = JSON.parse(host.messages[0]);
+    expect(joinReq.type).toBe("join-request");
+    expect(joinReq.userId).toBe("guest-pending");
+
+    // Guest disconnects before host approves
+    const guestClosed = new Promise<void>((resolve) => {
+      guest.ws.on("close", () => resolve());
+    });
+    guest.ws.close();
+    await guestClosed;
+
+    // Now host tries to approve the already-disconnected guest
+    host.messages.length = 0;
+    sendJSON(host.ws, {
+      type: "join-response",
+      userId: "guest-pending",
+      approved: true,
+      permission: "read-write",
+    });
+
+    // No crash, and nothing should happen since the guest WS is gone
+    await new Promise((r) => setTimeout(r, 300));
+    // The server should not have thrown; test passes if we reach here
+  });
 });

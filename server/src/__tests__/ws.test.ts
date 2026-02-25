@@ -253,4 +253,57 @@ describe("WebSocket handler", () => {
     await new Promise((r) => setTimeout(r, 300));
     expect(client.messages.length).toBe(msgCountBefore);
   });
+
+  it("enforces read-only on Yjs sync updates", async () => {
+    const room = await createRoom("read-only-sync");
+
+    // Connect a normal read-write client
+    const clientA = await connectWs(room.id, room.token);
+    await waitForMessages(clientA.messages, 1); // syncStep1
+
+    const docA = new Y.Doc();
+    sendSyncStep1(clientA.ws, docA);
+    await new Promise((r) => setTimeout(r, 150));
+
+    // Connect a read-only client using the permission query param
+    const readOnlyUrl = `ws://localhost:${port}/ws/${room.id}?token=${room.token}&permission=read-only`;
+    const readOnlyClient = await new Promise<{
+      ws: WebSocket;
+      messages: Uint8Array[];
+    }>((resolve, reject) => {
+      const ws = new WebSocket(readOnlyUrl);
+      const messages: Uint8Array[] = [];
+      ws.on("message", (data: Buffer | ArrayBuffer | Buffer[]) => {
+        if (Buffer.isBuffer(data)) {
+          messages.push(new Uint8Array(data));
+        } else if (data instanceof ArrayBuffer) {
+          messages.push(new Uint8Array(data));
+        } else if (Array.isArray(data)) {
+          messages.push(new Uint8Array(Buffer.concat(data)));
+        }
+      });
+      ws.on("open", () => {
+        openSockets.push(ws);
+        resolve({ ws, messages });
+      });
+      ws.on("error", reject);
+    });
+    await waitForMessages(readOnlyClient.messages, 1); // syncStep1
+
+    await new Promise((r) => setTimeout(r, 150));
+    const msgCountBefore = clientA.messages.length;
+
+    // Read-only client sends a syncUpdate — should be blocked by the server
+    const roDoc = new Y.Doc();
+    roDoc.getText("content").insert(0, "read-only attempt");
+    const roUpdate = Y.encodeStateAsUpdate(roDoc);
+    sendUpdate(readOnlyClient.ws, roUpdate);
+
+    // Wait and verify the normal client did NOT receive the update
+    await new Promise((r) => setTimeout(r, 500));
+    expect(clientA.messages.length).toBe(msgCountBefore);
+
+    roDoc.destroy();
+    docA.destroy();
+  });
 });
