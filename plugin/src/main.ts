@@ -430,8 +430,8 @@ export default class LiveSharePlugin extends Plugin {
         await this.connectSync();
         await this.manifestManager.connect();
         if (this.settings.role === "host") {
-          await this.backgroundSync.startAll("host");
           await this.manifestManager.publishManifest();
+          await this.backgroundSync.startAll("host");
         } else {
           await this.cleanupStaleFiles();
           await this.manifestManager.syncFromManifest(
@@ -548,8 +548,8 @@ export default class LiveSharePlugin extends Plugin {
       try {
         await this.connectSync();
         await this.manifestManager.connect();
-        await this.backgroundSync.startAll("host");
         await this.manifestManager.publishManifest({ purge: true });
+        await this.backgroundSync.startAll("host");
         new Notice("Live Share: session started, invite copied to clipboard");
       } catch {
         await this.abortSession("Live Share: failed to start session");
