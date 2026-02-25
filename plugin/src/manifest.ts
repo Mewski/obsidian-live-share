@@ -140,12 +140,12 @@ export class ManifestManager {
     let synced = 0;
     const entries = Array.from(this.manifest.entries());
 
-    for (const [path, fileEntry] of entries) {
+    for (const [path, entry] of entries) {
       if (!path || path.startsWith("/") || path.startsWith("\\")) continue;
       const segments = path.split(/[\\/]/);
       if (segments.some((s) => s === ".." || s === ".")) continue;
 
-      if (fileEntry.directory) {
+      if (entry.directory) {
         const existing = this.vault.getAbstractFileByPath(path);
         if (!existing) {
           await ensureFolder(this.vault, path);
@@ -156,50 +156,55 @@ export class ManifestManager {
 
       // When backgroundSync handles text files, skip them here to avoid
       // redundant temporary WebSocket connections.
-      if (options?.skipText && !fileEntry.binary && isTextFile(path)) continue;
+      if (options?.skipText && !entry.binary && isTextFile(path)) continue;
 
       const localFile = this.vault.getAbstractFileByPath(path) as TFile | null;
 
       let needsSync = false;
       if (!localFile) {
         needsSync = true;
-      } else if (fileEntry.binary) {
+      } else if (entry.binary) {
         const buf = await this.vault.readBinary(localFile);
-        if ((await hashBuffer(buf)) !== fileEntry.hash) {
+        if ((await hashBuffer(buf)) !== entry.hash) {
           needsSync = true;
         }
       } else {
         const content = await this.vault.read(localFile);
-        if ((await hashContent(content)) !== fileEntry.hash) {
+        if ((await hashContent(content)) !== entry.hash) {
           needsSync = true;
         }
       }
 
       if (!needsSync) continue;
 
-      if (fileEntry.binary) {
+      if (entry.binary) {
         requestBinary?.(path);
         synced++;
         continue;
       }
 
-      const fileDoc = new Y.Doc();
+      const tempDoc = new Y.Doc();
       const roomName = `${this.settings.roomId}:${encodeURIComponent(path)}`;
       const wsUrl = toWsUrl(this.settings.serverUrl);
-      const fileParams: Record<string, string> = {
+      const tempParams: Record<string, string> = {
         token: this.settings.token,
       };
-      if (this.settings.jwt) fileParams.jwt = this.settings.jwt;
-      const fileUserId = this.settings.githubUserId || this.settings.clientId;
-      if (fileUserId) fileParams.userId = fileUserId;
-      const fileProvider = new WebsocketProvider(`${wsUrl}/ws`, roomName, fileDoc, {
-        params: fileParams,
-      });
+      if (this.settings.jwt) tempParams.jwt = this.settings.jwt;
+      const userId = this.settings.githubUserId || this.settings.clientId;
+      if (userId) tempParams.userId = userId;
+      const tempProvider = new WebsocketProvider(
+        `${wsUrl}/ws`,
+        roomName,
+        tempDoc,
+        {
+          params: tempParams,
+        },
+      );
 
       try {
-        await waitForSync(fileProvider);
+        await waitForSync(tempProvider);
 
-        const text = fileDoc.getText("content");
+        const text = tempDoc.getText("content");
         const content = text.toString();
 
         const dir = path.substring(0, path.lastIndexOf("/"));
@@ -220,15 +225,17 @@ export class ManifestManager {
         synced++;
       } catch {
       } finally {
-        fileProvider.destroy();
-        fileDoc.destroy();
+        tempProvider.destroy();
+        tempDoc.destroy();
       }
     }
 
     return synced;
   }
 
-  onManifestChange(callback: (added: string[], removed: string[]) => void): void {
+  onManifestChange(
+    callback: (added: string[], removed: string[]) => void,
+  ): void {
     if (!this.manifest) return;
 
     if (this.observer && this.manifest) {
@@ -239,7 +246,8 @@ export class ManifestManager {
       const added: string[] = [];
       const removed: string[] = [];
       event.changes.keys.forEach((change, key) => {
-        if (change.action === "add" || change.action === "update") added.push(key);
+        if (change.action === "add" || change.action === "update")
+          added.push(key);
         else if (change.action === "delete") removed.push(key);
       });
       if (added.length > 0 || removed.length > 0) {
@@ -279,7 +287,11 @@ export class ManifestManager {
     this.manifest.set(path, { hash: "", size: 0, mtime: 0, directory: true });
   }
 
-  renameFile(oldPath: string, newPath: string, syncManager?: SyncManager): void {
+  renameFile(
+    oldPath: string,
+    newPath: string,
+    syncManager?: SyncManager,
+  ): void {
     if (!this.manifest) return;
     const normOld = normalizePath(oldPath);
     const normNew = normalizePath(newPath);
@@ -307,7 +319,10 @@ export class ManifestManager {
         ? this.settings.sharedFolder
         : `${this.settings.sharedFolder}/`,
     );
-    return path.startsWith(folder) || path === normalizePath(this.settings.sharedFolder);
+    return (
+      path.startsWith(folder) ||
+      path === normalizePath(this.settings.sharedFolder)
+    );
   }
 
   destroy(): void {

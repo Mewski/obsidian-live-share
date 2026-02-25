@@ -3,7 +3,7 @@
 // Key: `${roomId}:${userId}`, Value: permission level
 const permissions = new Map<string, "read-write" | "read-only">();
 
-function key(roomId: string, userId: string): string {
+function permissionKey(roomId: string, userId: string): string {
   return `${roomId}:${userId}`;
 }
 
@@ -12,18 +12,18 @@ export function setPermission(
   userId: string,
   permission: "read-write" | "read-only",
 ): void {
-  permissions.set(key(roomId, userId), permission);
+  permissions.set(permissionKey(roomId, userId), permission);
 }
 
 export function getPermission(
   roomId: string,
   userId: string,
 ): "read-write" | "read-only" | undefined {
-  return permissions.get(key(roomId, userId));
+  return permissions.get(permissionKey(roomId, userId));
 }
 
 export function clearPermission(roomId: string, userId: string): void {
-  permissions.delete(key(roomId, userId));
+  permissions.delete(permissionKey(roomId, userId));
 }
 
 export function clearRoom(roomId: string): void {

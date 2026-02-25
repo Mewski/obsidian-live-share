@@ -43,11 +43,11 @@ export class BackgroundSync {
     this.subscribing.add(path);
 
     try {
-      const result = this.syncManager.getDoc(path);
-      if (!result) return;
+      const docHandle = this.syncManager.getDoc(path);
+      if (!docHandle) return;
 
       try {
-        await waitForSync(result.provider);
+        await waitForSync(docHandle.provider);
       } catch {
         return;
       }
@@ -56,19 +56,19 @@ export class BackgroundSync {
       if (this.observers.has(path)) return;
 
       // Re-check text.length after await to avoid double-seeding
-      if (this.role === "host" && result.text.length === 0) {
+      if (this.role === "host" && docHandle.text.length === 0) {
         const file = this.vault.getAbstractFileByPath(path) as TFile | null;
         if (file) {
           const content = await this.vault.read(file);
-          if (result.text.length === 0 && content.length > 0) {
-            result.doc.transact(() => {
-              result.text.insert(0, content);
+          if (docHandle.text.length === 0 && content.length > 0) {
+            docHandle.doc.transact(() => {
+              docHandle.text.insert(0, content);
             });
           }
         }
-      } else if (this.role === "guest" && result.text.length > 0) {
+      } else if (this.role === "guest" && docHandle.text.length > 0) {
         const file = this.vault.getAbstractFileByPath(path) as TFile | null;
-        const remoteContent = result.text.toString();
+        const remoteContent = docHandle.text.toString();
         const localContent = file ? await this.vault.read(file) : "";
         if (remoteContent !== localContent) {
           await this.writeToDisk(path, remoteContent);
@@ -78,10 +78,10 @@ export class BackgroundSync {
       const observer = (_event: Y.YTextEvent, transaction: Y.Transaction) => {
         if (transaction.local) return;
         if (path === this.activeFile) return;
-        this.scheduleDiskWrite(path, result.text);
+        this.scheduleDiskWrite(path, docHandle.text);
       };
-      result.text.observe(observer);
-      this.observers.set(path, () => result.text.unobserve(observer));
+      docHandle.text.observe(observer);
+      this.observers.set(path, () => docHandle.text.unobserve(observer));
     } finally {
       this.subscribing.delete(path);
     }
@@ -104,9 +104,9 @@ export class BackgroundSync {
 
     // Flush old active file to disk so the background observer can take over
     if (oldActive && oldActive !== path) {
-      const result = this.syncManager.getDoc(oldActive);
-      if (result) {
-        this.writeToDisk(oldActive, result.text.toString());
+      const docHandle = this.syncManager.getDoc(oldActive);
+      if (docHandle) {
+        this.writeToDisk(oldActive, docHandle.text.toString());
       }
     }
   }
@@ -168,19 +168,19 @@ export class BackgroundSync {
     if (this.writtenByUs.has(path)) return;
     if (path === this.activeFile) return;
 
-    const result = this.syncManager.getDoc(path);
-    if (!result) return;
+    const docHandle = this.syncManager.getDoc(path);
+    if (!docHandle) return;
 
     const file = this.vault.getAbstractFileByPath(path) as TFile | null;
     if (!file) return;
 
     const localContent = await this.vault.read(file);
-    const remoteContent = result.text.toString();
+    const remoteContent = docHandle.text.toString();
     if (localContent === remoteContent) return;
 
-    result.doc.transact(() => {
-      result.text.delete(0, result.text.length);
-      result.text.insert(0, localContent);
+    docHandle.doc.transact(() => {
+      docHandle.text.delete(0, docHandle.text.length);
+      docHandle.text.insert(0, localContent);
     });
 
     await this.manifestManager.updateFile(file, localContent);
@@ -207,9 +207,9 @@ export class BackgroundSync {
     if (!timer) return;
     clearTimeout(timer);
     this.writeTimers.delete(path);
-    const result = this.syncManager.getDoc(path);
-    if (result) {
-      this.writeToDisk(path, result.text.toString());
+    const docHandle = this.syncManager.getDoc(path);
+    if (docHandle) {
+      this.writeToDisk(path, docHandle.text.toString());
     }
   }
 

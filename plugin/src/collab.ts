@@ -27,14 +27,14 @@ export class CollabManager {
       view.dispatch({ effects: this.compartment.reconfigure([]) });
       return;
     }
-    const result = syncManager.getDoc(filePath);
-    if (!result) {
+    const docHandle = syncManager.getDoc(filePath);
+    if (!docHandle) {
       view.dispatch({ effects: this.compartment.reconfigure([]) });
       return;
     }
 
     try {
-      await waitForSync(result.provider);
+      await waitForSync(docHandle.provider);
     } catch {
       new Notice("Live Share: sync timed out");
       view.dispatch({ effects: this.compartment.reconfigure([]) });
@@ -47,14 +47,16 @@ export class CollabManager {
     // Only the host seeds content to prevent duplication race
     if (role === "host") {
       const localContent = view.state.doc.toString();
-      if (result.text.length === 0 && localContent.length > 0) {
-        result.doc.transact(() => {
-          result.text.insert(0, localContent);
+      if (docHandle.text.length === 0 && localContent.length > 0) {
+        docHandle.doc.transact(() => {
+          docHandle.text.insert(0, localContent);
         });
       }
     }
 
-    const extensions: Extension[] = [yCollab(result.text, result.provider.awareness)];
+    const extensions: Extension[] = [
+      yCollab(docHandle.text, docHandle.provider.awareness),
+    ];
     if (permission === "read-only") {
       extensions.push(EditorState.readOnly.of(true));
     }

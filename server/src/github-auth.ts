@@ -67,31 +67,34 @@ export function createAuthRouter(): Router {
         return;
       }
 
-      let tokenRes: Response;
+      let tokenResponse: Response;
       try {
-        tokenRes = await fetch("https://github.com/login/oauth/access_token", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Accept: "application/json",
+        tokenResponse = await fetch(
+          "https://github.com/login/oauth/access_token",
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Accept: "application/json",
+            },
+            body: JSON.stringify({
+              client_id: GITHUB_CLIENT_ID,
+              client_secret: GITHUB_CLIENT_SECRET,
+              code,
+            }),
           },
-          body: JSON.stringify({
-            client_id: GITHUB_CLIENT_ID,
-            client_secret: GITHUB_CLIENT_SECRET,
-            code,
-          }),
-        });
+        );
       } catch {
         res.status(502).send("Failed to contact GitHub");
         return;
       }
 
-      if (!tokenRes.ok) {
+      if (!tokenResponse.ok) {
         res.status(401).send("GitHub auth failed");
         return;
       }
 
-      const { access_token } = (await tokenRes.json()) as {
+      const { access_token } = (await tokenResponse.json()) as {
         access_token: string;
       };
 
@@ -100,9 +103,9 @@ export function createAuthRouter(): Router {
         return;
       }
 
-      let userRes: Response;
+      let userResponse: Response;
       try {
-        userRes = await fetch("https://api.github.com/user", {
+        userResponse = await fetch("https://api.github.com/user", {
           headers: {
             Authorization: `Bearer ${access_token}`,
             Accept: "application/vnd.github+json",
@@ -113,19 +116,19 @@ export function createAuthRouter(): Router {
         return;
       }
 
-      if (!userRes.ok) {
+      if (!userResponse.ok) {
         res.status(401).send("Failed to fetch user info");
         return;
       }
 
-      const ghUser = (await userRes.json()) as GitHubUser;
-      const displayName = ghUser.name || ghUser.login;
+      const githubUser = (await userResponse.json()) as GitHubUser;
+      const displayName = githubUser.name || githubUser.login;
 
       const payload: Omit<JWTPayload, "iat" | "exp"> = {
-        sub: String(ghUser.id),
-        username: ghUser.login,
+        sub: String(githubUser.id),
+        username: githubUser.login,
         displayName,
-        avatar: ghUser.avatar_url,
+        avatar: githubUser.avatar_url,
       };
 
       const jwtToken = jwt.sign(payload, JWT_SECRET, { expiresIn: "7d" });

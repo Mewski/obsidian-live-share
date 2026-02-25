@@ -65,7 +65,9 @@ export class FileOpsManager {
   async applyRemoteOp(op: FileOp) {
     const paths = this.getOpPaths(op);
     // Serialize operations on the same path to prevent interleaving
-    const waitFor = paths.map((path) => this.opQueues.get(path)).filter(Boolean) as Promise<void>[];
+    const waitFor = paths
+      .map((path) => this.opQueues.get(path))
+      .filter(Boolean) as Promise<void>[];
     if (waitFor.length > 0) await Promise.all(waitFor);
 
     const promise = this.applyRemoteOpInner(op);
@@ -146,14 +148,18 @@ export class FileOpsManager {
             await this.vault.rename(file, op.newPath);
           } else if (file && alreadyExists) {
             // Both sides renamed to the same target -- keep existing, trash source
-            new Notice(`Live Share: rename conflict -- ${op.newPath} already exists`);
+            new Notice(
+              `Live Share: rename conflict -- ${op.newPath} already exists`,
+            );
             await this.vault.trash(file, true);
           }
           break;
         }
         case "chunk-start": {
           if (op.totalSize > MAX_FILE_SIZE) {
-            new Notice(`Live Share: incoming ${op.path} exceeds 50 MB limit, skipping`);
+            new Notice(
+              `Live Share: incoming ${op.path} exceeds 50 MB limit, skipping`,
+            );
             break;
           }
           this.pendingChunks.delete(op.path);
@@ -172,28 +178,28 @@ export class FileOpsManager {
           break;
         }
         case "chunk-end": {
-          const completed = this.pendingChunks.get(op.path);
+          const assembly = this.pendingChunks.get(op.path);
           this.pendingChunks.delete(op.path);
-          if (!completed) break;
+          if (!assembly) break;
 
           // Verify all chunks arrived -- sparse array entries would be undefined
-          const expectedChunks = Math.ceil(completed.totalSize / CHUNK_SIZE);
+          const expectedChunks = Math.ceil(assembly.totalSize / CHUNK_SIZE);
           let chunksValid = true;
           for (let i = 0; i < expectedChunks; i++) {
-            if (completed.chunks[i] === undefined) {
+            if (assembly.chunks[i] === undefined) {
               chunksValid = false;
               break;
             }
           }
           if (!chunksValid) break;
 
-          const joined = completed.chunks.join("");
+          const joined = assembly.chunks.join("");
           const exists = this.vault.getAbstractFileByPath(op.path);
           if (!exists) {
             const dir = op.path.substring(0, op.path.lastIndexOf("/"));
             if (dir) await ensureFolder(this.vault, dir);
           }
-          if (completed.binary) {
+          if (assembly.binary) {
             const buf = base64ToArrayBuffer(joined);
             if (exists) {
               await this.vault.modifyBinary(exists as TFile, buf);
@@ -286,7 +292,12 @@ export class FileOpsManager {
   onFileRename(file: TAbstractFile, oldPath: string) {
     const newPath = normalizePath(file.path);
     const oldNorm = normalizePath(oldPath);
-    if (this.isPathSuppressed(newPath) || this.isPathSuppressed(oldNorm) || !this.sendOp) return;
+    if (
+      this.isPathSuppressed(newPath) ||
+      this.isPathSuppressed(oldNorm) ||
+      !this.sendOp
+    )
+      return;
     this.sendOp({ type: "rename", oldPath: oldNorm, newPath });
   }
 

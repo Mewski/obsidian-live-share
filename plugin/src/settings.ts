@@ -41,21 +41,21 @@ export class LiveShareSettingTab extends PluginSettingTab {
         );
     }
 
-    const connState = this.plugin.connectionState.getState();
+    const connectionState = this.plugin.connectionState.getState();
     if (active) {
       const role = settings.role === "host" ? "Hosting" : "Joined";
       const stateLabel =
-        connState === "connected"
+        connectionState === "connected"
           ? "Connected"
-          : connState === "reconnecting"
+          : connectionState === "reconnecting"
             ? "Reconnecting..."
-            : connState === "connecting"
+            : connectionState === "connecting"
               ? "Connecting..."
-              : connState === "error"
+              : connectionState === "error"
                 ? "Error"
-                : connState === "auth-required"
+                : connectionState === "auth-required"
                   ? "Auth required"
-                  : connState;
+                  : connectionState;
       new Setting(containerEl)
         .setName("Session active")
         .setDesc(`${role} -- Room: ${settings.roomId} -- ${stateLabel}`);
