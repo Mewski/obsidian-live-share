@@ -36,7 +36,9 @@ vi.stubGlobal("WebSocket", MockWebSocket);
 
 const { ControlChannel: CC } = await import("../control-ws");
 
-function createSettings(overrides?: Partial<LiveShareSettings>): LiveShareSettings {
+function createSettings(
+  overrides?: Partial<LiveShareSettings>,
+): LiveShareSettings {
   return {
     serverUrl: "http://localhost:4321",
     roomId: "test-room",
@@ -133,7 +135,9 @@ describe("ControlChannel", () => {
 
       const ws = connectAndGetWs(channel);
       ws.simulateMessage(JSON.stringify({ type: "file-op", path: "a.md" }));
-      ws.simulateMessage(JSON.stringify({ type: "presence-update", userId: "u1" }));
+      ws.simulateMessage(
+        JSON.stringify({ type: "presence-update", userId: "u1" }),
+      );
 
       expect(fileOpHandler).toHaveBeenCalledOnce();
       expect(presenceHandler).toHaveBeenCalledOnce();
@@ -271,7 +275,9 @@ describe("ControlChannel", () => {
       await new Promise((r) => setTimeout(r, 50));
 
       expect(handler).not.toHaveBeenCalled();
-      expect(warnSpy).toHaveBeenCalledWith("Live Share: failed to decrypt control message");
+      expect(warnSpy).toHaveBeenCalledWith(
+        "Live Share: failed to decrypt control message",
+      );
 
       warnSpy.mockRestore();
     });
@@ -356,7 +362,7 @@ describe("ControlChannel", () => {
       expect(e2e.encryptString).not.toHaveBeenCalled();
     });
 
-    it("falls back to unencrypted when encryption fails", async () => {
+    it("drops message when encryption fails instead of sending plaintext", async () => {
       const e2e = createMockE2E();
       e2e.encryptString.mockRejectedValue(new Error("crypto error"));
       channel = new CC(createSettings(), e2e as any);
@@ -367,11 +373,9 @@ describe("ControlChannel", () => {
         op: { type: "create", path: "a.md", content: "hello" },
       });
 
-      await vi.waitFor(() => expect(ws.sent.length).toBe(1));
-
-      const sent = JSON.parse(ws.sent[0]);
-      expect(sent.op.content).toBe("hello");
-      expect(sent.encrypted).toBeUndefined();
+      // Give the async encryptAndSend time to settle
+      await new Promise((r) => setTimeout(r, 50));
+      expect(ws.sent).toHaveLength(0);
     });
   });
 
@@ -383,7 +387,9 @@ describe("ControlChannel", () => {
 
       connectAndGetWs(channel);
 
-      await vi.waitFor(() => expect(stateCallback).toHaveBeenCalledWith("connected"));
+      await vi.waitFor(() =>
+        expect(stateCallback).toHaveBeenCalledWith("connected"),
+      );
     });
 
     it("cleans up on destroy", () => {
