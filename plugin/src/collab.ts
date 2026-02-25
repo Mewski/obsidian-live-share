@@ -4,6 +4,7 @@ import type { EditorView } from "@codemirror/view";
 import { Notice } from "obsidian";
 import { yCollab } from "y-codemirror.next";
 import type * as awarenessProtocol from "y-protocols/awareness";
+import * as Y from "yjs";
 
 import type { SyncManager } from "./sync";
 import type { Permission, SessionRole } from "./types";
@@ -44,27 +45,18 @@ export class CollabManager {
           });
         } catch {}
       }
-      if (this.currentAwareness && filePath !== this.currentPath) {
-        this.currentAwareness.setLocalState(null);
-        this.currentAwareness = null;
-      }
+      this.currentAwareness = null;
     }
     this.currentPath = filePath;
     this.currentView = view;
     if (!filePath) {
-      if (this.currentAwareness) {
-        this.currentAwareness.setLocalState(null);
-        this.currentAwareness = null;
-      }
+      this.currentAwareness = null;
       view.dispatch({ effects: this.compartment.reconfigure([]) });
       return;
     }
     const docHandle = syncManager.getDoc(filePath);
     if (!docHandle) {
-      if (this.currentAwareness) {
-        this.currentAwareness.setLocalState(null);
-        this.currentAwareness = null;
-      }
+      this.currentAwareness = null;
       view.dispatch({ effects: this.compartment.reconfigure([]) });
       return;
     }
@@ -73,10 +65,7 @@ export class CollabManager {
       await syncManager.waitForSync(filePath);
     } catch {
       new Notice("Live Share: sync timed out");
-      if (this.currentAwareness) {
-        this.currentAwareness.setLocalState(null);
-        this.currentAwareness = null;
-      }
+      this.currentAwareness = null;
       view.dispatch({ effects: this.compartment.reconfigure([]) });
       return;
     }
@@ -100,13 +89,21 @@ export class CollabManager {
     if (cursorUser) {
       docHandle.awareness.setLocalStateField("user", cursorUser);
     }
-    const extensions: Extension[] = [yCollab(docHandle.text, docHandle.awareness)];
+    const collabExt = yCollab(docHandle.text, docHandle.awareness, {
+      undoManager: false,
+    });
+    const extensions: Extension[] = Array.isArray(collabExt) ? [...collabExt] : [collabExt];
     if (permission === "read-only") {
       extensions.push(EditorState.readOnly.of(true));
     }
     view.dispatch({
       effects: this.compartment.reconfigure(extensions),
     });
+
+    const sel = view.state.selection.main;
+    const anchor = Y.createRelativePositionFromTypeIndex(docHandle.text, sel.anchor);
+    const head = Y.createRelativePositionFromTypeIndex(docHandle.text, sel.head);
+    docHandle.awareness.setLocalStateField("cursor", { anchor, head });
   }
 
   deactivateAll(view: EditorView) {
