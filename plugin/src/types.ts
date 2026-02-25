@@ -82,6 +82,11 @@ export interface FileChunkEndOp {
   path: string;
 }
 
+export interface FolderCreateOp {
+  type: "folder-create";
+  path: string;
+}
+
 export type FileOp =
   | FileCreateOp
   | FileModifyOp
@@ -89,4 +94,5 @@ export type FileOp =
   | FileRenameOp
   | FileChunkStartOp
   | FileChunkDataOp
-  | FileChunkEndOp;
+  | FileChunkEndOp
+  | FolderCreateOp;

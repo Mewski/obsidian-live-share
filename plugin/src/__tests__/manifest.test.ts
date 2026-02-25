@@ -18,7 +18,9 @@ vi.mock("y-websocket", () => ({
   WebsocketProvider: MockWebsocketProvider,
 }));
 
-function createSettings(overrides: Partial<LiveShareSettings> = {}): LiveShareSettings {
+function createSettings(
+  overrides: Partial<LiveShareSettings> = {},
+): LiveShareSettings {
   return {
     serverUrl: "http://localhost:3000",
     roomId: "test-room",
@@ -41,7 +43,8 @@ function createSettings(overrides: Partial<LiveShareSettings> = {}): LiveShareSe
 function createVault() {
   return {
     getFiles: vi.fn(() => []),
-    getAbstractFileByPath: vi.fn(() => null),
+    getAllLoadedFiles: vi.fn(() => []),
+    getAbstractFileByPath: vi.fn((): Record<string, unknown> | null => null),
     read: vi.fn(async () => ""),
     readBinary: vi.fn(async () => new ArrayBuffer(0)),
     modify: vi.fn(async () => {}),
@@ -145,7 +148,9 @@ describe("ManifestManager", () => {
         manager.setExclusionManager(exclusion);
 
         expect(manager.isSharedPath(".obsidian/config")).toBe(false);
-        expect(manager.isSharedPath(".obsidian/plugins/foo/main.js")).toBe(false);
+        expect(manager.isSharedPath(".obsidian/plugins/foo/main.js")).toBe(
+          false,
+        );
         expect(manager.isSharedPath(".liveshare.json")).toBe(false);
         expect(manager.isSharedPath(".trash/deleted.md")).toBe(false);
       });
@@ -220,7 +225,10 @@ describe("ManifestManager", () => {
     });
 
     it("does not add entry for files outside the shared folder", async () => {
-      const manager = new ManifestManager(vault as any, createSettings({ sharedFolder: "shared" }));
+      const manager = new ManifestManager(
+        vault as any,
+        createSettings({ sharedFolder: "shared" }),
+      );
       const { manifest } = injectManifest(manager);
 
       const file = {
@@ -462,7 +470,11 @@ describe("ManifestManager", () => {
       await manager.updateFile(file, "content");
 
       const mockSyncManager = { releaseDoc: vi.fn() };
-      manager.renameFile("folder\\old.md", "folder\\new.md", mockSyncManager as any);
+      manager.renameFile(
+        "folder\\old.md",
+        "folder\\new.md",
+        mockSyncManager as any,
+      );
 
       expect(mockSyncManager.releaseDoc).toHaveBeenCalledWith("folder/old.md");
     });
@@ -542,7 +554,11 @@ describe("ManifestManager", () => {
       });
 
       const requestBinary = vi.fn();
-      const synced = await manager.syncFromManifest(undefined, undefined, requestBinary);
+      const synced = await manager.syncFromManifest(
+        undefined,
+        undefined,
+        requestBinary,
+      );
 
       expect(synced).toBe(1);
       expect(requestBinary).toHaveBeenCalledWith("file..name.png");
@@ -563,7 +579,11 @@ describe("ManifestManager", () => {
       });
 
       const requestBinary = vi.fn();
-      const synced = await manager.syncFromManifest(undefined, undefined, requestBinary);
+      const synced = await manager.syncFromManifest(
+        undefined,
+        undefined,
+        requestBinary,
+      );
 
       expect(synced).toBe(1);
       expect(requestBinary).toHaveBeenCalledWith("safe-binary.png");
@@ -587,9 +607,14 @@ describe("ManifestManager", () => {
       });
 
       const requestBinary = vi.fn();
-      const synced = await manager.syncFromManifest(undefined, undefined, requestBinary, {
-        skipText: true,
-      });
+      const synced = await manager.syncFromManifest(
+        undefined,
+        undefined,
+        requestBinary,
+        {
+          skipText: true,
+        },
+      );
 
       // Only the binary file should be synced; the .md is skipped
       expect(synced).toBe(1);
@@ -693,6 +718,107 @@ describe("ManifestManager", () => {
     it("does nothing if manifest is not initialized", () => {
       const manager = new ManifestManager(vault as any, createSettings());
       manager.onManifestChange(() => {});
+    });
+  });
+
+  // -----------------------------------------------------------------------
+  // addFolder
+  // -----------------------------------------------------------------------
+  describe("addFolder", () => {
+    it("adds a directory entry to the manifest", () => {
+      const manager = new ManifestManager(vault as any, createSettings());
+      const { manifest } = injectManifest(manager);
+
+      manager.addFolder("empty-dir");
+
+      expect(manifest.has("empty-dir")).toBe(true);
+      const entry = manifest.get("empty-dir");
+      expect(entry.directory).toBe(true);
+      expect(entry.hash).toBe("");
+      expect(entry.size).toBe(0);
+    });
+
+    it("does not overwrite an existing entry", () => {
+      const manager = new ManifestManager(vault as any, createSettings());
+      const { manifest } = injectManifest(manager);
+
+      manifest.set("existing", { hash: "abc", size: 10, mtime: 1000 });
+      manager.addFolder("existing");
+
+      expect(manifest.get("existing").hash).toBe("abc");
+    });
+
+    it("does nothing when manifest is not initialized", () => {
+      const manager = new ManifestManager(vault as any, createSettings());
+      manager.addFolder("folder");
+    });
+
+    it("respects sharedFolder setting", () => {
+      const manager = new ManifestManager(
+        vault as any,
+        createSettings({ sharedFolder: "shared" }),
+      );
+      const { manifest } = injectManifest(manager);
+
+      manager.addFolder("outside");
+      expect(manifest.has("outside")).toBe(false);
+
+      manager.addFolder("shared/inside");
+      expect(manifest.has("shared/inside")).toBe(true);
+    });
+  });
+
+  // -----------------------------------------------------------------------
+  // syncFromManifest directory entries
+  // -----------------------------------------------------------------------
+  describe("syncFromManifest directories", () => {
+    it("creates directories from directory entries", async () => {
+      const manager = new ManifestManager(vault as any, createSettings());
+      const { manifest } = injectManifest(manager);
+
+      manifest.set("empty-dir", {
+        hash: "",
+        size: 0,
+        mtime: 0,
+        directory: true,
+      });
+
+      const synced = await manager.syncFromManifest();
+      expect(synced).toBe(1);
+      expect(vault.createFolder).toHaveBeenCalledWith("empty-dir");
+    });
+
+    it("skips directory entries that already exist locally", async () => {
+      const manager = new ManifestManager(vault as any, createSettings());
+      const { manifest } = injectManifest(manager);
+
+      vault.getAbstractFileByPath.mockReturnValueOnce({ path: "existing-dir" });
+      manifest.set("existing-dir", {
+        hash: "",
+        size: 0,
+        mtime: 0,
+        directory: true,
+      });
+
+      const synced = await manager.syncFromManifest();
+      expect(synced).toBe(0);
+      expect(vault.createFolder).not.toHaveBeenCalled();
+    });
+
+    it("creates nested directory paths", async () => {
+      const manager = new ManifestManager(vault as any, createSettings());
+      const { manifest } = injectManifest(manager);
+
+      manifest.set("a/b/c", {
+        hash: "",
+        size: 0,
+        mtime: 0,
+        directory: true,
+      });
+
+      const synced = await manager.syncFromManifest();
+      expect(synced).toBe(1);
+      expect(vault.createFolder).toHaveBeenCalled();
     });
   });
 

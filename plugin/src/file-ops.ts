@@ -211,6 +211,10 @@ export class FileOpsManager {
           }
           break;
         }
+        case "folder-create": {
+          await ensureFolder(this.vault, op.path);
+          break;
+        }
       }
     } catch {
       new Notice(`Live Share: failed to apply remote ${op.type}`);
@@ -227,7 +231,10 @@ export class FileOpsManager {
   async onFileCreate(file: TAbstractFile) {
     const path = normalizePath(file.path);
     if (this.isPathSuppressed(path) || !this.sendOp) return;
-    if (!("extension" in file)) return;
+    if (!("extension" in file)) {
+      this.sendOp({ type: "folder-create", path });
+      return;
+    }
     const binary = !isTextFile(file.path);
     try {
       if (binary) {

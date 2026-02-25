@@ -36,6 +36,7 @@ function createMockVault() {
     }),
     read: vi.fn(async () => "file content"),
     readBinary: vi.fn(async () => new ArrayBuffer(8)),
+    createFolder: vi.fn(async () => ({})),
   };
 }
 
@@ -103,6 +104,26 @@ describe("FileOpsManager", () => {
       expect(vault.rename).not.toHaveBeenCalled();
     });
 
+    it("creates a folder for folder-create op", async () => {
+      await manager.applyRemoteOp({
+        type: "folder-create",
+        path: "new-folder",
+      });
+      expect(vault.createFolder).toHaveBeenCalledWith("new-folder");
+    });
+
+    it("skips folder-create when folder already exists", async () => {
+      vault.files.set("existing-folder", {
+        path: "existing-folder",
+        extension: "",
+      });
+      await manager.applyRemoteOp({
+        type: "folder-create",
+        path: "existing-folder",
+      });
+      expect(vault.createFolder).not.toHaveBeenCalled();
+    });
+
     it("suppresses local broadcasts during remote apply", async () => {
       // Make vault.create trigger onFileCreate synchronously (simulating Obsidian behavior)
       vault.create.mockImplementation(async (path: string) => {
@@ -142,10 +163,10 @@ describe("FileOpsManager", () => {
       });
     });
 
-    it("does not broadcast folder creation", () => {
+    it("broadcasts folder-create for folders", () => {
       const folder = { path: "my-folder" } as any;
       manager.onFileCreate(folder);
-      expect(sentOps.length).toBe(0);
+      expect(sentOps).toEqual([{ type: "folder-create", path: "my-folder" }]);
     });
 
     it("broadcasts file delete", () => {

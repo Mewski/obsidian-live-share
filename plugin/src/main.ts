@@ -294,14 +294,18 @@ export default class LiveSharePlugin extends Plugin {
         if (!this.manifestManager.isSharedPath(file.path)) return;
         if (this.fileOpsManager.isPathSuppressed(file.path)) return;
         this.fileOpsManager.onFileCreate(file);
-        if (this.settings.role === "host" && file instanceof TFile) {
-          try {
-            const content = isTextFile(file.path)
-              ? await this.app.vault.read(file)
-              : await this.app.vault.readBinary(file);
-            await this.manifestManager.updateFile(file, content);
-          } catch {
-            new Notice(`Live Share: failed to update manifest for ${file.path}`);
+        if (this.settings.role === "host") {
+          if (file instanceof TFile) {
+            try {
+              const content = isTextFile(file.path)
+                ? await this.app.vault.read(file)
+                : await this.app.vault.readBinary(file);
+              await this.manifestManager.updateFile(file, content);
+            } catch {
+              new Notice(`Live Share: failed to update manifest for ${file.path}`);
+            }
+          } else {
+            this.manifestManager.addFolder(file.path);
           }
         }
       }),
