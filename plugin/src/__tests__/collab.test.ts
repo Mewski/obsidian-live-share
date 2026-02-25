@@ -51,7 +51,8 @@ function createMockSyncManager(opts?: {
   const text = {
     length: opts?.textLength ?? 0,
     insert: vi.fn(),
-    toString: () => "remote",
+    delete: vi.fn(),
+    toString: () => (opts?.textLength ? "remote" : ""),
   };
   const doc = {
     transact: vi.fn((fn: () => void) => fn()),
@@ -128,7 +129,12 @@ describe("CollabManager", () => {
       const view = createMockView();
       const syncManager = createMockSyncManager({ textLength: 0 });
 
-      await collab.activateForFile(view as any, "test.md", syncManager as any, "host");
+      await collab.activateForFile(
+        view as any,
+        "test.md",
+        syncManager as any,
+        "host",
+      );
 
       expect(syncManager._doc.transact).toHaveBeenCalled();
       expect(syncManager._text.insert).toHaveBeenCalledWith(0, "local content");
@@ -138,7 +144,12 @@ describe("CollabManager", () => {
       const view = createMockView();
       const syncManager = createMockSyncManager({ textLength: 0 });
 
-      await collab.activateForFile(view as any, "test.md", syncManager as any, "guest");
+      await collab.activateForFile(
+        view as any,
+        "test.md",
+        syncManager as any,
+        "guest",
+      );
 
       expect(syncManager._text.insert).not.toHaveBeenCalled();
     });
@@ -152,20 +163,31 @@ describe("CollabManager", () => {
       expect(syncManager._text.insert).not.toHaveBeenCalled();
     });
 
-    it("does not seed content when remote doc already has content", async () => {
+    it("host overwrites remote doc when content differs", async () => {
       const view = createMockView();
       const syncManager = createMockSyncManager({ textLength: 42 });
 
-      await collab.activateForFile(view as any, "test.md", syncManager as any, "host");
+      await collab.activateForFile(
+        view as any,
+        "test.md",
+        syncManager as any,
+        "host",
+      );
 
-      expect(syncManager._text.insert).not.toHaveBeenCalled();
+      expect(syncManager._text.delete).toHaveBeenCalledWith(0, 42);
+      expect(syncManager._text.insert).toHaveBeenCalledWith(0, "local content");
     });
 
     it("activates yCollab extension after successful sync", async () => {
       const view = createMockView();
       const syncManager = createMockSyncManager({ textLength: 5 });
 
-      await collab.activateForFile(view as any, "test.md", syncManager as any, "host");
+      await collab.activateForFile(
+        view as any,
+        "test.md",
+        syncManager as any,
+        "host",
+      );
 
       expect(view.dispatch).toHaveBeenCalled();
       expect(reconfigureCalls).toContainEqual(["yCollab-extension"]);
@@ -184,7 +206,9 @@ describe("CollabManager", () => {
       );
 
       expect(view.dispatch).toHaveBeenCalled();
-      const lastReconfigure = reconfigureCalls[reconfigureCalls.length - 1] as unknown[];
+      const lastReconfigure = reconfigureCalls[
+        reconfigureCalls.length - 1
+      ] as unknown[];
       expect(lastReconfigure).toHaveLength(2);
       expect(lastReconfigure[0]).toBe("yCollab-extension");
       expect(lastReconfigure[1]).toEqual({ readOnly: true });
@@ -218,7 +242,12 @@ describe("CollabManager", () => {
       const view = createMockView();
       const syncManager = createMockSyncManager();
 
-      const promise = collab.activateForFile(view as any, "first.md", syncManager as any, "host");
+      const promise = collab.activateForFile(
+        view as any,
+        "first.md",
+        syncManager as any,
+        "host",
+      );
 
       collab.deactivateAll(view as any);
 
