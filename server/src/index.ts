@@ -1,5 +1,3 @@
-/** Express app setup, WebSocket upgrade routing, TLS, and graceful shutdown. */
-
 import { readFileSync } from "node:fs";
 import { type Server, createServer } from "node:http";
 import { resolve } from "node:path";

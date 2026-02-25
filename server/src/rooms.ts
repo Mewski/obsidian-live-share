@@ -1,5 +1,3 @@
-/** Room CRUD, token validation, and TTL-based cleanup. */
-
 import { Router } from "express";
 import { nanoid } from "nanoid";
 

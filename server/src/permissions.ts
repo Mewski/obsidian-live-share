@@ -1,5 +1,3 @@
-/** Shared permission store between control channel and Yjs WebSocket handler. */
-
 // Key: `${roomId}:${userId}`, Value: permission level
 const permissions = new Map<string, "read-write" | "read-only">();
 

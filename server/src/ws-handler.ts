@@ -1,5 +1,3 @@
-/** Yjs WebSocket handler with per-room Y.Doc persistence and awareness relay. */
-
 import type { IncomingMessage } from "node:http";
 import * as decoding from "lib0/decoding";
 import * as encoding from "lib0/encoding";

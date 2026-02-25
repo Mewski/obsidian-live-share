@@ -1,5 +1,3 @@
-/** Control channel message routing, host enforcement, and rate limiting. */
-
 import type { IncomingMessage } from "node:http";
 import { WebSocket, WebSocketServer } from "ws";
 

@@ -1,5 +1,3 @@
-/** LevelDB persistence for Y.Docs and room metadata. */
-
 import { Level } from "level";
 import * as Y from "yjs";
 
