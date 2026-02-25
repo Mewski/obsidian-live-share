@@ -33,14 +33,14 @@ async function hashContent(content: string): Promise<string> {
   const buf = new TextEncoder().encode(content);
   const hash = await crypto.subtle.digest("SHA-256", buf);
   return Array.from(new Uint8Array(hash))
-    .map((b) => b.toString(16).padStart(2, "0"))
+    .map((byte) => byte.toString(16).padStart(2, "0"))
     .join("");
 }
 
 async function hashBinaryContent(buf: ArrayBuffer): Promise<string> {
   const hash = await crypto.subtle.digest("SHA-256", buf);
   return Array.from(new Uint8Array(hash))
-    .map((b) => b.toString(16).padStart(2, "0"))
+    .map((byte) => byte.toString(16).padStart(2, "0"))
     .join("");
 }
 
@@ -113,13 +113,13 @@ export class ManifestManager {
     }
 
     this.doc.transact(() => {
-      for (const key of this.manifest?.keys() ?? []) {
-        if (!entries.has(key)) {
-          this.manifest?.delete(key);
+      for (const filePath of this.manifest?.keys() ?? []) {
+        if (!entries.has(filePath)) {
+          this.manifest?.delete(filePath);
         }
       }
-      for (const [path, entry] of entries) {
-        this.manifest?.set(path, entry);
+      for (const [filePath, fileEntry] of entries) {
+        this.manifest?.set(filePath, fileEntry);
       }
     });
   }
@@ -134,7 +134,7 @@ export class ManifestManager {
     let synced = 0;
     const entries = Array.from(this.manifest.entries());
 
-    for (const [path, entry] of entries) {
+    for (const [path, fileEntry] of entries) {
       if (
         !path ||
         path.startsWith("/") ||
@@ -148,21 +148,21 @@ export class ManifestManager {
       let needsSync = false;
       if (!localFile) {
         needsSync = true;
-      } else if (entry.binary) {
+      } else if (fileEntry.binary) {
         const buf = await this.vault.readBinary(localFile);
-        if ((await hashBinaryContent(buf)) !== entry.hash) {
+        if ((await hashBinaryContent(buf)) !== fileEntry.hash) {
           needsSync = true;
         }
       } else {
         const content = await this.vault.read(localFile);
-        if ((await hashContent(content)) !== entry.hash) {
+        if ((await hashContent(content)) !== fileEntry.hash) {
           needsSync = true;
         }
       }
 
       if (!needsSync) continue;
 
-      if (entry.binary) {
+      if (fileEntry.binary) {
         // Binary files sync via the control channel (chunked transfer).
         requestBinary?.(path);
         synced++;
@@ -262,10 +262,10 @@ export class ManifestManager {
     if (!this.manifest) return;
     const normOld = normalizePath(oldPath);
     const normNew = normalizePath(newPath);
-    const entry = this.manifest.get(normOld);
-    if (entry) {
+    const fileEntry = this.manifest.get(normOld);
+    if (fileEntry) {
       this.manifest.delete(normOld);
-      this.manifest.set(normNew, entry);
+      this.manifest.set(normNew, fileEntry);
     }
     if (syncManager) {
       syncManager.releaseDoc(normOld);

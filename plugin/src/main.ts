@@ -69,8 +69,8 @@ export default class LiveSharePlugin extends Plugin {
   private registerManifestChangeHandler() {
     this.manifestManager.onManifestChange(async (added, removed) => {
       if (added.length > 0) {
-        const n = await this.manifestManager.syncFromManifest(undefined, undefined, (p) =>
-          this.requestBinaryFile(p),
+        const n = await this.manifestManager.syncFromManifest(undefined, undefined, (path) =>
+          this.requestBinaryFile(path),
         );
         if (n > 0) new Notice(`Live Share: synced ${n} file(s)`);
       }
@@ -349,8 +349,8 @@ export default class LiveSharePlugin extends Plugin {
       if (this.settings.role === "host") {
         await this.manifestManager.publishManifest();
       } else {
-        await this.manifestManager.syncFromManifest(undefined, undefined, (p) =>
-          this.requestBinaryFile(p),
+        await this.manifestManager.syncFromManifest(undefined, undefined, (path) =>
+          this.requestBinaryFile(path),
         );
         this.registerManifestChangeHandler();
       }
@@ -417,8 +417,8 @@ export default class LiveSharePlugin extends Plugin {
     if (ok) {
       await this.connectSync();
       await this.manifestManager.connect();
-      const count = await this.manifestManager.syncFromManifest(undefined, undefined, (p) =>
-        this.requestBinaryFile(p),
+      const count = await this.manifestManager.syncFromManifest(undefined, undefined, (path) =>
+        this.requestBinaryFile(path),
       );
       this.registerManifestChangeHandler();
       new Notice(`Live Share: joined session, synced ${count} file(s)`);
@@ -521,7 +521,7 @@ export default class LiveSharePlugin extends Plugin {
         "oldPath" in op ? op.oldPath : null,
         "newPath" in op ? op.newPath : null,
       ].filter(Boolean) as string[];
-      if (paths.some((p) => !this.manifestManager.isSharedPath(p))) return;
+      if (paths.some((path) => !this.manifestManager.isSharedPath(path))) return;
       this.fileOpsManager.applyRemoteOp(op);
     });
     for (const chunkType of ["file-chunk-start", "file-chunk-data", "file-chunk-end"] as const) {
@@ -774,10 +774,10 @@ export default class LiveSharePlugin extends Plugin {
     }
     if (!this.controlChannel) return;
     new Notice("Live Share: reloading all files from host...");
-    const suppress = (p: string) => this.fileOpsManager.suppressPath(p);
-    const unsuppress = (p: string) => this.fileOpsManager.unsuppressPath(p);
-    const n = await this.manifestManager.syncFromManifest(suppress, unsuppress, (p) =>
-      this.requestBinaryFile(p),
+    const suppress = (path: string) => this.fileOpsManager.suppressPath(path);
+    const unsuppress = (path: string) => this.fileOpsManager.unsuppressPath(path);
+    const n = await this.manifestManager.syncFromManifest(suppress, unsuppress, (path) =>
+      this.requestBinaryFile(path),
     );
     if (n > 0) new Notice(`Live Share: reloaded ${n} file(s) from host`);
   }

@@ -97,7 +97,7 @@ function sendAwarenessState(ws: WebSocket, awareness: awarenessProtocol.Awarenes
 }
 
 export function createYjsWSS(persist?: Persistence) {
-  const p = persist ?? getDefaultPersistence();
+  const persistence = persist ?? getDefaultPersistence();
   const roomStates = new Map<string, RoomState>();
   const pendingRooms = new Map<string, Promise<RoomState>>();
   const wss = new WebSocketServer({
@@ -109,7 +109,7 @@ export function createYjsWSS(persist?: Persistence) {
     const doc = new Y.Doc();
     const awareness = new awarenessProtocol.Awareness(doc);
 
-    await p.loadDoc(roomId, doc);
+    await persistence.loadDoc(roomId, doc);
 
     const state: RoomState = {
       doc,
@@ -135,7 +135,7 @@ export function createYjsWSS(persist?: Persistence) {
 
       if (state.persistTimer) clearTimeout(state.persistTimer);
       state.persistTimer = setTimeout(() => {
-        p.persistDoc(roomId, doc).catch((err) => {
+        persistence.persistDoc(roomId, doc).catch((err) => {
           console.error(`persist error for ${roomId}:`, err);
         });
       }, 5_000);
@@ -211,7 +211,7 @@ export function createYjsWSS(persist?: Persistence) {
   async function cleanupRoom(roomId: string, state: RoomState) {
     if (state.persistTimer) clearTimeout(state.persistTimer);
     try {
-      await p.persistDoc(roomId, state.doc);
+      await persistence.persistDoc(roomId, state.doc);
     } catch (err) {
       console.error(`failed to persist room ${roomId} during cleanup:`, err);
     }
@@ -229,7 +229,7 @@ export function createYjsWSS(persist?: Persistence) {
       if (state.persistTimer) clearTimeout(state.persistTimer);
       if (state.cleanupTimer) clearTimeout(state.cleanupTimer);
       try {
-        await p.persistDoc(roomId, state.doc);
+        await persistence.persistDoc(roomId, state.doc);
       } catch (err) {
         console.error(`failed to persist room ${roomId} during shutdown:`, err);
       }

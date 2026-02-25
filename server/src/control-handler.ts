@@ -207,8 +207,8 @@ export function createControlWSS() {
       if (msg.type === "kick" && client.isHost) {
         const targetUserId = msg.userId;
         if (typeof targetUserId !== "string" || !targetUserId) return;
-        for (const [clientWs, c] of room.clients) {
-          if (c.userId === targetUserId) {
+        for (const [clientWs, targetClient] of room.clients) {
+          if (targetClient.userId === targetUserId) {
             sendTo(clientWs, { type: "kicked" });
             clientWs.close();
           }
@@ -241,8 +241,8 @@ export function createControlWSS() {
       ) {
         const targetUserId = msg.targetUserId;
         const strData = typeof data === "string" ? data : data.toString("utf-8");
-        for (const [clientWs, c] of room.clients) {
-          if (c.userId === targetUserId && clientWs.readyState === WebSocket.OPEN) {
+        for (const [clientWs, targetClient] of room.clients) {
+          if (targetClient.userId === targetUserId && clientWs.readyState === WebSocket.OPEN) {
             clientWs.send(strData);
           }
         }

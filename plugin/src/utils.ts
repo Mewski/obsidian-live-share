@@ -9,8 +9,8 @@ import { TFolder, type Vault } from "obsidian";
 
 export const HEX_COLOR_RE = /^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/;
 
-export function normalizePath(p: string): string {
-  return p.replace(/\\/g, "/");
+export function normalizePath(filePath: string): string {
+  return filePath.replace(/\\/g, "/");
 }
 
 export function toWsUrl(httpUrl: string): string {

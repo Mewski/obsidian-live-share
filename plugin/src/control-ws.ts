@@ -122,7 +122,7 @@ export class ControlChannel {
         }
         const handlers = this.handlers.get(msg.type);
         if (handlers) {
-          for (const h of handlers) h(msg);
+          for (const handler of handlers) handler(msg);
         }
       } catch {}
     };
@@ -234,7 +234,7 @@ export class ControlChannel {
       }
       const handlers = this.handlers.get(decMsg.type as ControlMessageType);
       if (handlers) {
-        for (const h of handlers) h(decMsg as ControlMessage);
+        for (const handler of handlers) handler(decMsg as ControlMessage);
       }
     } catch {
       // decryption failed -- ignore malformed/miskeyed message

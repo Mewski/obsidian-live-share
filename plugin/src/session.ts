@@ -28,9 +28,9 @@ export class SessionManager {
     const { settings } = this.plugin;
     const baseUrl = settings.serverUrl.replace(/\/+$/, "");
 
-    let res: Response;
+    let createResponse: Response;
     try {
-      res = await fetch(`${baseUrl}/rooms`, {
+      createResponse = await fetch(`${baseUrl}/rooms`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -43,20 +43,20 @@ export class SessionManager {
       return false;
     }
 
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({ error: "unknown" }));
+    if (!createResponse.ok) {
+      const err = await createResponse.json().catch(() => ({ error: "unknown" }));
       new Notice(`Live Share: ${(err as { error: string }).error}`);
       return false;
     }
 
-    const data = (await res.json()) as {
+    const roomData = (await createResponse.json()) as {
       id: string;
       token: string;
       name: string;
     };
 
-    settings.roomId = data.id;
-    settings.token = data.token;
+    settings.roomId = roomData.id;
+    settings.token = roomData.token;
     settings.role = "host";
     settings.encryptionPassphrase = generatePassphrase();
     await this.plugin.saveSettings();
@@ -66,37 +66,37 @@ export class SessionManager {
   }
 
   async joinSession(inviteString: string): Promise<boolean> {
-    const parsed = this.parseInvite(inviteString);
-    if (!parsed) {
+    const parsedInvite = this.parseInvite(inviteString);
+    if (!parsedInvite) {
       new Notice("Live Share: invalid invite string");
       return false;
     }
 
     const { settings } = this.plugin;
-    const baseUrl = parsed.s.replace(/\/+$/, "");
+    const baseUrl = parsedInvite.s.replace(/\/+$/, "");
 
-    let res: Response;
+    let joinResponse: Response;
     try {
-      res = await fetch(`${baseUrl}/rooms/${parsed.r}/join`, {
+      joinResponse = await fetch(`${baseUrl}/rooms/${parsedInvite.r}/join`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ token: parsed.t }),
+        body: JSON.stringify({ token: parsedInvite.t }),
       });
     } catch {
       new Notice("Live Share: cannot reach server");
       return false;
     }
 
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({ error: "unknown" }));
+    if (!joinResponse.ok) {
+      const err = await joinResponse.json().catch(() => ({ error: "unknown" }));
       new Notice(`Live Share: ${(err as { error: string }).error}`);
       return false;
     }
 
-    settings.serverUrl = parsed.s;
-    settings.roomId = parsed.r;
-    settings.token = parsed.t;
-    settings.encryptionPassphrase = parsed.e ?? "";
+    settings.serverUrl = parsedInvite.s;
+    settings.roomId = parsedInvite.r;
+    settings.token = parsedInvite.t;
+    settings.encryptionPassphrase = parsedInvite.e ?? "";
     settings.role = "guest";
     await this.plugin.saveSettings();
 

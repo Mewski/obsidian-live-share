@@ -73,14 +73,14 @@ export class FileOpsManager {
   async applyRemoteOp(op: FileOp) {
     const paths = this.getOpPaths(op);
     // Serialize operations on the same path to prevent interleaving
-    const waitFor = paths.map((p) => this.opQueues.get(p)).filter(Boolean) as Promise<void>[];
+    const waitFor = paths.map((path) => this.opQueues.get(path)).filter(Boolean) as Promise<void>[];
     if (waitFor.length > 0) await Promise.all(waitFor);
 
     const promise = this.applyRemoteOpInner(op);
-    for (const p of paths) this.opQueues.set(p, promise);
+    for (const path of paths) this.opQueues.set(path, promise);
     await promise;
-    for (const p of paths) {
-      if (this.opQueues.get(p) === promise) this.opQueues.delete(p);
+    for (const path of paths) {
+      if (this.opQueues.get(path) === promise) this.opQueues.delete(path);
     }
   }
 
@@ -102,7 +102,7 @@ export class FileOpsManager {
     if ("newPath" in op && !this.isPathSafe(op.newPath)) return;
 
     const paths = this.getOpPaths(op);
-    for (const p of paths) this.suppressPath(p);
+    for (const path of paths) this.suppressPath(path);
     try {
       switch (op.type) {
         case "create": {
@@ -226,7 +226,7 @@ export class FileOpsManager {
       // the vault operation resolves) still see the path as suppressed.
       // Uses reference counting so concurrent ops on the same path stay suppressed.
       setTimeout(() => {
-        for (const p of paths) this.unsuppressPath(p);
+        for (const path of paths) this.unsuppressPath(path);
       }, 50);
     }
   }

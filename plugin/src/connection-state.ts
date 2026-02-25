@@ -54,7 +54,7 @@ export class ConnectionStateManager {
         break;
     }
     if (this.state !== prev) {
-      for (const l of this.listeners) l(this.state, event);
+      for (const listener of this.listeners) listener(this.state, event);
     }
   }
 
