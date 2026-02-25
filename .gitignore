@@ -1,7 +1,8 @@
-node_modules/
-dist/
-main.js
-data/
+.claude/
 .direnv/
-result
+data/
+dist/
+node_modules/
+result/
+main.js
 *.tsbuildinfo
