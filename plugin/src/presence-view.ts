@@ -94,7 +94,7 @@ export class PresenceView extends ItemView {
 
       const dot = item.createEl("span", { cls: "live-share-presence-dot" });
       if (HEX_COLOR_RE.test(user.cursorColor)) {
-        dot.style.backgroundColor = user.cursorColor;
+        dot.style.setProperty("--cursor-color", user.cursorColor);
       }
 
       const info = item.createEl("div", { cls: "live-share-presence-info" });
