@@ -1,6 +1,9 @@
-import { timingSafeEqual } from "node:crypto";
+import { createHmac, timingSafeEqual } from "node:crypto";
+
+const COMPARE_KEY = "live-share-token-compare";
 
 export function safeTokenCompare(a: string, b: string): boolean {
-  if (a.length !== b.length) return false;
-  return timingSafeEqual(Buffer.from(a), Buffer.from(b));
+  const ha = createHmac("sha256", COMPARE_KEY).update(a).digest();
+  const hb = createHmac("sha256", COMPARE_KEY).update(b).digest();
+  return timingSafeEqual(ha, hb);
 }

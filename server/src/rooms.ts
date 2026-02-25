@@ -28,13 +28,19 @@ export function touchRoom(id: string) {
   const room = rooms.get(id);
   if (room) {
     room.lastActivityAt = Date.now();
-    _persistence.saveRoom(room).catch(() => {});
+    _persistence.saveRoom(room).catch((err) => {
+      console.error(`touchRoom persist error for ${id}:`, err);
+    });
   }
 }
 
 export async function removeRoom(id: string) {
   rooms.delete(id);
-  await _persistence.deleteRoom(id).catch(() => {});
+  try {
+    await _persistence.deleteRoom(id);
+  } catch (err) {
+    console.error(`removeRoom persist error for ${id}:`, err);
+  }
 }
 
 export async function reapStaleRooms() {
@@ -43,7 +49,11 @@ export async function reapStaleRooms() {
     const age = now - (room.lastActivityAt || room.createdAt);
     if (age > ROOM_MAX_AGE_MS) {
       rooms.delete(id);
-      await _persistence.deleteRoom(id).catch(() => {});
+      try {
+        await _persistence.deleteRoom(id);
+      } catch (err) {
+        console.error(`reapStaleRooms persist error for ${id}:`, err);
+      }
     }
   }
 }

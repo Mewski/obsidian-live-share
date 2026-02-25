@@ -59,6 +59,13 @@ export class PresenceView extends ItemView {
     this.render();
   }
 
+  updateState(users: Map<string, PresenceUser>, isHost: boolean, followedUserId: string | null) {
+    this.users = users;
+    this.isHost = isHost;
+    this.followedUserId = followedUserId;
+    this.render();
+  }
+
   async onOpen() {
     this.render();
   }

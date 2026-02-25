@@ -14,21 +14,19 @@ interface FileEntry {
   binary?: boolean;
 }
 
-function hashContent(content: string): string {
-  let h = 5381;
-  for (let i = 0; i < content.length; i++) {
-    h = ((h << 5) + h + content.charCodeAt(i)) | 0;
-  }
-  return (h >>> 0).toString(36);
+async function hashContent(content: string): Promise<string> {
+  const buf = new TextEncoder().encode(content);
+  const hash = await crypto.subtle.digest("SHA-256", buf);
+  return Array.from(new Uint8Array(hash))
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
 }
 
-function hashBinaryContent(buf: ArrayBuffer): string {
-  const bytes = new Uint8Array(buf);
-  let h = 5381;
-  for (let i = 0; i < bytes.byteLength; i++) {
-    h = ((h << 5) + h + bytes[i]) | 0;
-  }
-  return (h >>> 0).toString(36);
+async function hashBinaryContent(buf: ArrayBuffer): Promise<string> {
+  const hash = await crypto.subtle.digest("SHA-256", buf);
+  return Array.from(new Uint8Array(hash))
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
 }
 
 export class ManifestManager {
@@ -83,7 +81,7 @@ export class ManifestManager {
       if (binary) {
         const buf = await this.vault.readBinary(file);
         entries.set(normalizePath(file.path), {
-          hash: hashBinaryContent(buf),
+          hash: await hashBinaryContent(buf),
           size: file.stat.size,
           mtime: file.stat.mtime,
           binary: true,
@@ -91,7 +89,7 @@ export class ManifestManager {
       } else {
         const content = await this.vault.read(file);
         entries.set(normalizePath(file.path), {
-          hash: hashContent(content),
+          hash: await hashContent(content),
           size: file.stat.size,
           mtime: file.stat.mtime,
         });
@@ -120,8 +118,14 @@ export class ManifestManager {
     const entries = Array.from(this.manifest.entries());
 
     for (const [path, entry] of entries) {
-      // Binary files sync via file-ops, not Yjs
       if (entry.binary) continue;
+      if (
+        !path ||
+        path.startsWith("/") ||
+        path.startsWith("\\") ||
+        /(?:^|[\\/])\.\.(?:[\\/]|$)/.test(path)
+      )
+        continue;
 
       const localFile = this.vault.getAbstractFileByPath(path) as TFile | null;
 
@@ -130,7 +134,7 @@ export class ManifestManager {
         needsSync = true;
       } else {
         const content = await this.vault.read(localFile);
-        if (hashContent(content) !== entry.hash) {
+        if ((await hashContent(content)) !== entry.hash) {
           needsSync = true;
         }
       }
@@ -149,36 +153,34 @@ export class ManifestManager {
 
         try {
           await waitForSync(fileProvider);
+
+          const text = fileDoc.getText("content");
+          const content = text.toString();
+
+          if (content.length > 0) {
+            const dir = path.substring(0, path.lastIndexOf("/"));
+            if (dir) await this.ensureFolder(dir);
+
+            suppress?.(path);
+            try {
+              if (localFile) {
+                await this.vault.modify(localFile, content);
+              } else {
+                await this.vault.create(path, content);
+              }
+            } finally {
+              if (unsuppress) {
+                setTimeout(() => unsuppress(path), 50);
+              }
+            }
+            synced++;
+          }
         } catch {
+          // sync timed out or vault write failed — skip this file
+        } finally {
           fileProvider.destroy();
           fileDoc.destroy();
-          continue;
         }
-
-        const text = fileDoc.getText("content");
-        const content = text.toString();
-
-        if (content.length > 0) {
-          const dir = path.substring(0, path.lastIndexOf("/"));
-          if (dir) await this.ensureFolder(dir);
-
-          suppress?.(path);
-          try {
-            if (localFile) {
-              await this.vault.modify(localFile, content);
-            } else {
-              await this.vault.create(path, content);
-            }
-          } finally {
-            if (unsuppress) {
-              setTimeout(() => unsuppress(path), 50);
-            }
-          }
-          synced++;
-        }
-
-        fileProvider.destroy();
-        fileDoc.destroy();
       }
     }
 
@@ -196,7 +198,7 @@ export class ManifestManager {
       const added: string[] = [];
       const removed: string[] = [];
       event.changes.keys.forEach((change, key) => {
-        if (change.action === "add") added.push(key);
+        if (change.action === "add" || change.action === "update") added.push(key);
         else if (change.action === "delete") removed.push(key);
       });
       if (added.length > 0 || removed.length > 0) {
@@ -206,18 +208,18 @@ export class ManifestManager {
     this.manifest.observe(this.observer);
   }
 
-  updateFile(file: TFile, content: string | ArrayBuffer): void {
+  async updateFile(file: TFile, content: string | ArrayBuffer): Promise<void> {
     if (!this.manifest || !this.isSharedPath(file.path)) return;
     if (content instanceof ArrayBuffer) {
       this.manifest.set(normalizePath(file.path), {
-        hash: hashBinaryContent(content),
+        hash: await hashBinaryContent(content),
         size: content.byteLength,
         mtime: file.stat.mtime,
         binary: true,
       });
     } else {
       this.manifest.set(normalizePath(file.path), {
-        hash: hashContent(content),
+        hash: await hashContent(content),
         size: content.length,
         mtime: file.stat.mtime,
       });

@@ -1,4 +1,5 @@
 import { minimatch } from "minimatch";
+import { Notice } from "obsidian";
 import type { TFile, Vault } from "obsidian";
 
 export interface LiveShareConfig {
@@ -20,7 +21,9 @@ export class ExclusionManager {
           this.patterns = [...DEFAULT_EXCLUDES, ...config.exclude];
         }
       }
-    } catch {}
+    } catch {
+      new Notice("Live Share: .liveshare.json has invalid syntax");
+    }
   }
 
   isExcluded(path: string): boolean {

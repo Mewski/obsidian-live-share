@@ -200,6 +200,7 @@ export default class LiveSharePlugin extends Plugin {
       const view = new PresenceView(leaf);
       view.setFollowHandler((userId) => this.followUser(userId));
       view.setKickHandler((userId) => this.kickUser(userId));
+      view.setSummonHandler((userId) => this.summonUser(userId));
       view.setIsHost(this.settings.role === "host");
       return view;
     });
@@ -689,7 +690,7 @@ export default class LiveSharePlugin extends Plugin {
     const leaves = this.app.workspace.getLeavesOfType(PRESENCE_VIEW_TYPE);
     for (const leaf of leaves) {
       const view = leaf.view as PresenceView;
-      view.updateUsers(this.remoteUsers);
+      view.updateState(this.remoteUsers, this.settings.role === "host", this.followTarget);
     }
   }
 

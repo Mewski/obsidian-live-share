@@ -208,8 +208,8 @@ export class ControlChannel {
           this.ws.send(JSON.stringify(msg));
         }
       }
-    } catch {
-      this.ws?.send(JSON.stringify(msg));
+    } catch (err) {
+      console.error("Live Share: encryption failed, message dropped:", err);
     }
   }
 

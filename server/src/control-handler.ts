@@ -150,8 +150,9 @@ export function createControlWSS() {
       }
 
       if (msg.type === "join-request") {
-        client.userId = (msg.userId as string) || "";
-        client.displayName = (msg.displayName as string) || "";
+        client.userId = typeof msg.userId === "string" ? msg.userId.slice(0, 128) : "";
+        client.displayName =
+          typeof msg.displayName === "string" ? msg.displayName.slice(0, 100) : "";
 
         if (serverRoom?.requireApproval) {
           client.approved = false;
@@ -254,9 +255,9 @@ export function createControlWSS() {
               client.isHost = !findHost(room);
             }
           }
-          client.userId = msg.userId as string;
+          client.userId = (msg.userId as string).slice(0, 128);
         }
-        if (msg.displayName) client.displayName = msg.displayName as string;
+        if (msg.displayName) client.displayName = (msg.displayName as string).slice(0, 100);
       }
 
       broadcast(room, data, ws);
@@ -277,7 +278,9 @@ export function createControlWSS() {
       room.clients.delete(ws);
       if (room.clients.size === 0) {
         rooms.delete(roomId);
-        removeRoom(roomId);
+        removeRoom(roomId).catch((err) => {
+          console.error(`control close removeRoom error for ${roomId}:`, err);
+        });
       }
     });
   });
