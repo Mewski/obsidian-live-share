@@ -19,13 +19,13 @@ export class ApprovalModal extends Modal {
     onDecision: (approved: boolean, permission: Permission) => void,
   ) {
     super(app);
+    this.setTitle("Join Request");
     this.request = request;
     this.onDecision = onDecision;
   }
 
   onOpen() {
     const { contentEl } = this;
-    contentEl.createEl("h2", { text: "Join Request" });
 
     const info = contentEl.createDiv({ cls: "live-share-approval-info" });
     if (this.request.avatarUrl) {

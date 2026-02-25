@@ -70,7 +70,7 @@ export class ManifestManager {
     }
   }
 
-  async publishManifest(): Promise<void> {
+  async publishManifest(options?: { purge?: boolean }): Promise<void> {
     if (!this.manifest || !this.doc) return;
 
     const files = this.getSharedFiles();
@@ -110,9 +110,11 @@ export class ManifestManager {
     }
 
     this.doc.transact(() => {
-      for (const filePath of this.manifest?.keys() ?? []) {
-        if (!entries.has(filePath)) {
-          this.manifest?.delete(filePath);
+      if (options?.purge) {
+        for (const filePath of this.manifest?.keys() ?? []) {
+          if (!entries.has(filePath)) {
+            this.manifest?.delete(filePath);
+          }
         }
       }
       for (const [filePath, fileEntry] of entries) {

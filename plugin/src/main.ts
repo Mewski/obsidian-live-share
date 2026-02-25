@@ -390,7 +390,7 @@ export default class LiveSharePlugin extends Plugin {
         if (file.path === ".liveshare.json") {
           await this.exclusionManager.loadConfig(this.app.vault);
           if (this.settings.role === "host") {
-            await this.manifestManager.publishManifest();
+            await this.manifestManager.publishManifest({ purge: true });
           }
           return;
         }
@@ -399,7 +399,9 @@ export default class LiveSharePlugin extends Plugin {
 
         if (isTextFile(file.path)) {
           if (this.backgroundSync.isWrittenByUs(file.path)) return;
-          await this.backgroundSync.handleLocalTextModify(file.path);
+          if (this.settings.role === "host") {
+            await this.backgroundSync.handleLocalTextModify(file.path);
+          }
           return;
         }
         this.fileOpsManager.onFileModify(file);
@@ -532,7 +534,7 @@ export default class LiveSharePlugin extends Plugin {
         await this.connectSync();
         await this.manifestManager.connect();
         await this.backgroundSync.startAll("host");
-        await this.manifestManager.publishManifest();
+        await this.manifestManager.publishManifest({ purge: true });
         new Notice("Live Share: session started, invite copied to clipboard");
       } catch {
         await this.abortSession("Live Share: failed to start session");
@@ -1176,6 +1178,7 @@ class PromptModal extends Modal {
     resolve: (value: string | null) => void,
   ) {
     super(app);
+    this.setTitle("Live Share");
     this.placeholder = placeholder;
     this.resolve = resolve;
   }
@@ -1241,6 +1244,7 @@ class ConfirmModal extends Modal {
 
   constructor(app: import("obsidian").App, message: string, resolve: (value: boolean) => void) {
     super(app);
+    this.setTitle("Live Share");
     this.message = message;
     this.resolve = resolve;
   }
