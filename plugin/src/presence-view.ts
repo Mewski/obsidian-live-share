@@ -1,6 +1,6 @@
 /** Sidebar presence panel showing connected users with follow, kick, and summon controls. */
 
-import { ItemView, WorkspaceLeaf } from "obsidian";
+import { ItemView } from "obsidian";
 
 import { HEX_COLOR_RE } from "./utils";
 

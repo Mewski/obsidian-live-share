@@ -67,10 +67,6 @@ export class ControlChannel {
     this.reconnectCallback = callback;
   }
 
-  updateSettings(settings: LiveShareSettings) {
-    this.settings = settings;
-  }
-
   getLatency(): number {
     return this.latencyMs;
   }

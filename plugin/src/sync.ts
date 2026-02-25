@@ -93,10 +93,6 @@ export class SyncManager {
     }
   }
 
-  isConnected(): boolean {
-    return this.connected;
-  }
-
   destroy() {
     this.disconnect();
   }

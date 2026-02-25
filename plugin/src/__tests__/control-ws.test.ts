@@ -485,15 +485,6 @@ describe("ControlChannel", () => {
     });
   });
 
-  describe("updateSettings", () => {
-    it("updates the internal settings reference", () => {
-      channel = new CC(createSettings());
-      const newSettings = createSettings({ displayName: "Updated" });
-      channel.updateSettings(newSettings);
-      expect((channel as any).settings.displayName).toBe("Updated");
-    });
-  });
-
   describe("URL construction", () => {
     it("constructs WebSocket URL with room and token", () => {
       channel = new CC(

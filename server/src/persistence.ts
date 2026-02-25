@@ -4,18 +4,6 @@ import { Level } from "level";
 import * as Y from "yjs";
 
 export type Permission = "read-write" | "read-only";
-export type ApprovalStatus = "approved" | "pending" | "denied";
-
-export interface RoomParticipant {
-  githubUserId: string;
-  displayName: string;
-  avatarUrl: string;
-  role: "host" | "guest";
-  permission: Permission;
-  status: ApprovalStatus;
-  joinedAt: number;
-}
-
 export interface Room {
   id: string;
   token: string;
@@ -25,7 +13,6 @@ export interface Room {
   hostUserId?: string;
   requireApproval?: boolean;
   defaultPermission?: Permission;
-  participants?: RoomParticipant[];
 }
 
 export interface Persistence {

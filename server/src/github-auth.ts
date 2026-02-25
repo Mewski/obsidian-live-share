@@ -3,14 +3,14 @@
 import { Router } from "express";
 import jwt from "jsonwebtoken";
 
-export interface GitHubUser {
+interface GitHubUser {
   id: number;
   login: string;
   name: string | null;
   avatar_url: string;
 }
 
-export interface JWTPayload {
+interface JWTPayload {
   sub: string;
   username: string;
   displayName: string;
