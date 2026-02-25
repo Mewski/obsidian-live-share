@@ -1,5 +1,7 @@
 import { readFileSync } from "node:fs";
 import { type Server, createServer } from "node:http";
+import { resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import cors from "cors";
 import express from "express";
 import rateLimit from "express-rate-limit";
@@ -30,8 +32,13 @@ export function createApp(
     max: 30,
     standardHeaders: true,
   });
+  const authLimiter = rateLimit({
+    windowMs: 60 * 1000,
+    max: 10,
+    standardHeaders: true,
+  });
   app.use("/rooms", limiter, roomRouter);
-  app.use("/auth", createAuthRouter());
+  app.use("/auth", authLimiter, createAuthRouter());
 
   const server = externalServer ?? createServer(app);
 
@@ -127,10 +134,8 @@ export function createApp(
   return { app, server, shutdown };
 }
 
-// Only auto-start when run directly
-const isMain =
-  process.argv[1] &&
-  (process.argv[1].endsWith("/index.ts") || process.argv[1].endsWith("/index.js"));
+// Only auto-start when run directly (works on all platforms including Windows)
+const isMain = process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url);
 
 if (isMain) {
   const persistence = getDefaultPersistence();

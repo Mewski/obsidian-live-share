@@ -18,6 +18,7 @@ interface InvitePayload {
   s: string;
   r: string;
   t: string;
+  e?: string;
 }
 
 function parseInvite(invite: string): InvitePayload | null {
@@ -148,5 +149,45 @@ describe("Invite format parsing (mirrors SessionManager.parseInvite)", () => {
 
   it("rejects an empty string", () => {
     expect(parseInvite("")).toBeNull();
+  });
+
+  it("parses an invite with encryption passphrase", () => {
+    const result = parseInvite(
+      makeInvite({
+        s: "https://share.example.com",
+        r: "room-enc",
+        t: "tok-enc",
+        e: "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4",
+      }),
+    );
+    expect(result).toEqual({
+      s: "https://share.example.com",
+      r: "room-enc",
+      t: "tok-enc",
+      e: "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4",
+    });
+  });
+
+  it("parses an invite without encryption passphrase (backwards compat)", () => {
+    const result = parseInvite(
+      makeInvite({
+        s: "https://share.example.com",
+        r: "room-noenc",
+        t: "tok-noenc",
+      }),
+    );
+    expect(result).not.toBeNull();
+    expect(result!.e).toBeUndefined();
+  });
+
+  it("trims whitespace from invite string", () => {
+    const invite = makeInvite({
+      s: "http://localhost:4321",
+      r: "room",
+      t: "tok",
+    });
+    // parseInvite in session.ts trims, our test version doesn't
+    // but the format itself should still be valid without leading/trailing space
+    expect(parseInvite(invite)).not.toBeNull();
   });
 });

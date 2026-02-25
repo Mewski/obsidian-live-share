@@ -14,6 +14,9 @@ const ALLOWED_TYPES = new Set([
   "kick",
 ]);
 
+const MSG_RATE_WINDOW = 10_000;
+const MSG_RATE_LIMIT = 100;
+
 interface ControlClient {
   ws: WebSocket;
   userId: string;
@@ -21,6 +24,7 @@ interface ControlClient {
   isHost: boolean;
   approved: boolean;
   permission: "read-write" | "read-only";
+  msgTimestamps: number[];
 }
 
 interface ControlRoom {
@@ -75,8 +79,9 @@ export function createControlWSS() {
       userId: "",
       displayName: "",
       isHost: false,
-      approved: true, // Default: approved (no approval required)
+      approved: true,
       permission: serverRoom?.defaultPermission || "read-write",
+      msgTimestamps: [],
     };
     room.clients.set(ws, client);
 
@@ -86,6 +91,17 @@ export function createControlWSS() {
     });
 
     ws.on("message", (raw: Buffer | ArrayBuffer | Buffer[]) => {
+      // Rate limit: drop connection if client sends too many messages
+      const now = Date.now();
+      client.msgTimestamps.push(now);
+      while (client.msgTimestamps.length > 0 && client.msgTimestamps[0] < now - MSG_RATE_WINDOW) {
+        client.msgTimestamps.shift();
+      }
+      if (client.msgTimestamps.length > MSG_RATE_LIMIT) {
+        ws.close(1008, "rate limit exceeded");
+        return;
+      }
+
       const data =
         raw instanceof ArrayBuffer
           ? Buffer.from(raw)

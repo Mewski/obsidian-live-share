@@ -1,6 +1,7 @@
 import { WebsocketProvider } from "y-websocket";
 import * as Y from "yjs";
 import type { LiveShareSettings } from "./types";
+import { normalizePath, toWsUrl } from "./utils";
 
 export function waitForSync(provider: WebsocketProvider, timeoutMs = 10_000): Promise<void> {
   if (provider.synced) return Promise.resolve();
@@ -33,9 +34,10 @@ export class SyncManager {
   }
 
   // Get or create a Y.Doc + provider for a file path
-  getDoc(filePath: string): { doc: Y.Doc; text: Y.Text; provider: WebsocketProvider } | null {
+  getDoc(rawPath: string): { doc: Y.Doc; text: Y.Text; provider: WebsocketProvider } | null {
     if (!this.connected || !this.settings.roomId) return null;
 
+    const filePath = normalizePath(rawPath);
     let doc = this.docs.get(filePath);
     let provider = this.providers.get(filePath);
 
@@ -47,7 +49,7 @@ export class SyncManager {
     if (!provider) {
       // Room name = roomId:encodedFilePath to scope per file
       const roomName = `${this.settings.roomId}:${encodeURIComponent(filePath)}`;
-      const wsUrl = this.settings.serverUrl.replace(/^http/, "ws");
+      const wsUrl = toWsUrl(this.settings.serverUrl);
       const params: Record<string, string> = { token: this.settings.token };
       if (this.settings.jwt) params.jwt = this.settings.jwt;
       provider = new WebsocketProvider(`${wsUrl}/ws`, roomName, doc, {
@@ -66,7 +68,8 @@ export class SyncManager {
   }
 
   // Clean up a specific file's doc + provider
-  releaseDoc(filePath: string) {
+  releaseDoc(rawPath: string) {
+    const filePath = normalizePath(rawPath);
     const provider = this.providers.get(filePath);
     if (provider) {
       provider.destroy();

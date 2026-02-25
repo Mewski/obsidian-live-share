@@ -4,6 +4,7 @@ import { AuthManager } from "./auth";
 import { CollabManager } from "./collab";
 import { ConnectionStateManager } from "./connection-state";
 import { ControlChannel } from "./control-ws";
+import { E2ECrypto } from "./crypto";
 import { ExclusionManager } from "./exclusion";
 import { FileOpsManager } from "./file-ops";
 import { type FocusRequest, showFocusNotification } from "./focus-notification";
@@ -13,6 +14,7 @@ import { SessionManager } from "./session";
 import { LiveShareSettingTab } from "./settings";
 import { SyncManager } from "./sync";
 import { DEFAULT_SETTINGS, type LiveShareSettings } from "./types";
+import { normalizePath } from "./utils";
 
 /** Extract the CM6 EditorView from an Obsidian MarkdownView (untyped internal). */
 function getCmView(view: MarkdownView): import("@codemirror/view").EditorView | undefined {
@@ -216,25 +218,26 @@ export default class LiveSharePlugin extends Plugin {
 
     // Auto-reconnect if session was active
     if (this.settings.roomId && this.settings.token && this.settings.role) {
-      this.connectSync();
-      this.manifestManager.connect().then(() => {
-        if (this.settings.role === "host") {
-          this.manifestManager.publishManifest();
-        } else {
-          this.manifestManager.syncFromManifest();
-          this.manifestManager.onManifestChange(async (added, removed) => {
-            if (added.length > 0) {
-              const n = await this.manifestManager.syncFromManifest();
-              if (n > 0) new Notice(`Live Share: synced ${n} file(s)`);
-            }
-            for (const path of removed) {
-              const file = this.app.vault.getAbstractFileByPath(path);
-              if (file) await this.app.vault.trash(file, true);
-            }
-            if (removed.length > 0) new Notice(`Live Share: removed ${removed.length} file(s)`);
-          });
-        }
-      });
+      this.connectSync()
+        .then(() => this.manifestManager.connect())
+        .then(() => {
+          if (this.settings.role === "host") {
+            this.manifestManager.publishManifest();
+          } else {
+            this.manifestManager.syncFromManifest();
+            this.manifestManager.onManifestChange(async (added, removed) => {
+              if (added.length > 0) {
+                const n = await this.manifestManager.syncFromManifest();
+                if (n > 0) new Notice(`Live Share: synced ${n} file(s)`);
+              }
+              for (const path of removed) {
+                const file = this.app.vault.getAbstractFileByPath(path);
+                if (file) await this.app.vault.trash(file, true);
+              }
+              if (removed.length > 0) new Notice(`Live Share: removed ${removed.length} file(s)`);
+            });
+          }
+        });
     }
   }
 
@@ -277,7 +280,7 @@ export default class LiveSharePlugin extends Plugin {
 
     const ok = await this.sessionManager.startSession(name);
     if (ok) {
-      this.connectSync();
+      await this.connectSync();
       await this.manifestManager.connect();
       await this.manifestManager.publishManifest();
       new Notice("Live Share: session started, invite copied");
@@ -295,7 +298,7 @@ export default class LiveSharePlugin extends Plugin {
 
     const ok = await this.sessionManager.joinSession(invite);
     if (ok) {
-      this.connectSync();
+      await this.connectSync();
       await this.manifestManager.connect();
       const count = await this.manifestManager.syncFromManifest();
       this.manifestManager.onManifestChange(async (added, removed) => {
@@ -344,7 +347,7 @@ export default class LiveSharePlugin extends Plugin {
     new Notice("Live Share: session ended");
   }
 
-  private connectSync() {
+  private async connectSync() {
     this.connectionState.transition({ type: "connect" });
     this.syncManager.connect();
 
@@ -354,8 +357,15 @@ export default class LiveSharePlugin extends Plugin {
       this.controlChannel = null;
     }
 
+    // Initialize E2E encryption if a passphrase is configured
+    let e2e: E2ECrypto | undefined;
+    if (this.settings.encryptionPassphrase) {
+      e2e = new E2ECrypto(this.settings.encryptionPassphrase);
+      await e2e.init();
+    }
+
     // Set up control channel for file ops
-    this.controlChannel = new ControlChannel(this.settings);
+    this.controlChannel = new ControlChannel(this.settings, e2e);
     this.controlChannel.onStateChange((controlState) => {
       switch (controlState) {
         case "connected":
@@ -489,7 +499,7 @@ export default class LiveSharePlugin extends Plugin {
   private broadcastPresence() {
     if (!this.controlChannel) return;
     const view = this.app.workspace.getActiveViewOfType(MarkdownView);
-    const currentFile = view?.file?.path ?? "";
+    const currentFile = normalizePath(view?.file?.path ?? "");
     let scrollTop = 0;
     if (view) {
       const cmView = getCmView(view);

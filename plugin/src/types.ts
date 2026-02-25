@@ -11,6 +11,7 @@ export interface LiveShareSettings {
   cursorColor: string;
   sharedFolder: string;
   role: SessionRole;
+  encryptionPassphrase: string;
 }
 
 export const DEFAULT_SETTINGS: LiveShareSettings = {
@@ -24,6 +25,7 @@ export const DEFAULT_SETTINGS: LiveShareSettings = {
   cursorColor: "#7c3aed",
   sharedFolder: "",
   role: null,
+  encryptionPassphrase: "",
 };
 
 export interface FileCreateOp {

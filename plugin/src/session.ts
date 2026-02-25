@@ -1,10 +1,17 @@
 import { Notice } from "obsidian";
 import type LiveSharePlugin from "./main";
 
+/** Generate a random 32-char hex passphrase for E2E encryption. */
+function generatePassphrase(): string {
+  const bytes = crypto.getRandomValues(new Uint8Array(16));
+  return Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
+}
+
 interface InvitePayload {
   s: string; // serverUrl
   r: string; // roomId
   t: string; // token
+  e?: string; // encryptionPassphrase (optional for backward compat)
 }
 
 export class SessionManager {
@@ -44,6 +51,8 @@ export class SessionManager {
     settings.roomId = data.id;
     settings.token = data.token;
     settings.role = "host";
+    // Generate a random encryption passphrase for this session
+    settings.encryptionPassphrase = generatePassphrase();
     await this.plugin.saveSettings();
 
     await this.copyInvite();
@@ -81,6 +90,7 @@ export class SessionManager {
     settings.serverUrl = parsed.s;
     settings.roomId = parsed.r;
     settings.token = parsed.t;
+    settings.encryptionPassphrase = parsed.e ?? "";
     settings.role = "guest";
     await this.plugin.saveSettings();
 
@@ -104,6 +114,7 @@ export class SessionManager {
 
     settings.roomId = "";
     settings.token = "";
+    settings.encryptionPassphrase = "";
     settings.role = null;
     await this.plugin.saveSettings();
   }
@@ -119,6 +130,7 @@ export class SessionManager {
       s: settings.serverUrl,
       r: settings.roomId,
       t: settings.token,
+      e: settings.encryptionPassphrase || undefined,
     };
     const invite = `obsliveshare:${btoa(JSON.stringify(payload))}`;
     await navigator.clipboard.writeText(invite);

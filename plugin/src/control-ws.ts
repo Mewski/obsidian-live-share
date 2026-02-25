@@ -1,4 +1,6 @@
+import type { E2ECrypto } from "./crypto";
 import type { LiveShareSettings } from "./types";
+import { toWsUrl } from "./utils";
 
 export type ControlMessageType =
   | "file-op"
@@ -28,12 +30,14 @@ export class ControlChannel {
   private settings: LiveShareSettings;
   private destroyed = false;
   private reconnectAttempt = 0;
+  private e2e: E2ECrypto | null = null;
   private stateChangeCallback:
     | ((state: "connected" | "disconnected" | "reconnecting") => void)
     | null = null;
 
-  constructor(settings: LiveShareSettings) {
+  constructor(settings: LiveShareSettings, e2e?: E2ECrypto) {
     this.settings = settings;
+    this.e2e = e2e ?? null;
   }
 
   onStateChange(callback: (state: "connected" | "disconnected" | "reconnecting") => void) {
@@ -46,7 +50,7 @@ export class ControlChannel {
 
   connect(): void {
     if (this.destroyed) return;
-    const wsUrl = this.settings.serverUrl.replace(/^http/, "ws");
+    const wsUrl = toWsUrl(this.settings.serverUrl);
     let url = `${wsUrl}/control/${this.settings.roomId}?token=${encodeURIComponent(this.settings.token)}`;
     if (this.settings.jwt) url += `&jwt=${encodeURIComponent(this.settings.jwt)}`;
 
@@ -60,7 +64,13 @@ export class ControlChannel {
 
     this.ws.onmessage = (event) => {
       try {
-        const msg = JSON.parse(typeof event.data === "string" ? event.data : "") as ControlMessage;
+        const msg = JSON.parse(
+          typeof event.data === "string" ? event.data : "",
+        ) as ControlMessage & { encrypted?: boolean };
+        if (msg.encrypted && this.e2e?.enabled) {
+          this.decryptAndDispatch(msg);
+          return;
+        }
         const handlers = this.handlers.get(msg.type);
         if (handlers) {
           for (const h of handlers) h(msg);
@@ -82,8 +92,60 @@ export class ControlChannel {
   }
 
   send(msg: ControlMessage): void {
-    if (this.ws?.readyState === WebSocket.OPEN) {
+    if (this.ws?.readyState !== WebSocket.OPEN) return;
+    if (this.e2e?.enabled && msg.type === "file-op") {
+      // Encrypt file operation content — structure stays intact for server routing
+      this.encryptAndSend(msg);
+    } else {
       this.ws.send(JSON.stringify(msg));
+    }
+  }
+
+  private async encryptAndSend(msg: ControlMessage): Promise<void> {
+    if (!this.e2e || !this.ws || this.ws.readyState !== WebSocket.OPEN) return;
+    try {
+      const op = msg.op as Record<string, unknown>;
+      if (op && typeof op.content === "string") {
+        const encrypted = await this.e2e.encryptString(op.content);
+        const encMsg = {
+          ...msg,
+          op: { ...op, content: encrypted },
+          encrypted: true,
+        };
+        this.ws.send(JSON.stringify(encMsg));
+      } else {
+        this.ws.send(JSON.stringify(msg));
+      }
+    } catch {
+      // Fallback to plaintext if encryption fails
+      this.ws?.send(JSON.stringify(msg));
+    }
+  }
+
+  private async decryptAndDispatch(msg: ControlMessage): Promise<void> {
+    if (!this.e2e) return;
+    try {
+      const op = msg.op as Record<string, unknown> | undefined;
+      if (op && typeof op.content === "string") {
+        const decrypted = await this.e2e.decryptString(op.content);
+        const decMsg = {
+          ...msg,
+          op: { ...op, content: decrypted },
+          encrypted: undefined,
+        };
+        const handlers = this.handlers.get(decMsg.type as ControlMessageType);
+        if (handlers) {
+          for (const h of handlers) h(decMsg as ControlMessage);
+        }
+      } else {
+        const handlers = this.handlers.get(msg.type);
+        if (handlers) {
+          for (const h of handlers) h(msg);
+        }
+      }
+    } catch {
+      // Decryption failed — drop the message (wrong key or tampered)
+      console.warn("Live Share: failed to decrypt control message");
     }
   }
 

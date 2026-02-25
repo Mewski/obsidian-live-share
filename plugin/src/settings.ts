@@ -125,6 +125,14 @@ export class LiveShareSettingTab extends PluginSettingTab {
         .setName("Token")
         .setDesc("Read-only during active session")
         .addText((text) => text.setValue(settings.token).setDisabled(true));
+
+      new Setting(containerEl)
+        .setName("End-to-end encryption")
+        .setDesc(
+          settings.encryptionPassphrase
+            ? "Active — file content in control messages is encrypted"
+            : "Inactive — no encryption passphrase set",
+        );
     }
 
     // File exclusion

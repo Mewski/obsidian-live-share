@@ -5,6 +5,7 @@ import * as Y from "yjs";
 import type { ExclusionManager } from "./exclusion";
 import { type SyncManager, waitForSync } from "./sync";
 import type { LiveShareSettings } from "./types";
+import { normalizePath, toWsUrl } from "./utils";
 
 const TEXT_EXTENSIONS = new Set([
   "md",
@@ -112,7 +113,7 @@ export class ManifestManager {
 
     this.doc = new Y.Doc();
     const roomName = `${this.settings.roomId}:__manifest__`;
-    const wsUrl = this.settings.serverUrl.replace(/^http/, "ws");
+    const wsUrl = toWsUrl(this.settings.serverUrl);
     const params: Record<string, string> = { token: this.settings.token };
     if (this.settings.jwt) params.jwt = this.settings.jwt;
     this.provider = new WebsocketProvider(`${wsUrl}/ws`, roomName, this.doc, {
@@ -137,7 +138,7 @@ export class ManifestManager {
     const entries = new Map<string, FileEntry>();
     for (const file of files) {
       const content = await this.vault.read(file);
-      entries.set(file.path, {
+      entries.set(normalizePath(file.path), {
         hash: hashContent(content),
         size: file.stat.size,
         mtime: file.stat.mtime,
@@ -183,7 +184,7 @@ export class ManifestManager {
         // Open the per-file Y.Doc to get its content
         const fileDoc = new Y.Doc();
         const roomName = `${this.settings.roomId}:${encodeURIComponent(path)}`;
-        const wsUrl = this.settings.serverUrl.replace(/^http/, "ws");
+        const wsUrl = toWsUrl(this.settings.serverUrl);
         const fileParams: Record<string, string> = {
           token: this.settings.token,
         };
@@ -250,7 +251,7 @@ export class ManifestManager {
   // Host: update manifest when a file is created/modified
   updateFile(file: TFile, content: string): void {
     if (!this.manifest || !this.isSharedPath(file.path)) return;
-    this.manifest.set(file.path, {
+    this.manifest.set(normalizePath(file.path), {
       hash: hashContent(content),
       size: content.length,
       mtime: file.stat.mtime,
@@ -260,31 +261,36 @@ export class ManifestManager {
   // Host: remove file from manifest
   removeFile(path: string): void {
     if (!this.manifest) return;
-    this.manifest.delete(path);
+    this.manifest.delete(normalizePath(path));
   }
 
   // Host: rename file in manifest, release stale Yjs doc
   renameFile(oldPath: string, newPath: string, syncManager?: SyncManager): void {
     if (!this.manifest) return;
-    const entry = this.manifest.get(oldPath);
+    const normOld = normalizePath(oldPath);
+    const normNew = normalizePath(newPath);
+    const entry = this.manifest.get(normOld);
     if (entry) {
-      this.manifest.delete(oldPath);
-      this.manifest.set(newPath, entry);
+      this.manifest.delete(normOld);
+      this.manifest.set(normNew, entry);
     }
     // Release the old Yjs doc so it will be re-created under the new key
     if (syncManager) {
-      syncManager.releaseDoc(oldPath);
+      syncManager.releaseDoc(normOld);
     }
   }
 
-  isSharedPath(path: string): boolean {
+  isSharedPath(rawPath: string): boolean {
+    const path = normalizePath(rawPath);
     if (this.exclusionManager?.isExcluded(path)) return false;
     if (!isTextFile(path)) return false;
     if (!this.settings.sharedFolder) return true;
-    const folder = this.settings.sharedFolder.endsWith("/")
-      ? this.settings.sharedFolder
-      : `${this.settings.sharedFolder}/`;
-    return path.startsWith(folder) || path === this.settings.sharedFolder;
+    const folder = normalizePath(
+      this.settings.sharedFolder.endsWith("/")
+        ? this.settings.sharedFolder
+        : `${this.settings.sharedFolder}/`,
+    );
+    return path.startsWith(folder) || path === normalizePath(this.settings.sharedFolder);
   }
 
   destroy(): void {

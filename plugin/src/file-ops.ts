@@ -1,6 +1,7 @@
 import { Notice } from "obsidian";
 import type { TAbstractFile, TFile, Vault } from "obsidian";
 import type { FileOp } from "./types";
+import { normalizePath } from "./utils";
 
 export class FileOpsManager {
   private vault: Vault;
@@ -24,6 +25,11 @@ export class FileOpsManager {
 
   // Called when a remote file op is received -- apply locally without re-broadcasting
   async applyRemoteOp(op: FileOp) {
+    // Normalize all paths to forward slashes (cross-platform safety)
+    if ("path" in op) op.path = normalizePath(op.path);
+    if ("oldPath" in op) op.oldPath = normalizePath(op.oldPath);
+    if ("newPath" in op) op.newPath = normalizePath(op.newPath);
+
     // Validate all paths in the operation
     if ("path" in op && !this.isPathSafe(op.path)) return;
     if ("oldPath" in op && !this.isPathSafe(op.oldPath)) return;
@@ -69,7 +75,11 @@ export class FileOpsManager {
       this.vault
         .read(file as TFile)
         .then((content) => {
-          this.sendOp?.({ type: "create", path: file.path, content });
+          this.sendOp?.({
+            type: "create",
+            path: normalizePath(file.path),
+            content,
+          });
         })
         .catch(() => {
           // File may have been deleted before read completed
@@ -79,11 +89,15 @@ export class FileOpsManager {
 
   onFileDelete(file: TAbstractFile) {
     if (this.suppressCount > 0 || !this.sendOp) return;
-    this.sendOp({ type: "delete", path: file.path });
+    this.sendOp({ type: "delete", path: normalizePath(file.path) });
   }
 
   onFileRename(file: TAbstractFile, oldPath: string) {
     if (this.suppressCount > 0 || !this.sendOp) return;
-    this.sendOp({ type: "rename", oldPath, newPath: file.path });
+    this.sendOp({
+      type: "rename",
+      oldPath: normalizePath(oldPath),
+      newPath: normalizePath(file.path),
+    });
   }
 }

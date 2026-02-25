@@ -61,8 +61,4 @@ export class CollabManager {
     this.currentPath = null;
     view.dispatch({ effects: this.compartment.reconfigure([]) });
   }
-
-  getCurrentPath(): string | null {
-    return this.currentPath;
-  }
 }
