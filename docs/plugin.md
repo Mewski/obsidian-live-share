@@ -13,15 +13,15 @@ npm run build
 Copy the built files into your vault's plugin directory:
 
 ```bash
-mkdir -p /path/to/vault/.obsidian/plugins/obsidian-live-share
-cp main.js manifest.json styles.css /path/to/vault/.obsidian/plugins/obsidian-live-share/
+mkdir -p /path/to/vault/.obsidian/plugins/live-share
+cp main.js manifest.json styles.css /path/to/vault/.obsidian/plugins/live-share/
 ```
 
-Open Obsidian, go to **Settings > Community Plugins**, and enable **Obsidian Live Share**.
+Open Obsidian, go to **Settings > Community Plugins**, and enable **Live Share**.
 
 ## Configuration
 
-Open **Settings > Obsidian Live Share**:
+Open **Settings > Live Share**:
 
 | Setting | Description |
 |---------|-------------|
@@ -34,7 +34,7 @@ When a session is active, the settings page also shows the connection state, roo
 
 ## Commands
 
-All commands are accessible via the command palette (Ctrl/Cmd+P, then type "Obsidian Live Share").
+All commands are accessible via the command palette (Ctrl/Cmd+P, then type "Live Share").
 
 ### Session Management
 
@@ -78,11 +78,11 @@ The collaborators panel (right sidebar) shows each connected user with:
 
 The status bar shows the current connection state:
 
-- `Obsidian Live Share: off` -- No active session
-- `Obsidian Live Share: hosting (3) 42ms` -- Hosting with 3 total users, 42ms latency
-- `Obsidian Live Share: joined (2) 38ms` -- Joined with 2 total users, 38ms latency
-- `Obsidian Live Share: hosting (3) 42ms [presenting]` -- Presentation mode active
-- `Obsidian Live Share: reconnecting...` -- Connection lost, reconnecting
+- `Live Share: off` -- No active session
+- `Live Share: hosting (3) 42ms` -- Hosting with 3 total users, 42ms latency
+- `Live Share: joined (2) 38ms` -- Joined with 2 total users, 38ms latency
+- `Live Share: hosting (3) 42ms [presenting]` -- Presentation mode active
+- `Live Share: reconnecting...` -- Connection lost, reconnecting
 
 Click the status bar to open the collaborators panel.
 

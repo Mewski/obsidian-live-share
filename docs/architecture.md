@@ -77,4 +77,6 @@ Each session uses two WebSocket channels:
 | `kick` / `kicked` | Host -> Guest | Remove participant |
 | `session-end` | Host -> All | Host ended the session |
 | `sync-request` | Guest -> Host | Request full file resync |
+| `sync-response` | Host -> Guest | Full file content in response to sync-request |
+| `follow-update` | Client -> All | Follow/unfollow state change |
 | `ping` / `pong` | Client <-> Server | Latency measurement (30s interval) |

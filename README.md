@@ -48,16 +48,16 @@ npm run build
 Copy the built files into your vault:
 
 ```bash
-mkdir -p /path/to/vault/.obsidian/plugins/obsidian-live-share
+mkdir -p /path/to/vault/.obsidian/plugins/live-share
 cp plugin/main.js plugin/manifest.json plugin/styles.css \
-   /path/to/vault/.obsidian/plugins/obsidian-live-share/
+   /path/to/vault/.obsidian/plugins/live-share/
 ```
 
-Open Obsidian, go to **Settings > Community Plugins**, and enable **Obsidian Live Share**.
+Open Obsidian, go to **Settings > Community Plugins**, and enable **Live Share**.
 
 ### 3. Configure
 
-Open **Settings > Obsidian Live Share** and set:
+Open **Settings > Live Share** and set:
 
 - **Server URL** -- `http://localhost:4321` (or your deployed server URL)
 - **Display name** -- Your name shown to collaborators
@@ -67,12 +67,12 @@ Open **Settings > Obsidian Live Share** and set:
 ### 4. Start Collaborating
 
 **Host:**
-1. Open the command palette and run **Obsidian Live Share: Start session**
+1. Open the command palette and run **Live Share: Start session**
 2. Enter a session name -- an invite link is copied to your clipboard
 3. Share the invite link with collaborators
 
 **Guest:**
-1. Open the command palette and run **Obsidian Live Share: Join session**
+1. Open the command palette and run **Live Share: Join session**
 2. Paste the invite link
 3. Files sync automatically from the host
 
