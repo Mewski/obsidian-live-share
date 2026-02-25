@@ -67,7 +67,7 @@ export function getRoom(id: string): Room | undefined {
 
 export const roomRouter = Router();
 
-// biome-ignore lint/suspicious/noControlCharactersInRegex: intentional -- validates user input
+// biome-ignore lint/suspicious/noControlCharactersInRegex: intentional; validates user input
 const CONTROL_CHARS = /[\x00-\x1f\x7f]/;
 
 roomRouter.post("/", async (req, res) => {

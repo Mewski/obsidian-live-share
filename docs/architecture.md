@@ -8,9 +8,9 @@ Obsidian Live Share is a two-part system: a **relay server** and an **Obsidian p
 
 Each session uses two WebSocket channels:
 
-1. **Yjs sync channel** (`/ws/:roomId`) -- Binary Yjs protocol for document sync and awareness (cursors). One Y.Doc per file, keyed as `roomId:filePath`. The manifest doc (file inventory) is at `roomId:__manifest__`. Read-only clients are blocked from sending document updates (sync step2/update) server-side.
+1. **Yjs sync channel** (`/ws/:roomId`): Binary Yjs protocol for document sync and awareness (cursors). One Y.Doc per file, keyed as `roomId:filePath`. The manifest doc (file inventory) is at `roomId:__manifest__`. Read-only clients are blocked from sending document updates (sync step2/update) server-side.
 
-2. **Control channel** (`/control/:roomId`) -- JSON messages for file operations (create/delete/rename/modify), presence updates, follow mode, focus/summon requests, guest approval, kick, ping/pong latency, and session lifecycle.
+2. **Control channel** (`/control/:roomId`): JSON messages for file operations (create/delete/rename/modify), presence updates, follow mode, focus/summon requests, guest approval, kick, ping/pong latency, and session lifecycle.
 
 ## Data Flow
 
@@ -53,14 +53,14 @@ Each session uses two WebSocket channels:
 
 ## Key Design Decisions
 
-- **Yjs CRDT** -- Character-level conflict-free merging without coordination. Battle-tested with CodeMirror 6 via `y-codemirror.next`.
-- **One Y.Doc per file** -- Keeps memory bounded; only open files have active sync providers.
-- **Hub-and-spoke topology** -- All clients connect to the central relay server. No peer-to-peer.
-- **Per-path suppression** -- Ref-counted suppression map prevents vault events from echoing remote operations back to the server. Uses 50ms delayed unsuppress to handle async vault event firing.
-- **Host determination** -- Server-side, not client-side. JWT-verified identity is preferred; fallback without JWT: first connected client becomes host.
-- **LevelDB persistence** -- Server persists Y.Doc state with 5-second debounce after edits. Rooms are cleaned up 30 seconds after the last client disconnects.
-- **Forward-slash path normalization** -- All file paths are normalized to `/` separators for cross-platform compatibility.
-- **Fail-fast connections** -- When a WebSocket connection drops, the session ends immediately and all resources are cleaned up. No automatic reconnection or message queuing.
+- **Yjs CRDT**: Character-level conflict-free merging without coordination. Battle-tested with CodeMirror 6 via `y-codemirror.next`.
+- **One Y.Doc per file**: Keeps memory bounded; only open files have active sync providers.
+- **Hub-and-spoke topology**: All clients connect to the central relay server. No peer-to-peer.
+- **Per-path suppression**: Ref-counted suppression map prevents vault events from echoing remote operations back to the server. Uses 50ms delayed unsuppress to handle async vault event firing.
+- **Host determination**: Server-side, not client-side. JWT-verified identity is preferred; fallback without JWT: first connected client becomes host.
+- **LevelDB persistence**: Server persists Y.Doc state with 5-second debounce after edits. Rooms are cleaned up 30 seconds after the last client disconnects.
+- **Forward-slash path normalization**: All file paths are normalized to `/` separators for cross-platform compatibility.
+- **Fail-fast connections**: When a WebSocket connection drops, the session ends immediately and all resources are cleaned up. No automatic reconnection or message queuing.
 
 ## Control Message Types
 

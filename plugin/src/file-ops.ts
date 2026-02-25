@@ -145,7 +145,7 @@ export class FileOpsManager {
             if (dir) await ensureFolder(this.vault, dir);
             await this.vault.rename(file, op.newPath);
           } else if (file && alreadyExists) {
-            // Both sides renamed to the same target -- keep existing, trash source
+            // Both sides renamed to the same target: keep existing, trash source
             new Notice(`Live Share: rename conflict — ${op.newPath} already exists`);
             await this.vault.trash(file, true);
           }
@@ -176,7 +176,7 @@ export class FileOpsManager {
           this.pendingChunks.delete(op.path);
           if (!assembly) break;
 
-          // Verify all chunks arrived -- sparse array entries would be undefined
+          // Verify all chunks arrived; sparse array entries would be undefined
           const expectedChunks = Math.ceil(assembly.totalSize / CHUNK_SIZE);
           let chunksValid = true;
           for (let i = 0; i < expectedChunks; i++) {

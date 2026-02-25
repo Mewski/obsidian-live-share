@@ -35,12 +35,12 @@ npm run format       # Auto-fix formatting
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `PORT` | `4321` | Server port |
-| `TLS_CERT` | -- | Path to TLS certificate (enables HTTPS/WSS) |
-| `TLS_KEY` | -- | Path to TLS private key |
+| `TLS_CERT` | - | Path to TLS certificate (enables HTTPS/WSS) |
+| `TLS_KEY` | - | Path to TLS private key |
 | `REQUIRE_GITHUB_AUTH` | `false` | Require GitHub OAuth for all connections |
-| `GITHUB_CLIENT_ID` | -- | GitHub OAuth app client ID |
-| `GITHUB_CLIENT_SECRET` | -- | GitHub OAuth app client secret |
-| `JWT_SECRET` | -- | Secret for signing JWTs (required when `REQUIRE_GITHUB_AUTH=true`) |
+| `GITHUB_CLIENT_ID` | - | GitHub OAuth app client ID |
+| `GITHUB_CLIENT_SECRET` | - | GitHub OAuth app client secret |
+| `JWT_SECRET` | - | Secret for signing JWTs (required when `REQUIRE_GITHUB_AUTH=true`) |
 | `CORS_ORIGIN` | `*` | Allowed CORS origin(s) |
 
 ## TLS

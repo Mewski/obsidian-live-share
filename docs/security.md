@@ -9,13 +9,13 @@ When a host starts a session, a random 128-bit passphrase is generated and embed
 - Chunk data and file paths in `file-chunk-start`, `file-chunk-data`, and `file-chunk-end` messages (binary file transfers)
 
 **What is NOT encrypted:**
-- Yjs CRDT sync data -- the server processes sync protocol messages for persistence and late-join support
+- Yjs CRDT sync data: the server processes sync protocol messages for persistence and late-join support
 - Control message metadata (message types, presence info, non-chunk file paths)
 
 **Key derivation:**
 1. A deterministic salt is derived from the passphrase via SHA-256 (first 16 bytes)
 2. PBKDF2 derives a 256-bit AES-GCM key from the passphrase and salt
-3. All peers with the same passphrase derive the same key -- no key exchange needed
+3. All peers with the same passphrase derive the same key: no key exchange needed
 4. Each encryption uses a random 12-byte IV, prepended to the ciphertext
 
 The passphrase is included in the invite link and never sent to the server. Share invite links through a secure channel.
@@ -40,10 +40,10 @@ The server determines host status, not the client. Two modes:
 2. **Fallback mode**: The first connected client becomes host (used when no JWT is present)
 
 Host-only operations enforced server-side:
-- `summon` -- Only the host can summon participants
-- `session-end` -- Only the host can end the session
-- `kick` -- Only the host can kick participants
-- `set-permission` -- Only the host can change guest permissions
+- `summon`: Only the host can summon participants
+- `session-end`: Only the host can end the session
+- `kick`: Only the host can kick participants
+- `set-permission`: Only the host can change guest permissions
 
 ## Defenses
 
@@ -88,4 +88,4 @@ Host-only operations enforced server-side:
 - **Self-host the server** for full control over your data and network
 - **Enable GitHub OAuth** for authenticated sessions in multi-user environments
 - **Use `.liveshare.json`** exclusion patterns to avoid sharing sensitive files (credentials, private notes)
-- **Share invite links securely** -- the invite link contains the encryption passphrase
+- **Share invite links securely**: the invite link contains the encryption passphrase

@@ -4,24 +4,24 @@ Real-time collaborative editing for [Obsidian](https://obsidian.md). Share your 
 
 ## Features
 
-- **Real-time collaborative editing** -- Yjs CRDT-powered character-level sync with automatic conflict resolution
-- **Live cursors and selections** -- See collaborators' cursors and selections in the editor
-- **File sync** -- Creates, deletes, renames, and binary files are synced automatically
-- **End-to-end encryption** -- File content is encrypted client-side with AES-256-GCM (PBKDF2 key derivation)
-- **Presence panel** -- See who's connected, what file they're viewing, and their cursor position
-- **Follow mode** -- Follow a user's navigation and scroll position; auto-unfollows on interaction
-- **Presentation mode** -- Host broadcasts navigation to all participants automatically
-- **Focus and summon** -- Request attention or navigate specific participants to your location
-- **Host-only controls** -- Summon, kick, permission changes, presentation mode, and session end are host-only (enforced server-side)
-- **Guest approval** -- Optionally require host approval with read-write, read-only, or deny
-- **Mid-session permission changes** -- Host can toggle any guest between read-write and read-only at any time via the presence panel
-- **Read-only enforcement** -- Read-only guests are blocked from editing server-side on both Yjs and control channels
-- **Confirmation dialogs** -- End session and kick actions ask for confirmation before proceeding
-- **Host disconnect notice** -- Guests are notified when the host leaves the session
-- **Reload from host** -- Guests can re-download all files from the host
-- **File exclusion** -- Configure `.liveshare.json` to exclude files from sharing
-- **Latency monitoring** -- Ping/pong latency shown in the status bar
-- **Fail-fast connections** -- Connection drops immediately end the session and clean up all resources
+- **Real-time collaborative editing**: Yjs CRDT-powered character-level sync with automatic conflict resolution
+- **Live cursors and selections**: See collaborators' cursors and selections in the editor
+- **File sync**: Creates, deletes, renames, and binary files are synced automatically
+- **End-to-end encryption**: File content is encrypted client-side with AES-256-GCM (PBKDF2 key derivation)
+- **Presence panel**: See who's connected, what file they're viewing, and their cursor position
+- **Follow mode**: Follow a user's navigation and scroll position; auto-unfollows on interaction
+- **Presentation mode**: Host broadcasts navigation to all participants automatically
+- **Focus and summon**: Request attention or navigate specific participants to your location
+- **Host-only controls**: Summon, kick, permission changes, presentation mode, and session end are host-only (enforced server-side)
+- **Guest approval**: Optionally require host approval with read-write, read-only, or deny
+- **Mid-session permission changes**: Host can toggle any guest between read-write and read-only at any time via the presence panel
+- **Read-only enforcement**: Read-only guests are blocked from editing server-side on both Yjs and control channels
+- **Confirmation dialogs**: End session and kick actions ask for confirmation before proceeding
+- **Host disconnect notice**: Guests are notified when the host leaves the session
+- **Reload from host**: Guests can re-download all files from the host
+- **File exclusion**: Configure `.liveshare.json` to exclude files from sharing
+- **Latency monitoring**: Ping/pong latency shown in the status bar
+- **Fail-fast connections**: Connection drops immediately end the session and clean up all resources
 
 ## Quick Start
 
@@ -63,11 +63,11 @@ Open Obsidian, go to **Settings > Community Plugins**, and enable **Live Share**
 
 Open **Settings > Live Share** and set:
 
-- **Server URL** -- `http://localhost:4321` (or your deployed server URL)
-- **Display name** -- Your name shown to collaborators (defaults to "Anonymous" if blank)
-- **Cursor color** -- Pick your cursor color using the color picker
-- **Shared folder** -- Subfolder to share (leave empty for the whole vault)
-- **Require approval** -- Require host approval for guests to join (off by default)
+- **Server URL**: `http://localhost:4321` (or your deployed server URL)
+- **Display name**: Your name shown to collaborators (defaults to "Anonymous" if blank)
+- **Cursor color**: Pick your cursor color using the color picker
+- **Shared folder**: Subfolder to share (leave empty for the whole vault)
+- **Require approval**: Require host approval for guests to join (off by default)
 
 ### 4. Start Collaborating
 
@@ -114,8 +114,8 @@ Default excludes: `.obsidian/**`, `.liveshare.json`, `.trash/**`.
 
 Obsidian Live Share uses a relay server and two WebSocket channels per session:
 
-- **Yjs sync** (`/ws/:roomId`) -- Binary CRDT protocol for real-time document sync and cursor awareness. One Y.Doc per file, persisted to LevelDB with 5-second debounce.
-- **Control** (`/control/:roomId`) -- JSON messages for file operations, presence, follow/summon, session lifecycle, and ping/pong latency measurement.
+- **Yjs sync** (`/ws/:roomId`): Binary CRDT protocol for real-time document sync and cursor awareness. One Y.Doc per file, persisted to LevelDB with 5-second debounce.
+- **Control** (`/control/:roomId`): JSON messages for file operations, presence, follow/summon, session lifecycle, and ping/pong latency measurement.
 
 Text files sync character-by-character via Yjs. Binary files (images, PDFs, etc.) are transferred as base64 via the control channel with automatic chunking for files up to 50 MB.
 
@@ -124,12 +124,12 @@ Text files sync character-by-character via Yjs. Binary files (images, PDFs, etc.
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `PORT` | `4321` | Server port |
-| `TLS_CERT` | -- | Path to TLS certificate (enables HTTPS/WSS) |
-| `TLS_KEY` | -- | Path to TLS private key |
+| `TLS_CERT` | - | Path to TLS certificate (enables HTTPS/WSS) |
+| `TLS_KEY` | - | Path to TLS private key |
 | `REQUIRE_GITHUB_AUTH` | `false` | Require GitHub OAuth for all connections |
-| `GITHUB_CLIENT_ID` | -- | GitHub OAuth app client ID |
-| `GITHUB_CLIENT_SECRET` | -- | GitHub OAuth app client secret |
-| `JWT_SECRET` | -- | Secret for signing JWTs (required when auth is enabled) |
+| `GITHUB_CLIENT_ID` | - | GitHub OAuth app client ID |
+| `GITHUB_CLIENT_SECRET` | - | GitHub OAuth app client secret |
+| `JWT_SECRET` | - | Secret for signing JWTs (required when auth is enabled) |
 | `CORS_ORIGIN` | `*` | Allowed CORS origin(s) |
 
 See [Server Setup](docs/server.md) for TLS, OAuth, persistence, and deployment details.
@@ -163,10 +163,10 @@ See [Security](docs/security.md) for the full threat model.
 
 ## Documentation
 
-- [Architecture](docs/architecture.md) -- System design, protocols, and data flow
-- [Server Setup](docs/server.md) -- Installation, configuration, and deployment
-- [Plugin Usage](docs/plugin.md) -- Commands, features, and configuration
-- [Security](docs/security.md) -- Encryption, authentication, and threat model
+- [Architecture](docs/architecture.md): System design, protocols, and data flow
+- [Server Setup](docs/server.md): Installation, configuration, and deployment
+- [Plugin Usage](docs/plugin.md): Commands, features, and configuration
+- [Security](docs/security.md): Encryption, authentication, and threat model
 
 ## Disclosures
 
@@ -176,9 +176,9 @@ See [Security](docs/security.md) for the full threat model.
 
 ## Known Limitations
 
-- **No offline merge** -- File-level operations (create/delete/rename) don't have conflict resolution across separate sessions. Text content merges automatically via Yjs within a session.
-- **Single host** -- If the host disconnects, the session ends for all participants.
-- **E2E scope** -- File content in control messages is end-to-end encrypted. Real-time Yjs sync data is processed by the server for persistence and late-join support. Use TLS (`wss://`) to encrypt all traffic in transit.
+- **No offline merge**: File-level operations (create/delete/rename) don't have conflict resolution across separate sessions. Text content merges automatically via Yjs within a session.
+- **Single host**: If the host disconnects, the session ends for all participants.
+- **E2E scope**: File content in control messages is end-to-end encrypted. Real-time Yjs sync data is processed by the server for persistence and late-join support. Use TLS (`wss://`) to encrypt all traffic in transit.
 
 ## License
 

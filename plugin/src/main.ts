@@ -27,7 +27,7 @@ import { DEFAULT_SETTINGS, type LiveShareSettings } from "./types";
 import { isTextFile, normalizePath } from "./utils";
 
 function getCmView(view: MarkdownView): import("@codemirror/view").EditorView | undefined {
-  // biome-ignore lint/suspicious/noExplicitAny: Obsidian internal -- editor.cm is untyped
+  // biome-ignore lint/suspicious/noExplicitAny: Obsidian internal; editor.cm is untyped
   return (view.editor as any).cm as import("@codemirror/view").EditorView | undefined;
 }
 

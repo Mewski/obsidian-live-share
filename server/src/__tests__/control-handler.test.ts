@@ -716,7 +716,7 @@ describe("Control WebSocket handler", () => {
     host.messages.length = 0;
     guest.messages.length = 0;
 
-    // Guest tries to change host's permission -- should be ignored
+    // Guest tries to change host's permission (should be ignored)
     sendJSON(guest.ws, {
       type: "set-permission",
       userId: "host-1",
