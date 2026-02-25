@@ -9,7 +9,6 @@ const SALT_BYTES = 16;
 const IV_BYTES = 12;
 const PBKDF2_ITERATIONS = 100_000;
 
-/** Derive an AES-GCM key from a passphrase and salt. */
 async function deriveKey(passphrase: string, salt: Uint8Array): Promise<CryptoKey> {
   const raw = new TextEncoder().encode(passphrase);
   const base = await crypto.subtle.importKey("raw", raw, "PBKDF2", false, ["deriveKey"]);
@@ -50,7 +49,6 @@ export class E2ECrypto {
     return this.key !== null;
   }
 
-  /** Encrypt a Uint8Array. Returns IV + ciphertext. */
   async encrypt(plaintext: Uint8Array): Promise<Uint8Array> {
     if (!this.key) throw new Error("E2E not initialised");
     const iv = crypto.getRandomValues(new Uint8Array(IV_BYTES));
@@ -66,7 +64,6 @@ export class E2ECrypto {
     return result;
   }
 
-  /** Decrypt IV + ciphertext back to plaintext. */
   async decrypt(data: Uint8Array): Promise<Uint8Array> {
     if (!this.key) throw new Error("E2E not initialised");
     const iv = data.slice(0, IV_BYTES);
@@ -75,14 +72,12 @@ export class E2ECrypto {
     return new Uint8Array(plaintext);
   }
 
-  /** Encrypt a UTF-8 string and return a base64 string. */
   async encryptString(plain: string): Promise<string> {
     const bytes = new TextEncoder().encode(plain);
     const encrypted = await this.encrypt(bytes);
     return uint8ToBase64(encrypted);
   }
 
-  /** Decrypt a base64 string back to UTF-8. */
   async decryptString(encoded: string): Promise<string> {
     const encrypted = base64ToUint8(encoded);
     const decrypted = await this.decrypt(encrypted);
@@ -90,7 +85,6 @@ export class E2ECrypto {
   }
 }
 
-/** Deterministic input for salt derivation — keeps it simple without needing exchange. */
 function passphrase_salt_input(passphrase: string): string {
   return `obsidian-live-share-salt:${passphrase}`;
 }

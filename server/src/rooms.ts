@@ -5,7 +5,7 @@ import { safeTokenCompare } from "./util.js";
 
 export type { Room };
 
-const ROOM_MAX_AGE_MS = 24 * 60 * 60 * 1000; // 24 hours
+const ROOM_MAX_AGE_MS = 24 * 60 * 60 * 1000;
 
 const rooms = new Map<string, Room>();
 let _persistence: Persistence = noopPersistence;

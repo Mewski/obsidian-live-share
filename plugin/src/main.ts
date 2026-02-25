@@ -52,7 +52,6 @@ export default class LiveSharePlugin extends Plugin {
   /** Guard to prevent re-entrant calls to endSession (e.g. kicked -> endSession -> session-end -> endSession). */
   private endingSession = false;
 
-  /** Timer for debounced presence broadcasts. */
   private presenceTimer: ReturnType<typeof setTimeout> | null = null;
 
   /** Current scroll listener and its DOM element, so we can remove it on file change. */
@@ -640,7 +639,6 @@ export default class LiveSharePlugin extends Plugin {
     }
   }
 
-  /** Debounced version of broadcastPresence to avoid flooding the server on rapid events. */
   private debouncedBroadcastPresence() {
     if (this.presenceTimer) clearTimeout(this.presenceTimer);
     this.presenceTimer = setTimeout(() => {

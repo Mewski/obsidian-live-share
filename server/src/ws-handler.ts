@@ -204,7 +204,6 @@ export function createYjsWSS(persist?: Persistence) {
     roomStates.delete(roomId);
   }
 
-  /** Persist and close all rooms. Called during graceful shutdown. */
   async function closeAllRooms() {
     for (const [roomId, state] of roomStates) {
       if (state.persistTimer) clearTimeout(state.persistTimer);

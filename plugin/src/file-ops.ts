@@ -27,13 +27,11 @@ export class FileOpsManager {
     this.sendOp = fn;
   }
 
-  /** Increment suppression ref-count for a path. */
   suppressPath(path: string): void {
     const norm = normalizePath(path);
     this.suppressedPaths.set(norm, (this.suppressedPaths.get(norm) ?? 0) + 1);
   }
 
-  /** Decrement suppression ref-count for a path. */
   unsuppressPath(path: string): void {
     const norm = normalizePath(path);
     const count = this.suppressedPaths.get(norm) ?? 0;
@@ -97,7 +95,6 @@ export class FileOpsManager {
         case "create": {
           const exists = this.vault.getAbstractFileByPath(op.path);
           if (exists) {
-            // File already exists -- update its content
             if (op.binary) {
               const buf = base64ToArrayBuffer(op.content);
               await this.vault.modifyBinary(exists as TFile, buf);

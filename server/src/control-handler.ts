@@ -84,7 +84,6 @@ export function createControlWSS() {
     const room = getOrCreateRoom(roomId);
     const serverRoom = getRoom(roomId);
 
-    // Extract verified identity from JWT if present
     let verifiedUserId: string | null = null;
     try {
       const reqUrl = new URL(req.url || "", `http://${req.headers.host}`);
@@ -113,7 +112,6 @@ export function createControlWSS() {
     });
 
     ws.on("message", (raw: Buffer | ArrayBuffer | Buffer[]) => {
-      // Rate limit: drop connection if client sends too many messages
       const now = Date.now();
       client.msgTimestamps.push(now);
       while (client.msgTimestamps.length > 0 && client.msgTimestamps[0] < now - MSG_RATE_WINDOW) {
@@ -219,7 +217,6 @@ export function createControlWSS() {
         return;
       }
 
-      // Only the host can summon participants or end the session
       if (msg.type === "summon" && !client.isHost) {
         return;
       }
@@ -240,7 +237,6 @@ export function createControlWSS() {
         return;
       }
 
-      // Track identity from presence updates (isHost determined server-side)
       if (msg.type === "presence-update") {
         if (msg.userId) {
           if (!client.userId) {

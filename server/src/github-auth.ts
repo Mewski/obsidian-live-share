@@ -121,7 +121,6 @@ export function createAuthRouter(): Router {
 
       const jwtToken = jwt.sign(payload, JWT_SECRET, { expiresIn: "7d" });
 
-      // Escape for safe HTML interpolation
       const safeName = displayName
         .replace(/&/g, "&amp;")
         .replace(/</g, "&lt;")

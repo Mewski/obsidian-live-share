@@ -125,7 +125,7 @@ export function createApp(
       reapStaleRooms().catch((err) => console.error("reaper error:", err));
     },
     60 * 60 * 1000,
-  ); // every hour
+  );
 
   async function shutdown() {
     console.log("shutting down gracefully...");

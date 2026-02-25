@@ -42,16 +42,12 @@ export class ControlChannel {
     | ((state: "connected" | "disconnected" | "reconnecting") => void)
     | null = null;
 
-  /** Queue of messages that arrived while the socket was not open. */
   private sendQueue: ControlMessage[] = [];
-
-  /** Callback invoked after a successful reconnect (socket re-opens). */
   private reconnectCallback: (() => void) | null = null;
 
-  /** Whether the socket has connected at least once (to distinguish initial connect from reconnect). */
+  /** Distinguishes initial connect from reconnect. */
   private hasConnected = false;
 
-  /** Latest round-trip latency in ms (measured via ping/pong). */
   latencyMs = 0;
   private pingTimer: ReturnType<typeof setInterval> | null = null;
   private lastPingTime = 0;
@@ -74,7 +70,6 @@ export class ControlChannel {
     this.settings = settings;
   }
 
-  /** Get the latest measured latency in milliseconds. Returns 0 if not yet measured. */
   getLatency(): number {
     return this.latencyMs;
   }
@@ -280,7 +275,6 @@ export class ControlChannel {
     if (this.reconnectTimer) return;
     this.reconnectAttempt++;
     this.stateChangeCallback?.("reconnecting");
-    // Add jitter: +/- 20%
     const jitter = this.reconnectDelay * 0.2 * (Math.random() * 2 - 1);
     this.reconnectTimer = setTimeout(() => {
       this.reconnectTimer = null;
