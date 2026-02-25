@@ -70,11 +70,7 @@ export class ManifestManager {
     });
 
     this.manifest = this.doc.getMap("files");
-    try {
-      await waitForSync(this.provider);
-    } catch {
-      new Notice("Live Share: manifest sync timed out");
-    }
+    await waitForSync(this.provider);
   }
 
   async publishManifest(options?: { purge?: boolean }): Promise<void> {

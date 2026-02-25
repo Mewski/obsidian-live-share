@@ -17,8 +17,7 @@ export interface CursorUser {
 export class CollabManager {
   private compartment = new Compartment();
   private currentPath: string | null = null;
-  private currentProvider: import("y-websocket").WebsocketProvider | null =
-    null;
+  private currentProvider: import("y-websocket").WebsocketProvider | null = null;
   private activationGen = 0;
 
   getBaseExtension(): Extension {
@@ -78,6 +77,7 @@ export class CollabManager {
         if (this.activationGen !== gen) return;
         if (docHandle.text.length > 0) break;
       }
+      if (docHandle.text.length === 0) return;
     }
 
     if (role === "host") {
@@ -89,9 +89,7 @@ export class CollabManager {
     if (cursorUser) {
       docHandle.provider.awareness.setLocalStateField("user", cursorUser);
     }
-    const extensions: Extension[] = [
-      yCollab(docHandle.text, docHandle.provider.awareness),
-    ];
+    const extensions: Extension[] = [yCollab(docHandle.text, docHandle.provider.awareness)];
     if (permission === "read-only") {
       extensions.push(EditorState.readOnly.of(true));
     }

@@ -11,11 +11,13 @@ export function waitForSync(provider: WebsocketProvider, timeoutMs = 10_000): Pr
       reject(new Error(`Sync timeout after ${timeoutMs}ms`));
     }, timeoutMs);
 
-    function onSync() {
+    function onSync(synced: boolean) {
+      if (!synced) return;
+      provider.off("sync", onSync);
       clearTimeout(timer);
       resolve();
     }
-    provider.once("sync", onSync);
+    provider.on("sync", onSync);
   });
 }
 
