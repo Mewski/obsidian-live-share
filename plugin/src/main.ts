@@ -14,7 +14,7 @@ import { SessionManager } from "./session";
 import { LiveShareSettingTab } from "./settings";
 import { SyncManager } from "./sync";
 import { DEFAULT_SETTINGS, type LiveShareSettings } from "./types";
-import { normalizePath } from "./utils";
+import { isTextFile, normalizePath } from "./utils";
 
 /** Extract the CM6 EditorView from an Obsidian MarkdownView (untyped internal). */
 function getCmView(view: MarkdownView): import("@codemirror/view").EditorView | undefined {
@@ -167,14 +167,17 @@ export default class LiveSharePlugin extends Plugin {
         if (!this.manifestManager.isSharedPath(file.path)) return;
         this.fileOpsManager.onFileCreate(file);
         if (this.settings.role === "host" && file instanceof TFile) {
-          this.app.vault
-            .read(file)
-            .then((content) => {
-              this.manifestManager.updateFile(file, content);
-            })
-            .catch(() => {
-              // File may have been deleted before read completed
-            });
+          if (isTextFile(file.path)) {
+            this.app.vault
+              .read(file)
+              .then((content) => this.manifestManager.updateFile(file, content))
+              .catch(() => {});
+          } else {
+            this.app.vault
+              .readBinary(file)
+              .then((buf) => this.manifestManager.updateFile(file, buf))
+              .catch(() => {});
+          }
         }
       }),
     );
@@ -209,6 +212,20 @@ export default class LiveSharePlugin extends Plugin {
               this.manifestManager.publishManifest();
             }
           });
+          return;
+        }
+        if (
+          file instanceof TFile &&
+          !isTextFile(file.path) &&
+          this.manifestManager.isSharedPath(file.path)
+        ) {
+          this.fileOpsManager.onFileModify(file);
+          if (this.settings.role === "host") {
+            this.app.vault
+              .readBinary(file)
+              .then((buf) => this.manifestManager.updateFile(file, buf))
+              .catch(() => {});
+          }
         }
       }),
     );
@@ -373,7 +390,16 @@ export default class LiveSharePlugin extends Plugin {
     });
     this.controlChannel.connect();
     this.fileOpsManager.setSender((op) => {
-      this.controlChannel?.send({ type: "file-op", op });
+      if (op.type === "chunk-start" || op.type === "chunk-data" || op.type === "chunk-end") {
+        const typeMap = {
+          "chunk-start": "file-chunk-start",
+          "chunk-data": "file-chunk-data",
+          "chunk-end": "file-chunk-end",
+        } as const;
+        this.controlChannel?.send({ ...op, type: typeMap[op.type] } as never);
+      } else {
+        this.controlChannel?.send({ type: "file-op", op });
+      }
     });
     this.controlChannel.on("file-op", (msg) => {
       const op = msg.op as import("./types").FileOp;
@@ -385,6 +411,21 @@ export default class LiveSharePlugin extends Plugin {
       if (paths.some((p) => !this.manifestManager.isSharedPath(p))) return;
       this.fileOpsManager.applyRemoteOp(op);
     });
+    for (const chunkType of ["file-chunk-start", "file-chunk-data", "file-chunk-end"] as const) {
+      this.controlChannel.on(chunkType, (msg) => {
+        const path = msg.path as string;
+        if (!path || !this.manifestManager.isSharedPath(path)) return;
+        const typeMap = {
+          "file-chunk-start": "chunk-start",
+          "file-chunk-data": "chunk-data",
+          "file-chunk-end": "chunk-end",
+        } as const;
+        this.fileOpsManager.applyRemoteOp({
+          ...msg,
+          type: typeMap[chunkType],
+        } as never);
+      });
+    }
     this.controlChannel.on("presence-update", (msg) => {
       const user = msg as unknown as PresenceUser;
       this.remoteUsers.set(user.userId, user);
@@ -450,7 +491,10 @@ export default class LiveSharePlugin extends Plugin {
     if (!cmView) return;
 
     const filePath = file?.path ?? null;
-    const sharedPath = filePath && this.manifestManager.isSharedPath(filePath) ? filePath : null;
+    const sharedPath =
+      filePath && this.manifestManager.isSharedPath(filePath) && isTextFile(filePath)
+        ? filePath
+        : null;
     this.collabManager.activateForFile(cmView, sharedPath, this.syncManager, this.settings.role);
   }
 

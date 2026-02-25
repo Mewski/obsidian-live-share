@@ -4,6 +4,9 @@ import { toWsUrl } from "./utils";
 
 export type ControlMessageType =
   | "file-op"
+  | "file-chunk-start"
+  | "file-chunk-data"
+  | "file-chunk-end"
   | "presence-update"
   | "presence-leave"
   | "follow-update"
@@ -93,8 +96,9 @@ export class ControlChannel {
 
   send(msg: ControlMessage): void {
     if (this.ws?.readyState !== WebSocket.OPEN) return;
-    if (this.e2e?.enabled && msg.type === "file-op") {
-      // Encrypt file operation content — structure stays intact for server routing
+    const encryptable =
+      msg.type === "file-op" || msg.type === "file-chunk-data" || msg.type === "file-chunk-end";
+    if (this.e2e?.enabled && encryptable) {
       this.encryptAndSend(msg);
     } else {
       this.ws.send(JSON.stringify(msg));
@@ -104,20 +108,25 @@ export class ControlChannel {
   private async encryptAndSend(msg: ControlMessage): Promise<void> {
     if (!this.e2e || !this.ws || this.ws.readyState !== WebSocket.OPEN) return;
     try {
-      const op = msg.op as Record<string, unknown>;
-      if (op && typeof op.content === "string") {
-        const encrypted = await this.e2e.encryptString(op.content);
-        const encMsg = {
-          ...msg,
-          op: { ...op, content: encrypted },
-          encrypted: true,
-        };
-        this.ws.send(JSON.stringify(encMsg));
+      if (msg.type === "file-chunk-data" && typeof msg.data === "string") {
+        const encrypted = await this.e2e.encryptString(msg.data as string);
+        this.ws.send(JSON.stringify({ ...msg, data: encrypted, encrypted: true }));
       } else {
-        this.ws.send(JSON.stringify(msg));
+        const op = msg.op as Record<string, unknown>;
+        if (op && typeof op.content === "string") {
+          const encrypted = await this.e2e.encryptString(op.content);
+          this.ws.send(
+            JSON.stringify({
+              ...msg,
+              op: { ...op, content: encrypted },
+              encrypted: true,
+            }),
+          );
+        } else {
+          this.ws.send(JSON.stringify(msg));
+        }
       }
     } catch {
-      // Fallback to plaintext if encryption fails
       this.ws?.send(JSON.stringify(msg));
     }
   }
@@ -125,26 +134,28 @@ export class ControlChannel {
   private async decryptAndDispatch(msg: ControlMessage): Promise<void> {
     if (!this.e2e) return;
     try {
-      const op = msg.op as Record<string, unknown> | undefined;
-      if (op && typeof op.content === "string") {
-        const decrypted = await this.e2e.decryptString(op.content);
-        const decMsg = {
-          ...msg,
-          op: { ...op, content: decrypted },
-          encrypted: undefined,
-        };
-        const handlers = this.handlers.get(decMsg.type as ControlMessageType);
-        if (handlers) {
-          for (const h of handlers) h(decMsg as ControlMessage);
-        }
+      let decMsg: ControlMessage;
+      if (msg.type === "file-chunk-data" && typeof msg.data === "string") {
+        const decrypted = await this.e2e.decryptString(msg.data as string);
+        decMsg = { ...msg, data: decrypted, encrypted: undefined };
       } else {
-        const handlers = this.handlers.get(msg.type);
-        if (handlers) {
-          for (const h of handlers) h(msg);
+        const op = msg.op as Record<string, unknown> | undefined;
+        if (op && typeof op.content === "string") {
+          const decrypted = await this.e2e.decryptString(op.content);
+          decMsg = {
+            ...msg,
+            op: { ...op, content: decrypted },
+            encrypted: undefined,
+          };
+        } else {
+          decMsg = msg;
         }
       }
+      const handlers = this.handlers.get(decMsg.type as ControlMessageType);
+      if (handlers) {
+        for (const h of handlers) h(decMsg as ControlMessage);
+      }
     } catch {
-      // Decryption failed — drop the message (wrong key or tampered)
       console.warn("Live Share: failed to decrypt control message");
     }
   }

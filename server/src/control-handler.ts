@@ -4,6 +4,9 @@ import { getRoom } from "./rooms.js";
 
 const ALLOWED_TYPES = new Set([
   "file-op",
+  "file-chunk-start",
+  "file-chunk-data",
+  "file-chunk-end",
   "presence-update",
   "follow-update",
   "session-end",
@@ -36,7 +39,7 @@ export function createControlWSS() {
   const rooms = new Map<string, ControlRoom>();
   const wss = new WebSocketServer({
     noServer: true,
-    maxPayload: 1 * 1024 * 1024,
+    maxPayload: 2 * 1024 * 1024,
   });
 
   function getOrCreateRoom(roomId: string): ControlRoom {
@@ -179,7 +182,12 @@ export function createControlWSS() {
         return;
       }
 
-      if (msg.type === "file-op" && client.permission === "read-only") {
+      const isFileWrite =
+        msg.type === "file-op" ||
+        msg.type === "file-chunk-start" ||
+        msg.type === "file-chunk-data" ||
+        msg.type === "file-chunk-end";
+      if (isFileWrite && client.permission === "read-only") {
         return;
       }
 

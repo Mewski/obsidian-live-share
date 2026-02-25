@@ -5,84 +5,28 @@ import * as Y from "yjs";
 import type { ExclusionManager } from "./exclusion";
 import { type SyncManager, waitForSync } from "./sync";
 import type { LiveShareSettings } from "./types";
-import { normalizePath, toWsUrl } from "./utils";
-
-const TEXT_EXTENSIONS = new Set([
-  "md",
-  "txt",
-  "json",
-  "css",
-  "js",
-  "ts",
-  "jsx",
-  "tsx",
-  "html",
-  "xml",
-  "yaml",
-  "yml",
-  "csv",
-  "svg",
-  "tex",
-  "latex",
-  "bib",
-  "org",
-  "rst",
-  "adoc",
-  "canvas",
-  "mermaid",
-  "graphql",
-  "toml",
-  "ini",
-  "cfg",
-  "conf",
-  "sh",
-  "bash",
-  "zsh",
-  "fish",
-  "ps1",
-  "bat",
-  "cmd",
-  "py",
-  "rb",
-  "rs",
-  "go",
-  "java",
-  "kt",
-  "scala",
-  "c",
-  "cpp",
-  "h",
-  "hpp",
-  "cs",
-  "swift",
-  "r",
-  "lua",
-  "sql",
-  "scss",
-  "sass",
-  "less",
-  "styl",
-  "vue",
-  "svelte",
-]);
-
-function isTextFile(path: string): boolean {
-  const dot = path.lastIndexOf(".");
-  if (dot < 0) return false;
-  return TEXT_EXTENSIONS.has(path.slice(dot + 1).toLowerCase());
-}
+import { isTextFile, normalizePath, toWsUrl } from "./utils";
 
 interface FileEntry {
   hash: string;
   size: number;
   mtime: number;
+  binary?: boolean;
 }
 
-// Simple string hash (djb2)
 function hashContent(content: string): string {
   let h = 5381;
   for (let i = 0; i < content.length; i++) {
     h = ((h << 5) + h + content.charCodeAt(i)) | 0;
+  }
+  return (h >>> 0).toString(36);
+}
+
+function hashBinaryContent(buf: ArrayBuffer): string {
+  const bytes = new Uint8Array(buf);
+  let h = 5381;
+  for (let i = 0; i < bytes.byteLength; i++) {
+    h = ((h << 5) + h + bytes[i]) | 0;
   }
   return (h >>> 0).toString(36);
 }
@@ -135,12 +79,23 @@ export class ManifestManager {
 
     const entries = new Map<string, FileEntry>();
     for (const file of files) {
-      const content = await this.vault.read(file);
-      entries.set(normalizePath(file.path), {
-        hash: hashContent(content),
-        size: file.stat.size,
-        mtime: file.stat.mtime,
-      });
+      const binary = !isTextFile(file.path);
+      if (binary) {
+        const buf = await this.vault.readBinary(file);
+        entries.set(normalizePath(file.path), {
+          hash: hashBinaryContent(buf),
+          size: file.stat.size,
+          mtime: file.stat.mtime,
+          binary: true,
+        });
+      } else {
+        const content = await this.vault.read(file);
+        entries.set(normalizePath(file.path), {
+          hash: hashContent(content),
+          size: file.stat.size,
+          mtime: file.stat.mtime,
+        });
+      }
     }
 
     this.doc.transact(() => {
@@ -162,6 +117,9 @@ export class ManifestManager {
     const entries = Array.from(this.manifest.entries());
 
     for (const [path, entry] of entries) {
+      // Binary files sync via file-ops, not Yjs
+      if (entry.binary) continue;
+
       const localFile = this.vault.getAbstractFileByPath(path) as TFile | null;
 
       let needsSync = false;
@@ -238,13 +196,22 @@ export class ManifestManager {
     this.manifest.observe(this.observer);
   }
 
-  updateFile(file: TFile, content: string): void {
+  updateFile(file: TFile, content: string | ArrayBuffer): void {
     if (!this.manifest || !this.isSharedPath(file.path)) return;
-    this.manifest.set(normalizePath(file.path), {
-      hash: hashContent(content),
-      size: content.length,
-      mtime: file.stat.mtime,
-    });
+    if (content instanceof ArrayBuffer) {
+      this.manifest.set(normalizePath(file.path), {
+        hash: hashBinaryContent(content),
+        size: content.byteLength,
+        mtime: file.stat.mtime,
+        binary: true,
+      });
+    } else {
+      this.manifest.set(normalizePath(file.path), {
+        hash: hashContent(content),
+        size: content.length,
+        mtime: file.stat.mtime,
+      });
+    }
   }
 
   removeFile(path: string): void {
@@ -269,7 +236,6 @@ export class ManifestManager {
   isSharedPath(rawPath: string): boolean {
     const path = normalizePath(rawPath);
     if (this.exclusionManager?.isExcluded(path)) return false;
-    if (!isTextFile(path)) return false;
     if (!this.settings.sharedFolder) return true;
     const folder = normalizePath(
       this.settings.sharedFolder.endsWith("/")

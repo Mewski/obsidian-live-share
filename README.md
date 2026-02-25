@@ -63,10 +63,9 @@ npm run lint         # Lint with Biome
 
 ## Known Limitations
 
-- **Text files only** — Binary files are not synced (Yjs operates on text)
 - **No offline merge** — File-level operations (create/delete/rename) don't have conflict resolution when reconnecting after offline edits
 - **Single host** — If the host disconnects, the session ends
-- **Partial E2E** — File content in control messages is encrypted, but Yjs sync data is processed by the server. Use TLS and self-host for full privacy.
+- **E2E covers file transfers, not real-time sync** — File content transferred via the control channel is end-to-end encrypted. Real-time CRDT sync data is processed by the server (same model as VS Code Live Share). Use TLS (`wss://`) in production.
 
 ## Documentation
 

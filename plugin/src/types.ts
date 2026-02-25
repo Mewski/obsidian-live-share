@@ -32,6 +32,14 @@ export interface FileCreateOp {
   type: "create";
   path: string;
   content: string;
+  binary?: boolean;
+}
+
+export interface FileModifyOp {
+  type: "modify";
+  path: string;
+  content: string;
+  binary?: boolean;
 }
 
 export interface FileDeleteOp {
@@ -45,4 +53,30 @@ export interface FileRenameOp {
   newPath: string;
 }
 
-export type FileOp = FileCreateOp | FileDeleteOp | FileRenameOp;
+export interface FileChunkStartOp {
+  type: "chunk-start";
+  path: string;
+  totalSize: number;
+  binary?: boolean;
+}
+
+export interface FileChunkDataOp {
+  type: "chunk-data";
+  path: string;
+  index: number;
+  data: string;
+}
+
+export interface FileChunkEndOp {
+  type: "chunk-end";
+  path: string;
+}
+
+export type FileOp =
+  | FileCreateOp
+  | FileModifyOp
+  | FileDeleteOp
+  | FileRenameOp
+  | FileChunkStartOp
+  | FileChunkDataOp
+  | FileChunkEndOp;

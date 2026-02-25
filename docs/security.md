@@ -8,7 +8,7 @@ When a host starts a session, a random 128-bit passphrase is generated and embed
 - File content in `file-op` create messages (the actual text of new/synced files)
 
 **What is NOT encrypted:**
-- Yjs CRDT sync data (the server must process sync protocol messages to relay and persist document state)
+- Yjs CRDT sync data -- the server processes sync protocol messages to provide persistence, late-join sync, and reconnection recovery. This is the same model used by VS Code Live Share and other real-time collaboration tools.
 - Control message metadata (message types, file paths, presence info)
 
 **Flow:**
@@ -18,7 +18,7 @@ When a host starts a session, a random 128-bit passphrase is generated and embed
 4. Both peers derive the same AES-256-GCM key from the passphrase
 5. File content is encrypted before sending, decrypted on receipt
 
-For full privacy of real-time edits, combine E2E encryption with TLS (`wss://`) and a self-hosted server.
+Use TLS (`wss://`) in production to encrypt all traffic in transit, including real-time sync data.
 
 ## Authentication
 

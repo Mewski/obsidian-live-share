@@ -69,4 +69,4 @@ Create `.liveshare.json` in your vault root:
 
 Default excludes: `.obsidian/**`, `.liveshare.json`, `.trash/**`
 
-Only text files are shared. Binary files are automatically excluded.
+Both text and binary files are shared. Text files sync in real-time via Yjs; binary files (images, PDFs, etc.) are transferred via the control channel with base64 encoding and automatic chunking for large files (50 MB limit).
