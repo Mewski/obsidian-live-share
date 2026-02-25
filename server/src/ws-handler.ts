@@ -355,13 +355,20 @@ export function createYjsWSS(persist?: Persistence) {
   }
 
   function getStats() {
-    const muxConnections = new Set<WebSocket>();
-    for (const state of roomStates.values()) {
+    const uniqueClients = new Set<WebSocket>();
+    const sessions = new Set<string>();
+    for (const [roomId, state] of roomStates) {
+      const baseRoomId = roomId.substring(0, roomId.indexOf(":"));
+      if (baseRoomId) sessions.add(baseRoomId);
       for (const client of state.clients) {
-        muxConnections.add(client.ws);
+        uniqueClients.add(client.ws);
       }
     }
-    return { rooms: roomStates.size, connections: muxConnections.size };
+    return {
+      sessions: sessions.size,
+      documents: roomStates.size,
+      clients: uniqueClients.size,
+    };
   }
 
   function updatePermission(baseRoomId: string, userId: string, permission: Permission) {

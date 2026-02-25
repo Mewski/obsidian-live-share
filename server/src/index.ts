@@ -55,8 +55,9 @@ export function createApp(
     res.json({
       ok: true,
       uptime: process.uptime(),
-      rooms: stats.rooms,
-      connections: stats.connections,
+      sessions: stats.sessions,
+      documents: stats.documents,
+      clients: stats.clients,
     });
   });
 
