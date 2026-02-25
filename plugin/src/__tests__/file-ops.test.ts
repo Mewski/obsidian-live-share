@@ -148,9 +148,7 @@ describe("FileOpsManager", () => {
     it("broadcasts file create with content", async () => {
       const file = { path: "created.md", extension: "md" } as any;
       manager.onFileCreate(file);
-
       await new Promise((r) => setTimeout(r, 10));
-
       expect(sentOps.length).toBe(1);
       expect(sentOps[0]).toEqual({
         type: "create",

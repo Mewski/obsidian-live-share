@@ -5,6 +5,7 @@ import {
   arrayBufferToBase64,
   base64ToArrayBuffer,
   ensureFolder,
+  getPathWarning,
   isTextFile,
   normalizePath,
 } from "./utils";
@@ -93,6 +94,14 @@ export class FileOpsManager {
     if ("oldPath" in op && !this.isPathSafe(op.oldPath)) return;
     if ("newPath" in op && !this.isPathSafe(op.newPath)) return;
 
+    for (const opPath of this.getOpPaths(op)) {
+      const warning = getPathWarning(opPath);
+      if (warning) {
+        new Notice(`Live Share: ${warning}, skipping ${op.type}`);
+        return;
+      }
+    }
+
     const paths = this.getOpPaths(op);
     for (const path of paths) this.suppressPath(path);
     try {
@@ -150,9 +159,12 @@ export class FileOpsManager {
           if (file && !alreadyExists) {
             const dir = op.newPath.substring(0, op.newPath.lastIndexOf("/"));
             if (dir) await ensureFolder(this.vault, dir);
-            await this.vault.rename(file, op.newPath);
+            try {
+              await this.vault.rename(file, op.newPath);
+            } catch {
+              if (!this.vault.getAbstractFileByPath(op.newPath)) throw new Error("rename failed");
+            }
           } else if (file && alreadyExists) {
-            new Notice(`Live Share: rename conflict, ${op.newPath} already exists`);
             await this.vault.trash(file, true);
           }
           break;
@@ -241,9 +253,9 @@ export class FileOpsManager {
       return;
     }
     const prev = this.sendQueues.get(path) ?? Promise.resolve();
+    const binary = !isTextFile(file.path);
     const task = prev.then(async () => {
       if (!this.sendOp) return;
-      const binary = !isTextFile(file.path);
       try {
         if (binary) {
           const buf = await this.vault.readBinary(file as TFile);

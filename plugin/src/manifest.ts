@@ -6,7 +6,7 @@ import * as Y from "yjs";
 import type { ExclusionManager } from "./exclusion";
 import { type SyncManager, waitForSync } from "./sync";
 import type { LiveShareSettings } from "./types";
-import { ensureFolder, isTextFile, normalizePath, toWsUrl } from "./utils";
+import { ensureFolder, getPathWarning, isTextFile, normalizePath, toWsUrl } from "./utils";
 
 export interface FileEntry {
   hash: string;
@@ -61,15 +61,6 @@ export class ManifestManager {
     this.provider = new WebsocketProvider(`${wsUrl}/ws`, roomName, this.doc, {
       params,
     });
-
-    const onDisconnect = (event: { status: string }) => {
-      if (event.status === "disconnected") {
-        this.provider?.off("status", onDisconnect);
-        this.provider?.destroy();
-        this.provider = null;
-      }
-    };
-    this.provider.on("status", onDisconnect);
 
     this.manifest = this.doc.getMap("files");
     try {
@@ -145,6 +136,11 @@ export class ManifestManager {
       if (!path || path.startsWith("/") || path.startsWith("\\")) continue;
       const segments = path.split(/[\\/]/);
       if (segments.some((s) => s === ".." || s === ".")) continue;
+      const warning = getPathWarning(path);
+      if (warning) {
+        new Notice(`Live Share: ${warning}, skipping ${path}`);
+        continue;
+      }
 
       if (entry.directory) {
         const existing = this.vault.getAbstractFileByPath(path);

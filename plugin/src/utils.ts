@@ -75,6 +75,27 @@ export function isTextFile(path: string): boolean {
   return TEXT_EXTENSIONS.has(path.slice(dot + 1).toLowerCase());
 }
 
+const WINDOWS_RESERVED = /^(CON|PRN|AUX|NUL|COM\d|LPT\d)$/i;
+const WINDOWS_INVALID_CHARS = /[<>:"|?*]/;
+
+export function getPathWarning(path: string): string | null {
+  const segments = path.split("/");
+  for (const seg of segments) {
+    if (!seg) continue;
+    if (WINDOWS_INVALID_CHARS.test(seg)) {
+      return `"${seg}" contains characters not allowed on Windows`;
+    }
+    const name = seg.replace(/\.[^.]*$/, "");
+    if (WINDOWS_RESERVED.test(name)) {
+      return `"${seg}" is a reserved filename on Windows`;
+    }
+    if (seg.endsWith(".") || seg.endsWith(" ")) {
+      return `"${seg}" ends with a dot or space, which fails on Windows`;
+    }
+  }
+  return null;
+}
+
 export function arrayBufferToBase64(buf: ArrayBuffer): string {
   const bytes = new Uint8Array(buf);
   let binary = "";

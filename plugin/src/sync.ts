@@ -55,15 +55,7 @@ export class SyncManager {
       provider = new WebsocketProvider(`${wsUrl}/ws`, roomName, doc, {
         params,
       });
-      const thisProvider = provider;
-      const onDisconnect = (event: { status: string }) => {
-        if (event.status === "disconnected") {
-          thisProvider.off("status", onDisconnect);
-          thisProvider.destroy();
-          this.providers.delete(filePath);
-        }
-      };
-      thisProvider.on("status", onDisconnect);
+
       provider.awareness.setLocalStateField("user", {
         name: this.settings.displayName,
         color: this.settings.cursorColor,

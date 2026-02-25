@@ -24,7 +24,7 @@ import { SessionManager } from "./session";
 import { LiveShareSettingTab } from "./settings";
 import { SyncManager } from "./sync";
 import { DEFAULT_SETTINGS, type LiveShareSettings } from "./types";
-import { isTextFile, normalizePath } from "./utils";
+import { ensureFolder, isTextFile, normalizePath } from "./utils";
 
 function getCmView(view: MarkdownView): import("@codemirror/view").EditorView | undefined {
   // biome-ignore lint/suspicious/noExplicitAny: Obsidian does not expose .cm in its public typings
@@ -62,7 +62,50 @@ export default class LiveSharePlugin extends Plugin {
 
   private registerManifestChangeHandler() {
     this.manifestManager.onManifestChange(async (added, removed) => {
-      if (added.length > 0) {
+      const renamedOld = new Set<string>();
+      const renamedNew = new Set<string>();
+      if (added.length > 0 && removed.length > 0) {
+        const addedText = added.filter((p) => isTextFile(p));
+        const removedText = removed.filter((p) => isTextFile(p));
+        for (const oldPath of removedText) {
+          for (const newPath of addedText) {
+            if (renamedNew.has(newPath)) continue;
+            const oldFile = this.app.vault.getAbstractFileByPath(oldPath);
+            const newFile = this.app.vault.getAbstractFileByPath(newPath);
+            if (oldFile && !newFile) {
+              renamedOld.add(oldPath);
+              renamedNew.add(newPath);
+              this.fileOpsManager.suppressPath(oldPath);
+              this.fileOpsManager.suppressPath(newPath);
+              try {
+                const dir = newPath.substring(0, newPath.lastIndexOf("/"));
+                if (dir) await ensureFolder(this.app.vault, dir);
+                await this.app.vault.rename(oldFile, newPath);
+              } finally {
+                setTimeout(() => {
+                  this.fileOpsManager.unsuppressPath(oldPath);
+                  this.fileOpsManager.unsuppressPath(newPath);
+                }, 100);
+              }
+              this.backgroundSync.onFileRemoved(oldPath);
+              await this.backgroundSync.onFileAdded(newPath);
+              break;
+            }
+            if (!oldFile && newFile) {
+              renamedOld.add(oldPath);
+              renamedNew.add(newPath);
+              this.backgroundSync.onFileRemoved(oldPath);
+              await this.backgroundSync.onFileAdded(newPath);
+              break;
+            }
+          }
+        }
+      }
+
+      const actuallyAdded = added.filter((p) => !renamedNew.has(p));
+      const actuallyRemoved = removed.filter((p) => !renamedOld.has(p));
+
+      if (actuallyAdded.length > 0) {
         const syncedCount = await this.manifestManager.syncFromManifest(
           this.suppressPath,
           this.unsuppressPath,
@@ -70,18 +113,19 @@ export default class LiveSharePlugin extends Plugin {
           { skipText: true },
         );
         if (syncedCount > 0) new Notice(`Live Share: synced ${syncedCount} file(s)`);
-        for (const path of added) {
+        for (const path of actuallyAdded) {
           if (isTextFile(path)) {
             await this.backgroundSync.onFileAdded(path);
           }
         }
       }
-      for (const path of removed) {
+      for (const path of actuallyRemoved) {
         this.backgroundSync.onFileRemoved(path);
         const file = this.app.vault.getAbstractFileByPath(path);
         if (file) await this.app.vault.trash(file, true);
       }
-      if (removed.length > 0) new Notice(`Live Share: removed ${removed.length} file(s)`);
+      if (actuallyRemoved.length > 0)
+        new Notice(`Live Share: removed ${actuallyRemoved.length} file(s)`);
     });
   }
 
@@ -296,6 +340,9 @@ export default class LiveSharePlugin extends Plugin {
               const content = isTextFile(file.path)
                 ? await this.app.vault.read(file)
                 : await this.app.vault.readBinary(file);
+              if (isTextFile(file.path)) {
+                await this.backgroundSync.onFileAdded(file.path);
+              }
               await this.manifestManager.updateFile(file, content);
             } catch {
               new Notice(`Live Share: failed to update manifest for ${file.path}`);
@@ -312,12 +359,13 @@ export default class LiveSharePlugin extends Plugin {
         if (this.fileOpsManager.isPathSuppressed(file.path)) return;
         this.fileOpsManager.onFileDelete(file);
         if (this.settings.role === "host") {
+          this.backgroundSync.onFileRemoved(file.path);
           this.manifestManager.removeFile(file.path);
         }
       }),
     );
     this.registerEvent(
-      this.app.vault.on("rename", (file: TAbstractFile, oldPath: string) => {
+      this.app.vault.on("rename", async (file: TAbstractFile, oldPath: string) => {
         if (
           !this.manifestManager.isSharedPath(file.path) &&
           !this.manifestManager.isSharedPath(oldPath)
@@ -330,9 +378,16 @@ export default class LiveSharePlugin extends Plugin {
           return;
         this.fileOpsManager.onFileRename(file, oldPath);
         if (this.settings.role === "host") {
+          if (file instanceof TFile && isTextFile(file.path)) {
+            await this.backgroundSync.onFileRenamed(oldPath, file.path);
+          }
           this.manifestManager.renameFile(oldPath, file.path, this.syncManager);
+          if (!(file instanceof TFile && isTextFile(file.path))) {
+            this.backgroundSync.onFileRenamed(oldPath, file.path);
+          }
+        } else {
+          this.backgroundSync.onFileRenamed(oldPath, file.path);
         }
-        this.backgroundSync.onFileRenamed(oldPath, file.path);
       }),
     );
 
@@ -379,11 +434,11 @@ export default class LiveSharePlugin extends Plugin {
           await this.backgroundSync.startAll("host");
           await this.manifestManager.publishManifest();
         } else {
+          await this.cleanupStaleFiles();
           await this.manifestManager.syncFromManifest(
             this.suppressPath,
             this.unsuppressPath,
             this.requestBinaryFile,
-            { skipText: true },
           );
           await this.backgroundSync.startAll("guest");
           this.registerManifestChangeHandler();
@@ -426,6 +481,25 @@ export default class LiveSharePlugin extends Plugin {
     await this.saveData(this.settings);
     this.syncManager.updateSettings(this.settings);
     this.manifestManager.updateSettings(this.settings);
+  }
+
+  private async cleanupStaleFiles() {
+    const manifest = this.manifestManager.getEntries();
+    if (manifest.size === 0) return;
+    const manifestPaths = new Set(manifest.keys());
+    const localFiles = this.app.vault
+      .getFiles()
+      .filter((f) => this.manifestManager.isSharedPath(f.path));
+    for (const file of localFiles) {
+      if (!manifestPaths.has(normalizePath(file.path))) {
+        this.fileOpsManager.suppressPath(file.path);
+        try {
+          await this.app.vault.trash(file, true);
+        } finally {
+          setTimeout(() => this.fileOpsManager.unsuppressPath(file.path), 100);
+        }
+      }
+    }
   }
 
   private async abortSession(message: string) {
@@ -490,11 +564,11 @@ export default class LiveSharePlugin extends Plugin {
       try {
         await this.connectSync();
         await this.manifestManager.connect();
+        await this.cleanupStaleFiles();
         const syncedCount = await this.manifestManager.syncFromManifest(
           this.suppressPath,
           this.unsuppressPath,
           this.requestBinaryFile,
-          { skipText: true },
         );
         await this.backgroundSync.startAll("guest");
         this.registerManifestChangeHandler();
@@ -607,7 +681,33 @@ export default class LiveSharePlugin extends Plugin {
       } else {
         if (paths.some((path) => !this.manifestManager.isSharedPath(path))) return;
       }
-      this.fileOpsManager.applyRemoteOp(op).catch(() => {});
+      this.fileOpsManager
+        .applyRemoteOp(op)
+        .then(async () => {
+          if (this.settings.role !== "host") return;
+          if (op.type === "create" && "path" in op) {
+            const file = this.app.vault.getAbstractFileByPath(op.path);
+            if (file instanceof TFile) {
+              const content = isTextFile(file.path)
+                ? await this.app.vault.read(file)
+                : await this.app.vault.readBinary(file);
+              await this.manifestManager.updateFile(file, content);
+              if (isTextFile(file.path)) {
+                await this.backgroundSync.onFileAdded(file.path);
+              }
+            }
+          } else if (op.type === "delete" && "path" in op) {
+            this.manifestManager.removeFile(op.path);
+            this.backgroundSync.onFileRemoved(op.path);
+          } else if (op.type === "rename" && "oldPath" in op && "newPath" in op) {
+            const renameOp = op as { oldPath: string; newPath: string };
+            if (isTextFile(renameOp.newPath)) {
+              await this.backgroundSync.onFileRenamed(renameOp.oldPath, renameOp.newPath);
+            }
+            this.manifestManager.renameFile(renameOp.oldPath, renameOp.newPath, this.syncManager);
+          }
+        })
+        .catch(() => {});
     });
     for (const chunkType of ["file-chunk-start", "file-chunk-data", "file-chunk-end"] as const) {
       this.controlChannel.on(chunkType, (msg) => {
