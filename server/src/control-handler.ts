@@ -271,13 +271,13 @@ export function createControlWSS() {
         if (msg.userId) {
           if (!client.userId) {
             // Determine host status on first identification.
-            // Use the JWT-verified identity when available to prevent spoofing;
-            // fall back to the client-reported userId only when no JWT is present.
-            const identityForHostCheck = client.verifiedUserId ?? (msg.userId as string);
-            if (serverRoom?.hostUserId) {
-              client.isHost = identityForHostCheck === serverRoom.hostUserId;
+            // Use JWT-verified identity when available to prevent spoofing.
+            // Without JWT, fall back to first-come-first-serve: the first
+            // client to identify becomes host. This is safe because the room
+            // creator always connects before sharing the invite link.
+            if (client.verifiedUserId && serverRoom?.hostUserId) {
+              client.isHost = client.verifiedUserId === serverRoom.hostUserId;
             } else {
-              // Fallback: first client to identify becomes host
               client.isHost = !findHost(room);
             }
           }

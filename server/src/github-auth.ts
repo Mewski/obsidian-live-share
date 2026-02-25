@@ -28,12 +28,19 @@ const GITHUB_CLIENT_ID = process.env.GITHUB_CLIENT_ID || "";
 const GITHUB_CLIENT_SECRET = process.env.GITHUB_CLIENT_SECRET || "";
 const JWT_SECRET = process.env.JWT_SECRET || "change-me-in-production";
 
-if (!process.env.JWT_SECRET && process.env.REQUIRE_GITHUB_AUTH === "true") {
-  console.error(
-    "FATAL: REQUIRE_GITHUB_AUTH is true but JWT_SECRET is not set. " +
-      "Set JWT_SECRET to a strong random value.",
-  );
-  process.exit(1);
+if (!process.env.JWT_SECRET) {
+  if (process.env.REQUIRE_GITHUB_AUTH === "true") {
+    console.error(
+      "FATAL: REQUIRE_GITHUB_AUTH is true but JWT_SECRET is not set. " +
+        "Set JWT_SECRET to a strong random value.",
+    );
+    process.exit(1);
+  } else {
+    console.warn(
+      "WARNING: JWT_SECRET is not set -- using insecure default. " +
+        "Set JWT_SECRET to a strong random value in production.",
+    );
+  }
 }
 
 export function verifyJWT(token: string): JWTPayload | null {

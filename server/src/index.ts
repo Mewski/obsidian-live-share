@@ -71,13 +71,9 @@ export function createApp(
       const fullRoomName = wsMatch[1];
       const baseRoomId = fullRoomName.split(":")[0];
       const room = getRoom(baseRoomId);
-      if (!room) {
-        socket.destroy();
-        return;
-      }
-
       const token = url.searchParams.get("token");
-      if (!token || !safeTokenCompare(token, room.token)) {
+      // Combine room-existence and token checks so they're indistinguishable
+      if (!room || !token || !safeTokenCompare(token, room.token)) {
         socket.destroy();
         return;
       }
@@ -100,13 +96,8 @@ export function createApp(
     if (ctrlMatch) {
       const roomId = ctrlMatch[1];
       const room = getRoom(roomId);
-      if (!room) {
-        socket.destroy();
-        return;
-      }
-
       const token = url.searchParams.get("token");
-      if (!token || !safeTokenCompare(token, room.token)) {
+      if (!room || !token || !safeTokenCompare(token, room.token)) {
         socket.destroy();
         return;
       }

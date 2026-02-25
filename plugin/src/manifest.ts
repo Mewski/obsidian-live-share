@@ -135,13 +135,9 @@ export class ManifestManager {
     const entries = Array.from(this.manifest.entries());
 
     for (const [path, fileEntry] of entries) {
-      if (
-        !path ||
-        path.startsWith("/") ||
-        path.startsWith("\\") ||
-        /(?:^|[\\/])\.\.(?:[\\/]|$)/.test(path)
-      )
-        continue;
+      if (!path || path.startsWith("/") || path.startsWith("\\")) continue;
+      const segments = path.split(/[\\/]/);
+      if (segments.some((s) => s === ".." || s === ".")) continue;
 
       const localFile = this.vault.getAbstractFileByPath(path) as TFile | null;
 
