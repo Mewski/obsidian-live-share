@@ -6,14 +6,7 @@ import * as Y from "yjs";
 import type { ExclusionManager } from "./exclusion";
 import { type SyncManager, waitForSync } from "./sync";
 import type { LiveShareSettings } from "./types";
-import {
-  arrayBufferToBase64,
-  base64ToArrayBuffer,
-  ensureFolder,
-  isTextFile,
-  normalizePath,
-  toWsUrl,
-} from "./utils";
+import { ensureFolder, isTextFile, normalizePath, toWsUrl } from "./utils";
 
 export interface FileEntry {
   hash: string;

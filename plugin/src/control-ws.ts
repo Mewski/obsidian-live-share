@@ -137,7 +137,7 @@ export class ControlChannel {
     if (!this.e2e || !this.ws || this.ws.readyState !== WebSocket.OPEN) return;
     try {
       if (msg.type === "file-chunk-data" && typeof msg.data === "string") {
-        const encrypted = await this.e2e.encryptString(msg.data as string);
+        const encrypted = await this.e2e.encryptString(msg.data);
         this.ws.send(JSON.stringify({ ...msg, data: encrypted, encrypted: true }));
       } else {
         const op = msg.op as Record<string, unknown>;
@@ -164,7 +164,7 @@ export class ControlChannel {
     try {
       let decryptedMsg: ControlMessage;
       if (msg.type === "file-chunk-data" && typeof msg.data === "string") {
-        const decrypted = await this.e2e.decryptString(msg.data as string);
+        const decrypted = await this.e2e.decryptString(msg.data);
         decryptedMsg = { ...msg, data: decrypted, encrypted: undefined };
       } else {
         const op = msg.op as Record<string, unknown> | undefined;
