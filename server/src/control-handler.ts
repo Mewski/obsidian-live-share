@@ -22,6 +22,8 @@ const ALLOWED_TYPES = new Set([
   "sync-response",
   "set-permission",
   "permission-update",
+  "present-start",
+  "present-stop",
   "ping",
   "pong",
 ]);
@@ -291,6 +293,12 @@ export function createControlWSS(options?: ControlWSSOptions) {
         }
 
         if (msg.type === "summon" && !client.isHost) {
+          return;
+        }
+        if (msg.type === "present-start" && !client.isHost) {
+          return;
+        }
+        if (msg.type === "present-stop" && !client.isHost) {
           return;
         }
         if (msg.type === "session-end" && !client.isHost) {

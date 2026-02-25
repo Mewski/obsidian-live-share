@@ -20,6 +20,8 @@ export type ControlMessageType =
   | "sync-response"
   | "set-permission"
   | "permission-update"
+  | "present-start"
+  | "present-stop"
   | "ping"
   | "pong";
 
