@@ -95,9 +95,10 @@ export class ControlChannel {
     };
 
     this.ws.onclose = () => {
+      if (!this.ws) return;
       this.stopPing();
+      this.ws = null;
       if (!this.isDestroyed) {
-        this.isDestroyed = true;
         this.stateChangeCallback?.("disconnected");
       }
     };
@@ -160,11 +161,19 @@ export class ControlChannel {
       } else {
         const op = msg.op as Record<string, unknown>;
         if (op && typeof op.content === "string") {
-          const encrypted = await this.e2e.encryptString(op.content);
+          const encryptedOp: Record<string, unknown> = {
+            ...op,
+            content: await this.e2e.encryptString(op.content),
+          };
+          if (typeof op.path === "string") encryptedOp.path = await this.e2e.encryptString(op.path);
+          if (typeof op.oldPath === "string")
+            encryptedOp.oldPath = await this.e2e.encryptString(op.oldPath);
+          if (typeof op.newPath === "string")
+            encryptedOp.newPath = await this.e2e.encryptString(op.newPath);
           this.ws.send(
             JSON.stringify({
               ...msg,
-              op: { ...op, content: encrypted },
+              op: encryptedOp,
               encrypted: true,
             }),
           );
@@ -206,10 +215,18 @@ export class ControlChannel {
       } else {
         const op = msg.op as Record<string, unknown> | undefined;
         if (op && typeof op.content === "string") {
-          const decrypted = await this.e2e.decryptString(op.content);
+          const decryptedOp: Record<string, unknown> = {
+            ...op,
+            content: await this.e2e.decryptString(op.content),
+          };
+          if (typeof op.path === "string") decryptedOp.path = await this.e2e.decryptString(op.path);
+          if (typeof op.oldPath === "string")
+            decryptedOp.oldPath = await this.e2e.decryptString(op.oldPath);
+          if (typeof op.newPath === "string")
+            decryptedOp.newPath = await this.e2e.decryptString(op.newPath);
           decryptedMsg = {
             ...msg,
-            op: { ...op, content: decrypted },
+            op: decryptedOp,
             encrypted: undefined,
           };
         } else if (op) {

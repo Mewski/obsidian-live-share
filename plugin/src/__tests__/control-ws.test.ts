@@ -472,7 +472,8 @@ describe("ControlChannel", () => {
       ws.onclose?.();
 
       expect(stateCallback).toHaveBeenCalledWith("disconnected");
-      expect((channel as any).isDestroyed).toBe(true);
+      // Network close should NOT permanently mark as destroyed (only destroy() does)
+      expect((channel as any).isDestroyed).toBe(false);
     });
 
     it("does not fire disconnected twice if already destroyed", async () => {

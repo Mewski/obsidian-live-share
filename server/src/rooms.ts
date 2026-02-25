@@ -8,8 +8,10 @@ import { safeTokenCompare } from "./util.js";
 export type { Room };
 
 const ROOM_MAX_AGE_MS = 24 * 60 * 60 * 1000;
+const TOUCH_DEBOUNCE_MS = 5_000;
 
 const rooms = new Map<string, Room>();
+const touchTimers = new Map<string, ReturnType<typeof setTimeout>>();
 let persistence: Persistence = noopPersistence;
 
 export async function initRooms(store: Persistence) {
@@ -28,16 +30,28 @@ export async function initRooms(store: Persistence) {
 
 export function touchRoom(id: string) {
   const room = rooms.get(id);
-  if (room) {
-    room.lastActivityAt = Date.now();
-    persistence.saveRoom(room).catch((err) => {
-      console.error(`[rooms] failed to persist room ${id}:`, err);
-    });
+  if (!room) return;
+  room.lastActivityAt = Date.now();
+  if (!touchTimers.has(id)) {
+    touchTimers.set(
+      id,
+      setTimeout(() => {
+        touchTimers.delete(id);
+        persistence.saveRoom(room).catch((err) => {
+          console.error(`[rooms] failed to persist room ${id}:`, err);
+        });
+      }, TOUCH_DEBOUNCE_MS),
+    );
   }
 }
 
 export async function removeRoom(id: string) {
   rooms.delete(id);
+  const timer = touchTimers.get(id);
+  if (timer) {
+    clearTimeout(timer);
+    touchTimers.delete(id);
+  }
   try {
     await persistence.deleteRoom(id);
   } catch (err) {
@@ -51,6 +65,11 @@ export async function reapStaleRooms() {
     const age = now - (room.lastActivityAt || room.createdAt);
     if (age > ROOM_MAX_AGE_MS) {
       rooms.delete(id);
+      const timer = touchTimers.get(id);
+      if (timer) {
+        clearTimeout(timer);
+        touchTimers.delete(id);
+      }
       try {
         await persistence.deleteRoom(id);
       } catch (err) {

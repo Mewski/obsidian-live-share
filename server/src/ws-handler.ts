@@ -222,6 +222,11 @@ export function createYjsWSS(persist?: Persistence) {
   }
 
   async function closeAllRooms() {
+    // Wait for any rooms still being created so they get cleaned up too
+    const pending = Array.from(pendingRooms.values());
+    await Promise.allSettled(pending);
+    pendingRooms.clear();
+
     for (const [roomId, state] of roomStates) {
       if (state.persistTimer) clearTimeout(state.persistTimer);
       if (state.cleanupTimer) clearTimeout(state.cleanupTimer);

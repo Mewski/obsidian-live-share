@@ -292,8 +292,8 @@ export function createControlWSS(options?: ControlWSSOptions) {
       }
 
       if (msg.type === "presence-update") {
-        if (msg.userId && !client.userId) {
-          client.userId = (msg.userId as string).slice(0, 128);
+        if (typeof msg.userId === "string" && msg.userId && !client.userId) {
+          client.userId = msg.userId.slice(0, 128);
 
           if (client.verifiedUserId && serverRoom?.hostUserId) {
             client.isHost = client.verifiedUserId === serverRoom.hostUserId;
@@ -301,7 +301,7 @@ export function createControlWSS(options?: ControlWSSOptions) {
             client.isHost = !findHost(room);
           }
         }
-        if (msg.displayName) client.displayName = (msg.displayName as string).slice(0, 100);
+        if (typeof msg.displayName === "string") client.displayName = msg.displayName.slice(0, 100);
       }
 
       broadcast(room, data, ws);
