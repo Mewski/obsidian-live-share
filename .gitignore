@@ -4,3 +4,4 @@ main.js
 data/
 .direnv/
 result
+*.tsbuildinfo
