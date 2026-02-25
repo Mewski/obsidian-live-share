@@ -176,7 +176,7 @@ export class ManifestManager {
             synced++;
           }
         } catch {
-          // sync timed out or vault write failed — skip this file
+          // sync timed out or vault write failed -- skip this file
         } finally {
           fileProvider.destroy();
           fileDoc.destroy();

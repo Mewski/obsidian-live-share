@@ -202,7 +202,7 @@ export class ControlChannel {
         }
       }
     } catch {
-      // encryption failed — drop the message rather than sending plaintext
+      // encryption failed -- drop the message rather than sending plaintext
     }
   }
 
@@ -231,7 +231,7 @@ export class ControlChannel {
         for (const h of handlers) h(decMsg as ControlMessage);
       }
     } catch {
-      // decryption failed — ignore malformed/miskeyed message
+      // decryption failed -- ignore malformed/miskeyed message
     }
   }
 
