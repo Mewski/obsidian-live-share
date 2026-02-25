@@ -1,9 +1,4 @@
-/**
- * Per-file Y.Doc and WebsocketProvider management.
- *
- * Each shared text file gets its own Y.Doc identified by roomId:path. Providers
- * are created on demand and destroyed when the file is released or the session ends.
- */
+/** Per-file Y.Doc and WebsocketProvider management. */
 
 import { WebsocketProvider } from "y-websocket";
 import * as Y from "yjs";

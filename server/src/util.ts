@@ -1,9 +1,4 @@
-/**
- * Timing-safe token comparison.
- *
- * Uses constant-time string comparison to prevent timing side-channel attacks
- * when validating room tokens and other secrets.
- */
+/** Timing-safe token comparison. */
 
 import { createHmac, timingSafeEqual } from "node:crypto";
 

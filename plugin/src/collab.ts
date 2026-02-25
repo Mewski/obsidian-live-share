@@ -1,9 +1,4 @@
-/**
- * CodeMirror 6 Yjs integration for real-time collaborative editing.
- *
- * Manages yCollab extensions per editor view, swapping them when the active
- * file changes and tearing them down on disconnect.
- */
+/** CodeMirror 6 Yjs integration for real-time collaborative editing. */
 
 import { Compartment } from "@codemirror/state";
 import type { Extension } from "@codemirror/state";

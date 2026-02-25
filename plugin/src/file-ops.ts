@@ -1,9 +1,4 @@
-/**
- * Remote file operation application, path suppression, and chunked binary transfer.
- *
- * Applies incoming create/modify/delete/rename operations to the local vault and
- * broadcasts local vault changes to remote peers with automatic chunking for large files.
- */
+/** Remote file operation application, path suppression, and chunked binary transfer. */
 
 import { Notice } from "obsidian";
 import type { TAbstractFile, TFile, Vault } from "obsidian";
@@ -59,7 +54,6 @@ export class FileOpsManager {
     return (this.suppressedPaths.get(normalizePath(path)) ?? 0) > 0;
   }
 
-  /** Clear incomplete chunk assemblies (e.g. after disconnect/reconnect). */
   clearPendingChunks(): void {
     this.pendingChunks.clear();
   }
@@ -164,7 +158,6 @@ export class FileOpsManager {
             new Notice(`Live Share: incoming ${op.path} exceeds 50 MB limit, skipping`);
             break;
           }
-          // Discard any in-progress assembly for this path (concurrent transfer)
           this.pendingChunks.delete(op.path);
           this.pendingChunks.set(op.path, {
             chunks: [],

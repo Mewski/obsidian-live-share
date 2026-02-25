@@ -1,9 +1,4 @@
-/**
- * LevelDB persistence for Y.Docs and room metadata.
- *
- * Stores Y.Doc state as binary updates and room metadata as JSON. Provides
- * atomic get/set/delete operations and a close method for graceful shutdown.
- */
+/** LevelDB persistence for Y.Docs and room metadata. */
 
 import { Level } from "level";
 import * as Y from "yjs";
@@ -73,14 +68,10 @@ export function createLevelPersistence(dbPath = "./data/yjs-docs"): Persistence 
           if (key.startsWith("room:")) {
             try {
               rooms.push(JSON.parse(value.toString("utf-8")));
-            } catch {
-              // Skip corrupt room entry
-            }
+            } catch {}
           }
         }
-      } catch {
-        // DB may be empty
-      }
+      } catch {}
       return rooms;
     },
 

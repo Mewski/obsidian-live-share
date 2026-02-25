@@ -1,9 +1,4 @@
-/**
- * Connection lifecycle state machine.
- *
- * Tracks transitions between disconnected, connecting, connected, reconnecting,
- * error, and auth-required states. Notifies subscribers on every transition.
- */
+/** Connection lifecycle state machine. */
 
 export type ConnectionState =
   | "disconnected"

@@ -1,9 +1,4 @@
-/**
- * Yjs WebSocket handler with per-room Y.Doc persistence and awareness relay.
- *
- * Each room gets a shared Y.Doc that is loaded from LevelDB on first connect
- * and persisted on updates with a debounce. Awareness state is relayed between clients.
- */
+/** Yjs WebSocket handler with per-room Y.Doc persistence and awareness relay. */
 
 import type { IncomingMessage } from "node:http";
 import * as decoding from "lib0/decoding";

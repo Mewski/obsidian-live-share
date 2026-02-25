@@ -1,9 +1,4 @@
-/**
- * End-to-end encryption for Obsidian Live Share using AES-GCM with PBKDF2 key derivation.
- *
- * The encryption key is derived from a passphrase that is shared via the invite
- * link and never sent to the server. The server only sees encrypted blobs.
- */
+/** AES-256-GCM encryption with PBKDF2 key derivation from the invite-link passphrase. */
 
 import { arrayBufferToBase64, base64ToArrayBuffer } from "./utils";
 
@@ -37,7 +32,6 @@ export class E2ECrypto {
     this.passphrase = passphrase;
   }
 
-  /** Initialize the key. Call once before encrypt/decrypt. */
   async init(): Promise<void> {
     // Use a deterministic salt derived from the passphrase so all peers
     // with the same passphrase derive the same key without a key-exchange step.
@@ -59,7 +53,6 @@ export class E2ECrypto {
       this.key,
       plaintext as BufferSource,
     );
-    // Prepend IV so the receiver can extract it
     const result = new Uint8Array(IV_BYTES + ciphertext.byteLength);
     result.set(iv, 0);
     result.set(new Uint8Array(ciphertext), IV_BYTES);

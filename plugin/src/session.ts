@@ -1,9 +1,4 @@
-/**
- * Room creation/join, invite link encoding/parsing, and session state.
- *
- * Handles the REST calls to create or join a room, encodes session details
- * into a shareable invite link, and persists session state across restarts.
- */
+/** Room creation/join, invite link encoding/parsing, and session state. */
 
 import { Notice } from "obsidian";
 
@@ -113,9 +108,7 @@ export class SessionManager {
           method: "DELETE",
           headers: { Authorization: `Bearer ${settings.token}` },
         });
-      } catch {
-        // Best-effort room cleanup; session ends regardless of server reachability
-      }
+      } catch {}
     }
 
     settings.roomId = "";

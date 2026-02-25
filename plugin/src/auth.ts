@@ -1,9 +1,4 @@
-/**
- * GitHub OAuth token handling and JWT parsing.
- *
- * Opens a browser window for the GitHub OAuth flow, polls for the resulting JWT,
- * and extracts the user's display name and avatar from the token payload.
- */
+/** GitHub OAuth token handling and JWT parsing. */
 
 import { Notice } from "obsidian";
 import type LiveSharePlugin from "./main";

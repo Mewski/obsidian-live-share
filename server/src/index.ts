@@ -1,9 +1,4 @@
-/**
- * Express app setup, WebSocket upgrade routing, TLS, and graceful shutdown.
- *
- * Creates the HTTP(S) server, mounts REST routes for room management and auth,
- * and upgrades WebSocket connections to the Yjs sync or control channel handlers.
- */
+/** Express app setup, WebSocket upgrade routing, TLS, and graceful shutdown. */
 
 import { readFileSync } from "node:fs";
 import { type Server, createServer } from "node:http";

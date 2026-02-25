@@ -1,9 +1,4 @@
-/**
- * Shared TypeScript types and default settings.
- *
- * Defines the LiveShareSettings interface, file operation discriminated unions,
- * and the DEFAULT_SETTINGS constant used across the plugin.
- */
+/** Shared TypeScript types and default settings. */
 
 export type SessionRole = "host" | "guest" | null;
 

@@ -1,9 +1,4 @@
-/**
- * Path normalization, URL conversion, file type detection, and base64 helpers.
- *
- * Shared utility functions and constants used across the plugin, including the
- * canonical hex color regex and recursive folder creation.
- */
+/** Path normalization, URL conversion, file type detection, and base64 helpers. */
 
 import { TFolder, type Vault } from "obsidian";
 

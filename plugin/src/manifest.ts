@@ -1,9 +1,4 @@
-/**
- * File inventory sync via shared Y.Map with hash-based change detection.
- *
- * The host publishes a manifest of all shared files with SHA-256 hashes. Guests
- * compare against local state and pull any files that differ or are missing.
- */
+/** File inventory sync via shared Y.Map with hash-based change detection. */
 
 import type { TFile, Vault } from "obsidian";
 import { Notice } from "obsidian";
@@ -159,7 +154,6 @@ export class ManifestManager {
       if (!needsSync) continue;
 
       if (fileEntry.binary) {
-        // Binary files sync via the control channel (chunked transfer).
         requestBinary?.(path);
         synced++;
         continue;
@@ -200,7 +194,6 @@ export class ManifestManager {
         }
         synced++;
       } catch {
-        // sync timed out or vault write failed -- skip this file
       } finally {
         fileProvider.destroy();
         fileDoc.destroy();

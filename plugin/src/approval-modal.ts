@@ -1,9 +1,4 @@
-/**
- * Modal for the host to approve or deny guest join requests.
- *
- * Shows the requesting user's avatar and name with approve (read-write or
- * read-only) and deny buttons. The response is sent back via the control channel.
- */
+/** Host approval modal for guest join requests. */
 
 import { type App, Modal } from "obsidian";
 
@@ -42,9 +37,7 @@ export class ApprovalModal extends Modal {
             cls: "live-share-approval-avatar",
           });
         }
-      } catch {
-        // Invalid avatar URL; skip rendering the image
-      }
+      } catch {}
     }
     info.createEl("p", {
       text: `${this.request.displayName} wants to join your session.`,

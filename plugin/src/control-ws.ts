@@ -1,9 +1,4 @@
-/**
- * Control channel WebSocket client with reconnect, message queue, and encryption.
- *
- * Carries JSON messages for file operations, presence, follow/summon, session
- * lifecycle, and ping/pong latency measurement. Supports optional E2E encryption.
- */
+/** Control channel WebSocket client with reconnect, message queue, and encryption. */
 
 import type { E2ECrypto } from "./crypto";
 import type { LiveShareSettings } from "./types";
@@ -53,7 +48,6 @@ export class ControlChannel {
   private sendQueue: ControlMessage[] = [];
   private reconnectCallback: (() => void) | null = null;
 
-  /** Distinguishes initial connect from reconnect. */
   private hasConnected = false;
 
   private latencyMs = 0;
@@ -69,7 +63,6 @@ export class ControlChannel {
     this.stateChangeCallback = callback;
   }
 
-  /** Register a callback that fires each time the socket reconnects (not on first connect). */
   onReconnect(callback: () => void) {
     this.reconnectCallback = callback;
   }

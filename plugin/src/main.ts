@@ -1,9 +1,4 @@
-/**
- * Plugin entry point: commands, session lifecycle, and vault event handlers.
- *
- * Registers all Obsidian commands, manages the control channel and sync
- * connections, wires up vault events, and owns the presence/follow state.
- */
+/** Plugin entry point: commands, session lifecycle, and vault event handlers. */
 
 import {
   FuzzySuggestModal,
@@ -57,15 +52,13 @@ export default class LiveSharePlugin extends Plugin {
   private connectionStateUnsub: (() => void) | null = null;
   statusBarEl!: HTMLElement;
 
-  /** Guard to prevent re-entrant calls to endSession (e.g. kicked -> endSession -> session-end -> endSession). */
+  /** Prevents re-entrant endSession calls from kicked/session-end handlers. */
   private endingSession = false;
 
-  /** Request a binary file from the host via the control channel. */
   private requestBinaryFile(path: string) {
     this.controlChannel?.send({ type: "sync-request", path });
   }
 
-  /** Register the manifest-change observer for guest file sync. */
   private registerManifestChangeHandler() {
     this.manifestManager.onManifestChange(async (added, removed) => {
       if (added.length > 0) {
@@ -84,7 +77,6 @@ export default class LiveSharePlugin extends Plugin {
 
   private presenceTimer: ReturnType<typeof setTimeout> | null = null;
 
-  /** Current scroll listener and its DOM element, so we can remove it on file change. */
   private currentScrollListener: (() => void) | null = null;
   private currentScrollDOM: HTMLElement | null = null;
 
@@ -469,7 +461,6 @@ export default class LiveSharePlugin extends Plugin {
       this.connectionState.transition({ type: "disconnect" });
       new Notice("Live Share: session ended");
     } finally {
-      // Always clear session state, even if cleanup above throws
       await this.sessionManager.endSession();
       this.endingSession = false;
     }
