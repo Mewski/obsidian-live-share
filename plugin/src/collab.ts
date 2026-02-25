@@ -18,6 +18,7 @@ export interface CursorUser {
 export class CollabManager {
   private compartment = new Compartment();
   private currentPath: string | null = null;
+  private currentView: EditorView | null = null;
   private currentAwareness: awarenessProtocol.Awareness | null = null;
   private activationGen = 0;
 
@@ -35,11 +36,21 @@ export class CollabManager {
   ) {
     const gen = ++this.activationGen;
 
-    if (this.currentAwareness && filePath !== this.currentPath) {
-      this.currentAwareness.setLocalState(null);
-      this.currentAwareness = null;
+    if (filePath !== this.currentPath || view !== this.currentView) {
+      if (this.currentView && this.currentView !== view) {
+        try {
+          this.currentView.dispatch({
+            effects: this.compartment.reconfigure([]),
+          });
+        } catch {}
+      }
+      if (this.currentAwareness && filePath !== this.currentPath) {
+        this.currentAwareness.setLocalState(null);
+        this.currentAwareness = null;
+      }
     }
     this.currentPath = filePath;
+    this.currentView = view;
     if (!filePath) {
       if (this.currentAwareness) {
         this.currentAwareness.setLocalState(null);
@@ -78,7 +89,6 @@ export class CollabManager {
         if (this.activationGen !== gen) return;
         if (docHandle.text.length > 0) break;
       }
-      if (docHandle.text.length === 0) return;
     }
 
     if (role === "host") {
@@ -106,6 +116,7 @@ export class CollabManager {
       this.currentAwareness = null;
     }
     this.currentPath = null;
+    this.currentView = null;
     view.dispatch({ effects: this.compartment.reconfigure([]) });
   }
 }
