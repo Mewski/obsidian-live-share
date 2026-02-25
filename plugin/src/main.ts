@@ -325,7 +325,6 @@ export default class LiveSharePlugin extends Plugin {
     this.registerEvent(
       this.app.workspace.on("active-leaf-change", () => {
         this.onActiveFileChange();
-        setTimeout(() => this.onActiveFileChange(), 50);
         this.debouncedBroadcastPresence();
       }),
     );
@@ -580,6 +579,7 @@ export default class LiveSharePlugin extends Plugin {
         await this.manifestManager.publishManifest({ purge: true });
         await this.backgroundSync.startAll("host");
         this.registerManifestChangeHandler();
+        this.onActiveFileChange();
         new Notice("Live Share: session started, invite copied to clipboard");
       } catch {
         await this.abortSession("Live Share: failed to start session");
@@ -609,6 +609,7 @@ export default class LiveSharePlugin extends Plugin {
         );
         await this.backgroundSync.startAll("guest");
         this.registerManifestChangeHandler();
+        this.onActiveFileChange();
         new Notice(`Live Share: joined session, synced ${syncedCount} file(s)`);
       } catch {
         await this.abortSession("Live Share: failed to join session");
@@ -666,7 +667,9 @@ export default class LiveSharePlugin extends Plugin {
     this.controlChannel.onStateChange((controlState) => {
       if (controlState === "connected") {
         this.connectionState.transition({ type: "connected" });
-        this.onActiveFileChange();
+        if (this.backgroundSync.isRunning()) {
+          this.onActiveFileChange();
+        }
       } else if (controlState === "reconnecting") {
         this.connectionState.transition({ type: "reconnecting" });
       } else {

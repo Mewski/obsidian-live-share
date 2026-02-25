@@ -24,6 +24,7 @@ export class BackgroundSync {
   private recentDiskWrites = new Set<string>();
   private role: SessionRole = "host";
   private destroyed = false;
+  private running = false;
 
   constructor(
     private vault: Vault,
@@ -32,8 +33,13 @@ export class BackgroundSync {
     private fileOpsManager: FileOpsManager,
   ) {}
 
+  isRunning(): boolean {
+    return this.running;
+  }
+
   async startAll(role: SessionRole): Promise<void> {
     this.destroyed = false;
+    this.running = true;
     this.role = role;
     const entries = this.manifestManager.getEntries();
     for (const [path, entry] of entries) {
@@ -228,6 +234,7 @@ export class BackgroundSync {
 
   destroy(): void {
     this.destroyed = true;
+    this.running = false;
     for (const timer of this.writeTimers.values()) {
       clearTimeout(timer);
     }
