@@ -1,4 +1,9 @@
-/** Sidebar panel showing connected users with follow, kick, and summon controls. */
+/**
+ * Sidebar panel showing connected users with follow, kick, and summon controls.
+ *
+ * Renders a list of collaborators with colored dots, file locations, and action
+ * buttons. The host sees additional kick and summon controls.
+ */
 import { ItemView, WorkspaceLeaf } from "obsidian";
 import { HEX_COLOR_RE } from "./utils";
 

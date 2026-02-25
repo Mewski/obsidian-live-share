@@ -1,4 +1,9 @@
-/** Plugin entry point: commands, session lifecycle, and vault event handlers. */
+/**
+ * Plugin entry point: commands, session lifecycle, and vault event handlers.
+ *
+ * Registers all Obsidian commands, manages the control channel and sync
+ * connections, wires up vault events, and owns the presence/follow state.
+ */
 import {
   FuzzySuggestModal,
   MarkdownView,

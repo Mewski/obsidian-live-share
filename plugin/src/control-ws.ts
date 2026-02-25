@@ -1,4 +1,9 @@
-/** Control channel WebSocket client with reconnect, message queue, and encryption. */
+/**
+ * Control channel WebSocket client with reconnect, message queue, and encryption.
+ *
+ * Carries JSON messages for file operations, presence, follow/summon, session
+ * lifecycle, and ping/pong latency measurement. Supports optional E2E encryption.
+ */
 import type { E2ECrypto } from "./crypto";
 import type { LiveShareSettings } from "./types";
 import { toWsUrl } from "./utils";

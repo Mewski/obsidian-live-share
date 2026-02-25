@@ -1,4 +1,9 @@
-/** Remote file operation application, path suppression, and chunked binary transfer. */
+/**
+ * Remote file operation application, path suppression, and chunked binary transfer.
+ *
+ * Applies incoming create/modify/delete/rename operations to the local vault and
+ * broadcasts local vault changes to remote peers with automatic chunking for large files.
+ */
 import { Notice } from "obsidian";
 import type { TAbstractFile, TFile, Vault } from "obsidian";
 import type { FileOp } from "./types";

@@ -1,4 +1,9 @@
-/** File inventory sync via shared Y.Map with hash-based change detection. */
+/**
+ * File inventory sync via shared Y.Map with hash-based change detection.
+ *
+ * The host publishes a manifest of all shared files with SHA-256 hashes. Guests
+ * compare against local state and pull any files that differ or are missing.
+ */
 import type { TFile, Vault } from "obsidian";
 import { Notice } from "obsidian";
 import { WebsocketProvider } from "y-websocket";

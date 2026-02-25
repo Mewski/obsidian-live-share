@@ -1,4 +1,9 @@
-/** Control channel message routing, host enforcement, and rate limiting. */
+/**
+ * Control channel message routing, host enforcement, and rate limiting.
+ *
+ * Routes JSON messages between clients in the same room, enforces host-only
+ * actions (kick, session-end, summon), and applies per-connection rate limits.
+ */
 import type { IncomingMessage } from "node:http";
 import { WebSocket, WebSocketServer } from "ws";
 import { verifyJWT } from "./github-auth.js";

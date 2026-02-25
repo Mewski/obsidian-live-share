@@ -1,4 +1,9 @@
-/** GitHub OAuth flow, JWT signing, and verification. */
+/**
+ * GitHub OAuth flow, JWT signing, and verification.
+ *
+ * Implements the OAuth authorization code exchange, signs JWTs with the user's
+ * GitHub profile, and provides middleware to verify tokens on incoming requests.
+ */
 import { Router } from "express";
 import jwt from "jsonwebtoken";
 

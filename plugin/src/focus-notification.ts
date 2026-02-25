@@ -1,4 +1,9 @@
-/** "Look here" notification with a "Go to" button for focus/summon requests. */
+/**
+ * "Look here" notification with a "Go to" button for focus/summon requests.
+ *
+ * Displays a Notice when another participant sends a focus or summon request,
+ * with a button that navigates to the specified file and line.
+ */
 import { MarkdownView, Notice, TFile } from "obsidian";
 import type LiveSharePlugin from "./main";
 
