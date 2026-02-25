@@ -2,6 +2,7 @@ import { Notice } from "obsidian";
 import type { TAbstractFile, TFile, Vault } from "obsidian";
 import type { FileOp } from "./types";
 import {
+  VAULT_EVENT_SETTLE_MS,
   arrayBufferToBase64,
   base64ToArrayBuffer,
   ensureFolder,
@@ -23,7 +24,7 @@ interface ChunkAssembly {
 export class FileOpsManager {
   private vault: Vault;
   private sendOp: ((op: FileOp) => void) | null = null;
-  private suppressedPaths = new Map<string, number>();
+  private mutedPaths = new Map<string, number>();
   private pendingChunks = new Map<string, ChunkAssembly>();
   private opQueues = new Map<string, Promise<void>>();
   private sendQueues = new Map<string, Promise<void>>();
@@ -36,23 +37,23 @@ export class FileOpsManager {
     this.sendOp = sender;
   }
 
-  suppressPath(path: string): void {
+  mutePathEvents(path: string): void {
     const norm = normalizePath(path);
-    this.suppressedPaths.set(norm, (this.suppressedPaths.get(norm) ?? 0) + 1);
+    this.mutedPaths.set(norm, (this.mutedPaths.get(norm) ?? 0) + 1);
   }
 
-  unsuppressPath(path: string): void {
+  unmutePathEvents(path: string): void {
     const norm = normalizePath(path);
-    const count = this.suppressedPaths.get(norm) ?? 0;
+    const count = this.mutedPaths.get(norm) ?? 0;
     if (count <= 1) {
-      this.suppressedPaths.delete(norm);
+      this.mutedPaths.delete(norm);
     } else {
-      this.suppressedPaths.set(norm, count - 1);
+      this.mutedPaths.set(norm, count - 1);
     }
   }
 
-  isPathSuppressed(path: string): boolean {
-    return (this.suppressedPaths.get(normalizePath(path)) ?? 0) > 0;
+  isPathMuted(path: string): boolean {
+    return (this.mutedPaths.get(normalizePath(path)) ?? 0) > 0;
   }
 
   clearPendingChunks(): void {
@@ -104,7 +105,7 @@ export class FileOpsManager {
     }
 
     const paths = this.getOpPaths(op);
-    for (const path of paths) this.suppressPath(path);
+    for (const path of paths) this.mutePathEvents(path);
     try {
       switch (op.type) {
         case "create": {
@@ -241,14 +242,14 @@ export class FileOpsManager {
       new Notice(`Live Share: failed to apply remote ${op.type} for ${detail}`);
     } finally {
       setTimeout(() => {
-        for (const path of paths) this.unsuppressPath(path);
-      }, 100);
+        for (const path of paths) this.unmutePathEvents(path);
+      }, VAULT_EVENT_SETTLE_MS);
     }
   }
 
   async onFileCreate(file: TAbstractFile) {
     const path = normalizePath(file.path);
-    if (this.isPathSuppressed(path) || !this.sendOp) return;
+    if (this.isPathMuted(path) || !this.sendOp) return;
     if (!("extension" in file)) {
       this.sendOp({ type: "folder-create", path });
       return;
@@ -260,7 +261,7 @@ export class FileOpsManager {
       try {
         if (binary) {
           const buf = await this.vault.readBinary(file as TFile);
-          if (this.isPathSuppressed(path)) return;
+          if (this.isPathMuted(path)) return;
           if (buf.byteLength > MAX_FILE_SIZE) {
             new Notice(`Live Share: ${path} exceeds 50 MB limit, skipping`);
             return;
@@ -268,7 +269,7 @@ export class FileOpsManager {
           this.sendFileContent(path, arrayBufferToBase64(buf), true);
         } else {
           const content = normalizeLineEndings(await this.vault.read(file as TFile));
-          if (this.isPathSuppressed(path)) return;
+          if (this.isPathMuted(path)) return;
           this.sendFileContent(path, content, false);
         }
       } catch {
@@ -282,7 +283,7 @@ export class FileOpsManager {
 
   async onFileModify(file: TAbstractFile) {
     const path = normalizePath(file.path);
-    if (this.isPathSuppressed(path) || !this.sendOp) return;
+    if (this.isPathMuted(path) || !this.sendOp) return;
     if (!("extension" in file)) return;
     const binary = !isTextFile(file.path);
     if (!binary) return;
@@ -291,7 +292,7 @@ export class FileOpsManager {
       if (!this.sendOp) return;
       try {
         const buf = await this.vault.readBinary(file as TFile);
-        if (this.isPathSuppressed(path)) return;
+        if (this.isPathMuted(path)) return;
         if (buf.byteLength > MAX_FILE_SIZE) {
           new Notice(`Live Share: ${path} exceeds 50 MB limit, skipping`);
           return;
@@ -313,7 +314,7 @@ export class FileOpsManager {
 
   onFileDelete(file: TAbstractFile) {
     const path = normalizePath(file.path);
-    if (this.isPathSuppressed(path) || !this.sendOp) return;
+    if (this.isPathMuted(path) || !this.sendOp) return;
     const prev = this.sendQueues.get(path) ?? Promise.resolve();
     const task = prev.then(() => {
       if (this.sendOp) this.sendOp({ type: "delete", path });
@@ -324,7 +325,7 @@ export class FileOpsManager {
   onFileRename(file: TAbstractFile, oldPath: string) {
     const newPath = normalizePath(file.path);
     const oldNorm = normalizePath(oldPath);
-    if (this.isPathSuppressed(newPath) || this.isPathSuppressed(oldNorm) || !this.sendOp) return;
+    if (this.isPathMuted(newPath) || this.isPathMuted(oldNorm) || !this.sendOp) return;
     const prev = this.sendQueues.get(oldNorm) ?? Promise.resolve();
     const task = prev.then(() => {
       if (this.sendOp) this.sendOp({ type: "rename", oldPath: oldNorm, newPath });

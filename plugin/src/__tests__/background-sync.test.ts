@@ -56,9 +56,9 @@ function createManifestManager(entries: Map<string, any> = new Map()) {
 
 function createFileOpsManager() {
   return {
-    suppressPath: vi.fn(),
-    unsuppressPath: vi.fn(),
-    isPathSuppressed: vi.fn(() => false),
+    mutePathEvents: vi.fn(),
+    unmutePathEvents: vi.fn(),
+    isPathMuted: vi.fn(() => false),
   } as any;
 }
 
@@ -273,7 +273,7 @@ describe("BackgroundSync", () => {
     vi.advanceTimersByTime(1100);
     await vi.advanceTimersByTimeAsync(0);
 
-    expect(bg.isWrittenByUs("note.md")).toBe(true);
+    expect(bg.isRecentDiskWrite("note.md")).toBe(true);
 
     vault.read.mockResolvedValue("local edit during suppression");
     await bg.handleLocalTextModify("note.md");

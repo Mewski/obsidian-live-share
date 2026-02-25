@@ -7,6 +7,7 @@ import type { ManifestManager } from "./manifest";
 import { type SyncManager, waitForSync } from "./sync";
 import type { SessionRole } from "./types";
 import {
+  VAULT_EVENT_SETTLE_MS,
   applyMinimalYTextUpdate,
   ensureFolder,
   isTextFile,
@@ -21,7 +22,7 @@ export class BackgroundSync {
   private subscribing = new Set<string>();
   private writeTimers = new Map<string, ReturnType<typeof setTimeout>>();
   private activeFile: string | null = null;
-  private writtenByUs = new Set<string>();
+  private recentDiskWrites = new Set<string>();
   private role: SessionRole = "host";
 
   constructor(
@@ -163,7 +164,7 @@ export class BackgroundSync {
 
   async handleLocalTextModify(rawPath: string): Promise<void> {
     const path = normalizePath(rawPath);
-    if (this.writtenByUs.has(path)) return;
+    if (this.recentDiskWrites.has(path)) return;
     if (path === this.activeFile) return;
 
     const docHandle = this.syncManager.getDoc(path);
@@ -182,8 +183,8 @@ export class BackgroundSync {
     }
   }
 
-  isWrittenByUs(rawPath: string): boolean {
-    return this.writtenByUs.has(normalizePath(rawPath));
+  isRecentDiskWrite(rawPath: string): boolean {
+    return this.recentDiskWrites.has(normalizePath(rawPath));
   }
 
   destroy(): void {
@@ -195,7 +196,7 @@ export class BackgroundSync {
     }
     this.observers.clear();
     this.activeFile = null;
-    this.writtenByUs.clear();
+    this.recentDiskWrites.clear();
   }
 
   private flushWrite(path: string): void {
@@ -222,8 +223,8 @@ export class BackgroundSync {
   }
 
   private async writeToDisk(path: string, content: string): Promise<void> {
-    this.writtenByUs.add(path);
-    this.fileOpsManager.suppressPath(path);
+    this.recentDiskWrites.add(path);
+    this.fileOpsManager.mutePathEvents(path);
     try {
       const file = this.vault.getAbstractFileByPath(path) as TFile | null;
       if (file) {
@@ -237,9 +238,9 @@ export class BackgroundSync {
       new Notice(`Live Share: failed to write ${path} to disk`);
     } finally {
       setTimeout(() => {
-        this.writtenByUs.delete(path);
-        this.fileOpsManager.unsuppressPath(path);
-      }, 100);
+        this.recentDiskWrites.delete(path);
+        this.fileOpsManager.unmutePathEvents(path);
+      }, VAULT_EVENT_SETTLE_MS);
     }
   }
 }

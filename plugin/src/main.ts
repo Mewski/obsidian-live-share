@@ -1,30 +1,23 @@
-import {
-  FuzzySuggestModal,
-  MarkdownView,
-  Modal,
-  Notice,
-  Plugin,
-  type TAbstractFile,
-  TFile,
-} from "obsidian";
+import { MarkdownView, Notice, Plugin, type TAbstractFile, TFile } from "obsidian";
 
 import { ApprovalModal, type JoinRequest } from "./approval-modal";
 import { AuthManager } from "./auth";
 import { BackgroundSync } from "./background-sync";
 import { CollabManager } from "./collab";
 import { ConnectionStateManager } from "./connection-state";
-import { ControlChannel } from "./control-ws";
+import { ControlChannel, type ControlMessageType } from "./control-ws";
 import { E2ECrypto } from "./crypto";
 import { ExclusionManager } from "./exclusion";
 import { FileOpsManager } from "./file-ops";
 import { type FocusRequest, showFocusNotification } from "./focus-notification";
 import { ManifestManager } from "./manifest";
+import { ConfirmModal, PromptModal, UserPickerModal } from "./modals";
 import { PRESENCE_VIEW_TYPE, type PresenceUser, PresenceView } from "./presence-view";
 import { SessionManager } from "./session";
 import { LiveShareSettingTab } from "./settings";
 import { SyncManager } from "./sync";
 import { DEFAULT_SETTINGS, type LiveShareSettings } from "./types";
-import { ensureFolder, isTextFile, normalizePath } from "./utils";
+import { VAULT_EVENT_SETTLE_MS, ensureFolder, isTextFile, normalizePath } from "./utils";
 
 function getCmView(view: MarkdownView): import("@codemirror/view").EditorView | undefined {
   // biome-ignore lint/suspicious/noExplicitAny: Obsidian does not expose .cm in its public typings
@@ -57,11 +50,11 @@ export default class LiveSharePlugin extends Plugin {
     this.controlChannel?.send({ type: "sync-request", path });
   };
 
-  private suppressPath = (path: string) => this.fileOpsManager.suppressPath(path);
-  private unsuppressPath = (path: string) => this.fileOpsManager.unsuppressPath(path);
+  private mutePathEvents = (path: string) => this.fileOpsManager.mutePathEvents(path);
+  private unmutePathEvents = (path: string) => this.fileOpsManager.unmutePathEvents(path);
 
   private registerManifestChangeHandler() {
-    this.manifestManager.onManifestChange(async (added, removed) => {
+    this.manifestManager.setManifestChangeHandler(async (added, removed) => {
       const renamedOld = new Set<string>();
       const renamedNew = new Set<string>();
       if (added.length > 0 && removed.length > 0) {
@@ -73,17 +66,17 @@ export default class LiveSharePlugin extends Plugin {
             if (oldFile && !newFile) {
               renamedOld.add(oldPath);
               renamedNew.add(newPath);
-              this.fileOpsManager.suppressPath(oldPath);
-              this.fileOpsManager.suppressPath(newPath);
+              this.fileOpsManager.mutePathEvents(oldPath);
+              this.fileOpsManager.mutePathEvents(newPath);
               try {
                 const dir = newPath.substring(0, newPath.lastIndexOf("/"));
                 if (dir) await ensureFolder(this.app.vault, dir);
                 await this.app.vault.rename(oldFile, newPath);
               } finally {
                 setTimeout(() => {
-                  this.fileOpsManager.unsuppressPath(oldPath);
-                  this.fileOpsManager.unsuppressPath(newPath);
-                }, 100);
+                  this.fileOpsManager.unmutePathEvents(oldPath);
+                  this.fileOpsManager.unmutePathEvents(newPath);
+                }, VAULT_EVENT_SETTLE_MS);
               }
               if (isTextFile(oldPath)) {
                 this.backgroundSync.onFileRemoved(oldPath);
@@ -113,8 +106,8 @@ export default class LiveSharePlugin extends Plugin {
 
       if (actuallyAdded.length > 0) {
         const syncedCount = await this.manifestManager.syncFromManifest(
-          this.suppressPath,
-          this.unsuppressPath,
+          this.mutePathEvents,
+          this.unmutePathEvents,
           this.requestBinaryFile,
           { skipText: true },
         );
@@ -339,7 +332,7 @@ export default class LiveSharePlugin extends Plugin {
     this.registerEvent(
       this.app.vault.on("create", async (file: TAbstractFile) => {
         if (!this.manifestManager.isSharedPath(file.path)) return;
-        if (this.fileOpsManager.isPathSuppressed(file.path)) return;
+        if (this.fileOpsManager.isPathMuted(file.path)) return;
         this.fileOpsManager.onFileCreate(file);
         if (this.settings.role === "host") {
           if (file instanceof TFile) {
@@ -363,7 +356,7 @@ export default class LiveSharePlugin extends Plugin {
     this.registerEvent(
       this.app.vault.on("delete", (file: TAbstractFile) => {
         if (!this.manifestManager.isSharedPath(file.path)) return;
-        if (this.fileOpsManager.isPathSuppressed(file.path)) return;
+        if (this.fileOpsManager.isPathMuted(file.path)) return;
         this.fileOpsManager.onFileDelete(file);
         if (this.settings.role === "host") {
           this.backgroundSync.onFileRemoved(file.path);
@@ -378,10 +371,7 @@ export default class LiveSharePlugin extends Plugin {
           !this.manifestManager.isSharedPath(oldPath)
         )
           return;
-        if (
-          this.fileOpsManager.isPathSuppressed(file.path) ||
-          this.fileOpsManager.isPathSuppressed(oldPath)
-        )
+        if (this.fileOpsManager.isPathMuted(file.path) || this.fileOpsManager.isPathMuted(oldPath))
           return;
         this.fileOpsManager.onFileRename(file, oldPath);
         await this.backgroundSync.onFileRenamed(oldPath, file.path);
@@ -402,10 +392,10 @@ export default class LiveSharePlugin extends Plugin {
           return;
         }
         if (!(file instanceof TFile) || !this.manifestManager.isSharedPath(file.path)) return;
-        if (this.fileOpsManager.isPathSuppressed(file.path)) return;
+        if (this.fileOpsManager.isPathMuted(file.path)) return;
 
         if (isTextFile(file.path)) {
-          if (this.backgroundSync.isWrittenByUs(file.path)) return;
+          if (this.backgroundSync.isRecentDiskWrite(file.path)) return;
           if (this.settings.role === "host") {
             await this.backgroundSync.handleLocalTextModify(file.path);
           }
@@ -435,8 +425,8 @@ export default class LiveSharePlugin extends Plugin {
         } else {
           await this.cleanupStaleFiles();
           await this.manifestManager.syncFromManifest(
-            this.suppressPath,
-            this.unsuppressPath,
+            this.mutePathEvents,
+            this.unmutePathEvents,
             this.requestBinaryFile,
           );
           await this.backgroundSync.startAll("guest");
@@ -495,14 +485,38 @@ export default class LiveSharePlugin extends Plugin {
       .filter((f) => this.manifestManager.isSharedPath(f.path));
     for (const file of localFiles) {
       if (!manifestPaths.has(normalizePath(file.path))) {
-        this.fileOpsManager.suppressPath(file.path);
+        this.fileOpsManager.mutePathEvents(file.path);
         try {
           await this.app.vault.trash(file, true);
         } finally {
-          setTimeout(() => this.fileOpsManager.unsuppressPath(file.path), 100);
+          setTimeout(() => this.fileOpsManager.unmutePathEvents(file.path), VAULT_EVENT_SETTLE_MS);
         }
       }
     }
+  }
+
+  private cleanupSession() {
+    this.backgroundSync.destroy();
+    this.syncManager.disconnect();
+    this.controlChannel?.destroy();
+    this.controlChannel = null;
+    this.isPresenting = false;
+    this.followTarget = null;
+    this.clearUnfollowListeners();
+    this.removeScrollListener();
+    if (this.presenceTimer) {
+      clearTimeout(this.presenceTimer);
+      this.presenceTimer = null;
+    }
+    if (this.presenceInterval) {
+      clearInterval(this.presenceInterval);
+      this.presenceInterval = null;
+    }
+    this.remoteUsers.clear();
+    this.refreshPresenceView();
+    this.fileOpsManager.clearPendingChunks();
+    this.manifestManager.destroy();
+    this.connectionState.transition({ type: "disconnect" });
   }
 
   private async abortSession(message: string) {
@@ -510,27 +524,7 @@ export default class LiveSharePlugin extends Plugin {
     this.isEndingSession = true;
     try {
       new Notice(message);
-      this.backgroundSync.destroy();
-      this.syncManager.disconnect();
-      this.controlChannel?.destroy();
-      this.controlChannel = null;
-      this.isPresenting = false;
-      this.followTarget = null;
-      this.clearUnfollowListeners();
-      this.removeScrollListener();
-      if (this.presenceTimer) {
-        clearTimeout(this.presenceTimer);
-        this.presenceTimer = null;
-      }
-      if (this.presenceInterval) {
-        clearInterval(this.presenceInterval);
-        this.presenceInterval = null;
-      }
-      this.remoteUsers.clear();
-      this.refreshPresenceView();
-      this.fileOpsManager.clearPendingChunks();
-      this.manifestManager.destroy();
-      this.connectionState.transition({ type: "disconnect" });
+      this.cleanupSession();
     } finally {
       await this.sessionManager.endSession();
       this.isEndingSession = false;
@@ -573,8 +567,8 @@ export default class LiveSharePlugin extends Plugin {
         await this.manifestManager.connect();
         await this.cleanupStaleFiles();
         const syncedCount = await this.manifestManager.syncFromManifest(
-          this.suppressPath,
-          this.unsuppressPath,
+          this.mutePathEvents,
+          this.unmutePathEvents,
           this.requestBinaryFile,
         );
         await this.backgroundSync.startAll("guest");
@@ -606,27 +600,7 @@ export default class LiveSharePlugin extends Plugin {
         this.controlChannel.send({ type: "session-end" });
       }
 
-      this.backgroundSync.destroy();
-      this.syncManager.disconnect();
-      this.controlChannel?.destroy();
-      this.controlChannel = null;
-      this.isPresenting = false;
-      this.followTarget = null;
-      this.clearUnfollowListeners();
-      this.removeScrollListener();
-      if (this.presenceTimer) {
-        clearTimeout(this.presenceTimer);
-        this.presenceTimer = null;
-      }
-      if (this.presenceInterval) {
-        clearInterval(this.presenceInterval);
-        this.presenceInterval = null;
-      }
-      this.remoteUsers.clear();
-      this.refreshPresenceView();
-      this.fileOpsManager.clearPendingChunks();
-      this.manifestManager.destroy();
-      this.connectionState.transition({ type: "disconnect" });
+      this.cleanupSession();
       new Notice(
         this.settings.role === "host" ? "Live Share: session ended" : "Live Share: left session",
       );
@@ -668,12 +642,12 @@ export default class LiveSharePlugin extends Plugin {
 
     this.fileOpsManager.setSender((op) => {
       if (op.type === "chunk-start" || op.type === "chunk-data" || op.type === "chunk-end") {
-        const typeMap = {
+        const typeMap: Record<string, ControlMessageType> = {
           "chunk-start": "file-chunk-start",
           "chunk-data": "file-chunk-data",
           "chunk-end": "file-chunk-end",
-        } as const;
-        this.controlChannel?.send({ ...op, type: typeMap[op.type] } as never);
+        };
+        this.controlChannel?.send({ ...op, type: typeMap[op.type] });
       } else {
         this.controlChannel?.send({ type: "file-op", op });
       }
@@ -724,16 +698,16 @@ export default class LiveSharePlugin extends Plugin {
       this.controlChannel.on(chunkType, (msg) => {
         const path = msg.path as string;
         if (!path || !this.manifestManager.isSharedPath(path)) return;
-        const typeMap = {
+        const typeMap: Record<string, string> = {
           "file-chunk-start": "chunk-start",
           "file-chunk-data": "chunk-data",
           "file-chunk-end": "chunk-end",
-        } as const;
+        };
         this.fileOpsManager
           .applyRemoteOp({
             ...msg,
             type: typeMap[chunkType],
-          } as never)
+          } as import("./types").FileOp)
           .catch(() => {});
       });
     }
@@ -1044,8 +1018,8 @@ export default class LiveSharePlugin extends Plugin {
     if (!this.controlChannel) return;
     new Notice("Live Share: reloading all files from host...");
     const syncedCount = await this.manifestManager.syncFromManifest(
-      this.suppressPath,
-      this.unsuppressPath,
+      this.mutePathEvents,
+      this.unmutePathEvents,
       this.requestBinaryFile,
     );
     if (syncedCount > 0) new Notice(`Live Share: reloaded ${syncedCount} file(s) from host`);
@@ -1163,116 +1137,5 @@ export default class LiveSharePlugin extends Plugin {
       const modal = new ConfirmModal(this.app, message, resolve);
       modal.open();
     });
-  }
-}
-
-class PromptModal extends Modal {
-  private result: string | null = null;
-  private placeholder: string;
-  private resolve: (value: string | null) => void;
-
-  constructor(
-    app: import("obsidian").App,
-    placeholder: string,
-    resolve: (value: string | null) => void,
-  ) {
-    super(app);
-    this.setTitle("Live Share");
-    this.placeholder = placeholder;
-    this.resolve = resolve;
-  }
-
-  onOpen() {
-    const { contentEl } = this;
-    const input = contentEl.createEl("input", {
-      type: "text",
-      placeholder: this.placeholder,
-      cls: "live-share-prompt-input",
-    });
-    input.addEventListener("keydown", (e) => {
-      if (e.key === "Enter") {
-        e.preventDefault();
-        e.stopPropagation();
-        this.result = input.value;
-        this.close();
-      }
-    });
-    const btn = contentEl.createEl("button", { text: "OK" });
-    btn.addEventListener("click", () => {
-      this.result = input.value;
-      this.close();
-    });
-    input.focus();
-  }
-
-  onClose() {
-    this.resolve(this.result || null);
-    this.contentEl.empty();
-  }
-}
-
-class UserPickerModal extends FuzzySuggestModal<string> {
-  private users: Map<string, { displayName: string }>;
-  private onChoose: (userId: string) => void;
-
-  constructor(
-    app: import("obsidian").App,
-    users: Map<string, { displayName: string }>,
-    onChoose: (userId: string) => void,
-  ) {
-    super(app);
-    this.users = users;
-    this.onChoose = onChoose;
-  }
-
-  getItems(): string[] {
-    return Array.from(this.users.keys());
-  }
-
-  getItemText(userId: string): string {
-    return this.users.get(userId)?.displayName ?? userId;
-  }
-
-  onChooseItem(userId: string): void {
-    this.onChoose(userId);
-  }
-}
-
-class ConfirmModal extends Modal {
-  private message: string;
-  private resolve: (value: boolean) => void;
-  private hasDecided = false;
-
-  constructor(app: import("obsidian").App, message: string, resolve: (value: boolean) => void) {
-    super(app);
-    this.setTitle("Live Share");
-    this.message = message;
-    this.resolve = resolve;
-  }
-
-  onOpen() {
-    const { contentEl } = this;
-    contentEl.createEl("p", { text: this.message });
-    const buttons = contentEl.createDiv({ cls: "live-share-confirm-buttons" });
-    const confirm = buttons.createEl("button", {
-      text: "Confirm",
-      cls: "mod-warning",
-    });
-    confirm.addEventListener("click", () => {
-      this.hasDecided = true;
-      this.resolve(true);
-      this.close();
-    });
-    const cancel = buttons.createEl("button", { text: "Cancel" });
-    cancel.addEventListener("click", () => {
-      this.hasDecided = true;
-      this.resolve(false);
-      this.close();
-    });
-  }
-
-  onClose() {
-    if (!this.hasDecided) this.resolve(false);
-    this.contentEl.empty();
   }
 }

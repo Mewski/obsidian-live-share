@@ -87,11 +87,25 @@ export function createControlWSS(options?: ControlWSSOptions) {
     }
   }
 
-  function findHost(room: ControlRoom): ControlClient | undefined {
+  function getHostClient(room: ControlRoom): ControlClient | undefined {
     for (const client of room.clients.values()) {
       if (client.isHost) return client;
     }
     return undefined;
+  }
+
+  const HOST_ONLY_TYPES = new Set(["summon", "present-start", "present-stop", "session-end"]);
+
+  function determineHostStatus(
+    client: ControlClient,
+    room: ControlRoom,
+    serverRoom: ReturnType<typeof getRoom>,
+  ): void {
+    if (client.verifiedUserId && serverRoom?.hostUserId) {
+      client.isHost = client.verifiedUserId === serverRoom.hostUserId;
+    } else {
+      client.isHost = !getHostClient(room);
+    }
   }
 
   wss.on("connection", (ws: WebSocket, req: IncomingMessage, roomId: string) => {
@@ -166,11 +180,7 @@ export function createControlWSS(options?: ControlWSSOptions) {
         if (!client.userId) {
           client.userId = typeof msg.userId === "string" ? msg.userId.slice(0, 128) : "";
 
-          if (client.verifiedUserId && serverRoom?.hostUserId) {
-            client.isHost = client.verifiedUserId === serverRoom.hostUserId;
-          } else {
-            client.isHost = !findHost(room);
-          }
+          determineHostStatus(client, room, serverRoom);
         }
         client.displayName =
           typeof msg.displayName === "string" ? msg.displayName.slice(0, 100) : "";
@@ -179,7 +189,7 @@ export function createControlWSS(options?: ControlWSSOptions) {
           client.isApproved = false;
           room.pendingApprovals.set(client.userId, ws);
 
-          const host = findHost(room);
+          const host = getHostClient(room);
           if (host) {
             sendTo(host.ws, {
               type: "join-request",
@@ -263,16 +273,7 @@ export function createControlWSS(options?: ControlWSSOptions) {
         return;
       }
 
-      if (msg.type === "summon" && !client.isHost) {
-        return;
-      }
-      if (msg.type === "present-start" && !client.isHost) {
-        return;
-      }
-      if (msg.type === "present-stop" && !client.isHost) {
-        return;
-      }
-      if (msg.type === "session-end" && !client.isHost) {
+      if (HOST_ONLY_TYPES.has(msg.type) && !client.isHost) {
         return;
       }
 
@@ -294,12 +295,7 @@ export function createControlWSS(options?: ControlWSSOptions) {
       if (msg.type === "presence-update") {
         if (typeof msg.userId === "string" && msg.userId && !client.userId) {
           client.userId = msg.userId.slice(0, 128);
-
-          if (client.verifiedUserId && serverRoom?.hostUserId) {
-            client.isHost = client.verifiedUserId === serverRoom.hostUserId;
-          } else {
-            client.isHost = !findHost(room);
-          }
+          determineHostStatus(client, room, serverRoom);
         }
         if (typeof msg.displayName === "string") client.displayName = msg.displayName.slice(0, 100);
       }

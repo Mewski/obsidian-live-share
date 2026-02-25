@@ -7,7 +7,11 @@ import * as syncProtocol from "y-protocols/sync";
 import * as Y from "yjs";
 
 import { getPermission } from "./permissions.js";
-import { type Permission, type Persistence, getDefaultPersistence } from "./persistence.js";
+import {
+  type Permission,
+  type Persistence,
+  getDefaultPersistence,
+} from "./persistence.js";
 
 const MESSAGE_SYNC = 0;
 const MESSAGE_AWARENESS = 1;
@@ -31,7 +35,8 @@ function extractBaseRoomId(roomId: string): string {
 
 function toUint8Array(raw: Buffer | ArrayBuffer | Buffer[]): Uint8Array {
   if (raw instanceof ArrayBuffer) return new Uint8Array(raw);
-  if (Buffer.isBuffer(raw)) return new Uint8Array(raw.buffer, raw.byteOffset, raw.byteLength);
+  if (Buffer.isBuffer(raw))
+    return new Uint8Array(raw.buffer, raw.byteOffset, raw.byteLength);
   const buf = Buffer.concat(raw as Buffer[]);
   return new Uint8Array(buf.buffer, buf.byteOffset, buf.byteLength);
 }
@@ -46,7 +51,10 @@ function handleMessage(ws: WebSocket, state: RoomState, data: Uint8Array) {
   switch (msgType) {
     case MESSAGE_SYNC: {
       const syncType = decoding.peekVarUint(decoder);
-      if (state.readOnlyClients.has(ws) && (syncType === SYNC_STEP2 || syncType === SYNC_UPDATE)) {
+      if (
+        state.readOnlyClients.has(ws) &&
+        (syncType === SYNC_STEP2 || syncType === SYNC_UPDATE)
+      ) {
         break;
       }
       const encoder = encoding.createEncoder();
@@ -81,14 +89,20 @@ function sendSyncStep1(ws: WebSocket, doc: Y.Doc) {
   ws.send(encoding.toUint8Array(encoder));
 }
 
-function sendAwarenessState(ws: WebSocket, awareness: awarenessProtocol.Awareness) {
+function sendAwarenessState(
+  ws: WebSocket,
+  awareness: awarenessProtocol.Awareness,
+) {
   const clients = awareness.getStates();
   if (clients.size > 0) {
     const encoder = encoding.createEncoder();
     encoding.writeVarUint(encoder, MESSAGE_AWARENESS);
     encoding.writeVarUint8Array(
       encoder,
-      awarenessProtocol.encodeAwarenessUpdate(awareness, Array.from(clients.keys())),
+      awarenessProtocol.encodeAwarenessUpdate(
+        awareness,
+        Array.from(clients.keys()),
+      ),
     );
     ws.send(encoding.toUint8Array(encoder));
   }
@@ -210,7 +224,10 @@ export function createYjsWSS(persist?: Persistence) {
     try {
       await persistence.persistDoc(roomId, state.doc);
     } catch (err) {
-      console.error(`[yjs] failed to persist doc ${roomId} during cleanup:`, err);
+      console.error(
+        `[yjs] failed to persist doc ${roomId} during cleanup:`,
+        err,
+      );
     }
     awarenessProtocol.removeAwarenessStates(
       state.awareness,
@@ -222,7 +239,6 @@ export function createYjsWSS(persist?: Persistence) {
   }
 
   async function closeAllRooms() {
-    // Wait for any rooms still being created so they get cleaned up too
     const pending = Array.from(pendingRooms.values());
     await Promise.allSettled(pending);
     pendingRooms.clear();
@@ -233,7 +249,10 @@ export function createYjsWSS(persist?: Persistence) {
       try {
         await persistence.persistDoc(roomId, state.doc);
       } catch (err) {
-        console.error(`[yjs] failed to persist doc ${roomId} during shutdown:`, err);
+        console.error(
+          `[yjs] failed to persist doc ${roomId} during shutdown:`,
+          err,
+        );
       }
       for (const ws of state.clients) {
         ws.close(1000, "server shutting down");
@@ -251,69 +270,80 @@ export function createYjsWSS(persist?: Persistence) {
     return { rooms: roomStates.size, connections };
   }
 
-  wss.on("connection", async (ws: WebSocket, req: IncomingMessage, roomId: string) => {
-    let state: RoomState;
-    try {
-      state = await getOrCreateRoom(roomId);
-    } catch (err) {
-      console.error(`[yjs] failed to get/create room ${roomId}:`, err);
-      ws.close(1011, "internal error");
-      return;
-    }
-    state.clients.add(ws);
-
-    const reqUrl = new URL(req.url || "", `http://${req.headers.host}`);
-    const userId = reqUrl.searchParams.get("userId");
-    const baseRoomId = extractBaseRoomId(roomId);
-    if (userId) {
-      state.clientUserIds.set(ws, userId);
-      const permission = getPermission(baseRoomId, userId);
-      if (permission === "read-only") {
-        state.readOnlyClients.add(ws);
-      }
-    }
-
-    sendSyncStep1(ws, state.doc);
-    sendAwarenessState(ws, state.awareness);
-
-    ws.on("error", (err) => {
-      console.error(`[yjs] ws error for room ${roomId}:`, err.message);
-      ws.close();
-    });
-
-    ws.on("message", (raw: Buffer | ArrayBuffer | Buffer[]) => {
-      const data = toUint8Array(raw);
+  wss.on(
+    "connection",
+    async (ws: WebSocket, req: IncomingMessage, roomId: string) => {
+      let state: RoomState;
       try {
-        handleMessage(ws, state, data);
+        state = await getOrCreateRoom(roomId);
       } catch (err) {
-        console.error("[yjs] failed to handle message:", err);
+        console.error(`[yjs] failed to get/create room ${roomId}:`, err);
+        ws.close(1011, "internal error");
+        return;
       }
-    });
+      state.clients.add(ws);
 
-    ws.on("close", () => {
-      state.clients.delete(ws);
-      state.readOnlyClients.delete(ws);
-      state.clientUserIds.delete(ws);
-
-      const clientIds = state.clientAwarenessIds.get(ws);
-      if (clientIds && clientIds.size > 0) {
-        awarenessProtocol.removeAwarenessStates(state.awareness, Array.from(clientIds), null);
+      const reqUrl = new URL(req.url || "", `http://${req.headers.host}`);
+      const userId = reqUrl.searchParams.get("userId");
+      const baseRoomId = extractBaseRoomId(roomId);
+      if (userId) {
+        state.clientUserIds.set(ws, userId);
+        const permission = getPermission(baseRoomId, userId);
+        if (permission === "read-only") {
+          state.readOnlyClients.add(ws);
+        }
       }
-      state.clientAwarenessIds.delete(ws);
 
-      if (state.clients.size === 0) {
-        state.cleanupTimer = setTimeout(() => {
-          if (state.clients.size === 0) {
-            cleanupRoom(roomId, state).catch((err) => {
-              console.error(`[yjs] failed to cleanup room ${roomId}:`, err);
-            });
-          }
-        }, 30_000);
-      }
-    });
-  });
+      sendSyncStep1(ws, state.doc);
+      sendAwarenessState(ws, state.awareness);
 
-  function updatePermission(baseRoomId: string, userId: string, permission: Permission) {
+      ws.on("error", (err) => {
+        console.error(`[yjs] ws error for room ${roomId}:`, err.message);
+        ws.close();
+      });
+
+      ws.on("message", (raw: Buffer | ArrayBuffer | Buffer[]) => {
+        const data = toUint8Array(raw);
+        try {
+          handleMessage(ws, state, data);
+        } catch (err) {
+          console.error("[yjs] failed to handle message:", err);
+        }
+      });
+
+      ws.on("close", () => {
+        state.clients.delete(ws);
+        state.readOnlyClients.delete(ws);
+        state.clientUserIds.delete(ws);
+
+        const clientIds = state.clientAwarenessIds.get(ws);
+        if (clientIds && clientIds.size > 0) {
+          awarenessProtocol.removeAwarenessStates(
+            state.awareness,
+            Array.from(clientIds),
+            null,
+          );
+        }
+        state.clientAwarenessIds.delete(ws);
+
+        if (state.clients.size === 0) {
+          state.cleanupTimer = setTimeout(() => {
+            if (state.clients.size === 0) {
+              cleanupRoom(roomId, state).catch((err) => {
+                console.error(`[yjs] failed to cleanup room ${roomId}:`, err);
+              });
+            }
+          }, 30_000);
+        }
+      });
+    },
+  );
+
+  function updatePermission(
+    baseRoomId: string,
+    userId: string,
+    permission: Permission,
+  ) {
     for (const [rid, state] of roomStates) {
       if (extractBaseRoomId(rid) !== baseRoomId) continue;
       for (const [ws, uid] of state.clientUserIds) {

@@ -588,14 +588,14 @@ describe("ManifestManager", () => {
     });
   });
 
-  describe("onManifestChange", () => {
+  describe("setManifestChangeHandler", () => {
     it("fires callback with added keys on new entries", () => {
       const manager = new ManifestManager(vault as any, createSettings());
       const { manifest } = injectManifest(manager);
 
       const added: string[][] = [];
       const removed: string[][] = [];
-      manager.onManifestChange((a, r) => {
+      manager.setManifestChangeHandler((a, r) => {
         added.push(a);
         removed.push(r);
       });
@@ -615,7 +615,7 @@ describe("ManifestManager", () => {
 
       const added: string[][] = [];
       const removed: string[][] = [];
-      manager.onManifestChange((a, r) => {
+      manager.setManifestChangeHandler((a, r) => {
         added.push(a);
         removed.push(r);
       });
@@ -634,7 +634,7 @@ describe("ManifestManager", () => {
       manifest.set("file.md", { hash: "abc", size: 10, mtime: 1000 });
 
       const added: string[][] = [];
-      manager.onManifestChange((a) => {
+      manager.setManifestChangeHandler((a) => {
         added.push(a);
       });
 
@@ -650,11 +650,11 @@ describe("ManifestManager", () => {
       const firstCalls: number[] = [];
       const secondCalls: number[] = [];
 
-      manager.onManifestChange(() => firstCalls.push(1));
+      manager.setManifestChangeHandler(() => firstCalls.push(1));
       manifest.set("a.md", { hash: "abc", size: 10, mtime: 1000 });
       expect(firstCalls.length).toBe(1);
 
-      manager.onManifestChange(() => secondCalls.push(1));
+      manager.setManifestChangeHandler(() => secondCalls.push(1));
       manifest.set("b.md", { hash: "def", size: 10, mtime: 1000 });
 
       expect(firstCalls.length).toBe(1);
@@ -663,7 +663,7 @@ describe("ManifestManager", () => {
 
     it("does nothing if manifest is not initialized", () => {
       const manager = new ManifestManager(vault as any, createSettings());
-      manager.onManifestChange(() => {});
+      manager.setManifestChangeHandler(() => {});
     });
   });
 
@@ -763,7 +763,7 @@ describe("ManifestManager", () => {
     it("cleans up doc, manifest, and observer", () => {
       const manager = new ManifestManager(vault as any, createSettings());
       injectManifest(manager);
-      manager.onManifestChange(() => {});
+      manager.setManifestChangeHandler(() => {});
 
       manager.destroy();
 

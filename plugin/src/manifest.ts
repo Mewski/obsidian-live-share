@@ -7,6 +7,7 @@ import type { ExclusionManager } from "./exclusion";
 import { type SyncManager, waitForSync } from "./sync";
 import type { LiveShareSettings } from "./types";
 import {
+  VAULT_EVENT_SETTLE_MS,
   ensureFolder,
   getPathWarning,
   isTextFile,
@@ -137,8 +138,8 @@ export class ManifestManager {
   }
 
   async syncFromManifest(
-    suppress?: (path: string) => void,
-    unsuppress?: (path: string) => void,
+    mute?: (path: string) => void,
+    unmute?: (path: string) => void,
     requestBinary?: (path: string) => void,
     options?: { skipText?: boolean },
   ): Promise<number> {
@@ -215,7 +216,7 @@ export class ManifestManager {
         const dir = path.substring(0, path.lastIndexOf("/"));
         if (dir) await ensureFolder(this.vault, dir);
 
-        suppress?.(path);
+        mute?.(path);
         try {
           if (localFile) {
             await this.vault.modify(localFile, content);
@@ -223,8 +224,8 @@ export class ManifestManager {
             await this.vault.create(path, content);
           }
         } finally {
-          if (unsuppress) {
-            setTimeout(() => unsuppress(path), 100);
+          if (unmute) {
+            setTimeout(() => unmute(path), VAULT_EVENT_SETTLE_MS);
           }
         }
         synced++;
@@ -238,7 +239,7 @@ export class ManifestManager {
     return synced;
   }
 
-  onManifestChange(callback: (added: string[], removed: string[]) => void): void {
+  setManifestChangeHandler(callback: (added: string[], removed: string[]) => void): void {
     if (!this.manifest) return;
 
     if (this.observer && this.manifest) {
