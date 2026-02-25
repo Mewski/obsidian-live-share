@@ -31,14 +31,14 @@ const JWT_SECRET = process.env.JWT_SECRET || "change-me-in-production";
 if (!process.env.JWT_SECRET) {
   if (process.env.REQUIRE_GITHUB_AUTH === "true") {
     console.error(
-      "FATAL: REQUIRE_GITHUB_AUTH is true but JWT_SECRET is not set. " +
-        "Set JWT_SECRET to a strong random value.",
+      "[config] REQUIRE_GITHUB_AUTH is true but JWT_SECRET is not set -- " +
+        "set JWT_SECRET to a strong random value",
     );
     process.exit(1);
   } else {
     console.warn(
-      "WARNING: JWT_SECRET is not set -- using insecure default. " +
-        "Set JWT_SECRET to a strong random value in production.",
+      "[config] JWT_SECRET is not set -- using insecure default; " +
+        "set JWT_SECRET to a strong random value in production",
     );
   }
 }
@@ -155,7 +155,7 @@ export function createAuthRouter(): Router {
   </script>
 </body></html>`);
     } catch (err) {
-      console.error("auth callback error:", err);
+      console.error("[auth] failed to handle OAuth callback:", err);
       if (!res.headersSent) {
         res.status(500).send("Internal server error");
       }

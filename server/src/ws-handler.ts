@@ -136,7 +136,7 @@ export function createYjsWSS(persist?: Persistence) {
       if (state.persistTimer) clearTimeout(state.persistTimer);
       state.persistTimer = setTimeout(() => {
         persistence.persistDoc(roomId, doc).catch((err) => {
-          console.error(`persist error for ${roomId}:`, err);
+          console.error(`[yjs] failed to persist doc ${roomId}:`, err);
         });
       }, 5_000);
     });
@@ -213,7 +213,7 @@ export function createYjsWSS(persist?: Persistence) {
     try {
       await persistence.persistDoc(roomId, state.doc);
     } catch (err) {
-      console.error(`failed to persist room ${roomId} during cleanup:`, err);
+      console.error(`[yjs] failed to persist doc ${roomId} during cleanup:`, err);
     }
     awarenessProtocol.removeAwarenessStates(
       state.awareness,
@@ -231,7 +231,7 @@ export function createYjsWSS(persist?: Persistence) {
       try {
         await persistence.persistDoc(roomId, state.doc);
       } catch (err) {
-        console.error(`failed to persist room ${roomId} during shutdown:`, err);
+        console.error(`[yjs] failed to persist doc ${roomId} during shutdown:`, err);
       }
       for (const ws of state.clients) {
         ws.close(1000, "server shutting down");
@@ -254,7 +254,7 @@ export function createYjsWSS(persist?: Persistence) {
     try {
       state = await getOrCreateRoom(roomId);
     } catch (err) {
-      console.error(`failed to get/create room ${roomId}:`, err);
+      console.error(`[yjs] failed to get/create room ${roomId}:`, err);
       ws.close(1011, "internal error");
       return;
     }
@@ -269,7 +269,7 @@ export function createYjsWSS(persist?: Persistence) {
     sendAwarenessState(ws, state.awareness);
 
     ws.on("error", (err) => {
-      console.error(`yjs ws error for room ${roomId}:`, err.message);
+      console.error(`[yjs] ws error for room ${roomId}:`, err.message);
       ws.close();
     });
 
@@ -278,7 +278,7 @@ export function createYjsWSS(persist?: Persistence) {
       try {
         handleMessage(ws, state, data);
       } catch (err) {
-        console.error("ws message error:", err);
+        console.error("[yjs] failed to handle message:", err);
       }
     });
 
@@ -296,7 +296,7 @@ export function createYjsWSS(persist?: Persistence) {
         state.cleanupTimer = setTimeout(() => {
           if (state.clients.size === 0) {
             cleanupRoom(roomId, state).catch((err) => {
-              console.error(`failed to cleanup room ${roomId}:`, err);
+              console.error(`[yjs] failed to cleanup room ${roomId}:`, err);
             });
           }
         }, 30_000);

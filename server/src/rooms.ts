@@ -38,7 +38,7 @@ export function touchRoom(id: string) {
   if (room) {
     room.lastActivityAt = Date.now();
     _persistence.saveRoom(room).catch((err) => {
-      console.error(`touchRoom persist error for ${id}:`, err);
+      console.error(`[rooms] failed to persist room ${id}:`, err);
     });
   }
 }
@@ -48,7 +48,7 @@ export async function removeRoom(id: string) {
   try {
     await _persistence.deleteRoom(id);
   } catch (err) {
-    console.error(`removeRoom persist error for ${id}:`, err);
+    console.error(`[rooms] failed to delete room ${id}:`, err);
   }
 }
 
@@ -61,7 +61,7 @@ export async function reapStaleRooms() {
       try {
         await _persistence.deleteRoom(id);
       } catch (err) {
-        console.error(`reapStaleRooms persist error for ${id}:`, err);
+        console.error(`[rooms] failed to reap stale room ${id}:`, err);
       }
     }
   }

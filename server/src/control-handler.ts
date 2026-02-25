@@ -118,7 +118,7 @@ export function createControlWSS() {
     room.clients.set(ws, client);
 
     ws.on("error", (err) => {
-      console.error(`control ws error for room ${roomId}:`, err.message);
+      console.error(`[control] ws error for room ${roomId}:`, err.message);
       ws.close();
     });
 
@@ -305,7 +305,7 @@ export function createControlWSS() {
       if (room.clients.size === 0) {
         rooms.delete(roomId);
         removeRoom(roomId).catch((err) => {
-          console.error(`control close removeRoom error for ${roomId}:`, err);
+          console.error(`[control] failed to remove room ${roomId}:`, err);
         });
       }
     });

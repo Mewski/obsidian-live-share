@@ -121,13 +121,13 @@ export function createApp(
 
   const reaperInterval = setInterval(
     () => {
-      reapStaleRooms().catch((err) => console.error("reaper error:", err));
+      reapStaleRooms().catch((err) => console.error("[rooms] failed to reap stale rooms:", err));
     },
     60 * 60 * 1000,
   );
 
   async function shutdown() {
-    console.log("shutting down gracefully...");
+    console.info("[server] shutting down gracefully...");
     clearInterval(reaperInterval);
     control.closeAll();
     await yjs.closeAllRooms();
@@ -168,7 +168,7 @@ if (isMain) {
 
       const port = Number.parseInt(process.env.PORT || "4321");
       server.listen(port, () => {
-        console.log(`live-share server on :${port}`);
+        console.info(`[server] listening on :${port}`);
       });
 
       let shuttingDown = false;
@@ -178,7 +178,7 @@ if (isMain) {
         shutdown()
           .then(() => process.exit(0))
           .catch((err) => {
-            console.error("error during shutdown:", err);
+            console.error("[server] failed to shut down:", err);
             process.exit(1);
           });
       };
@@ -186,7 +186,7 @@ if (isMain) {
       process.on("SIGINT", onSignal);
     })
     .catch((err) => {
-      console.error("failed to start server:", err);
+      console.error("[server] failed to start:", err);
       process.exit(1);
     });
 }
