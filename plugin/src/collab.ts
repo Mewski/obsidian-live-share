@@ -48,6 +48,14 @@ export class CollabManager {
 
     if (this.currentPath !== filePath) return;
 
+    if (role !== "host" && docHandle.text.length === 0) {
+      for (let i = 0; i < 10; i++) {
+        await new Promise((r) => setTimeout(r, 100));
+        if (this.currentPath !== filePath) return;
+        if (docHandle.text.length > 0) break;
+      }
+    }
+
     if (role === "host") {
       const localContent = view.state.doc.toString();
       const remoteContent = docHandle.text.toString();

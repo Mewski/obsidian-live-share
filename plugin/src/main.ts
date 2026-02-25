@@ -909,7 +909,7 @@ export default class LiveSharePlugin extends Plugin {
 
     this.broadcastPresence();
     if (this.presenceInterval) clearInterval(this.presenceInterval);
-    this.presenceInterval = setInterval(() => this.broadcastPresence(), 10_000);
+    this.presenceInterval = setInterval(() => this.broadcastPresence(), 3_000);
 
     this.onActiveFileChange();
   }
