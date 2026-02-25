@@ -704,8 +704,23 @@ export default class LiveSharePlugin extends Plugin {
     this.controlChannel.on("focus-request", (msg) => {
       showFocusNotification(this, msg as unknown as FocusRequest);
     });
-    this.controlChannel.on("summon", (msg) => {
-      showFocusNotification(this, msg as unknown as FocusRequest);
+    this.controlChannel.on("summon", async (msg) => {
+      const req = msg as unknown as FocusRequest;
+      const file = this.app.vault.getAbstractFileByPath(req.filePath);
+      if (file instanceof TFile) {
+        await this.app.workspace.getLeaf().openFile(file);
+        const view = this.app.workspace.getActiveViewOfType(MarkdownView);
+        if (view) {
+          view.editor.setCursor({ line: req.line, ch: req.ch });
+          view.editor.scrollIntoView(
+            { from: { line: req.line, ch: 0 }, to: { line: req.line, ch: 0 } },
+            true,
+          );
+        }
+      }
+      new Notice(
+        `Live Share: ${req.fromDisplayName} summoned you to ${req.filePath}:${req.line + 1}`,
+      );
     });
 
     this.controlChannel.on("present-start", (msg) => {

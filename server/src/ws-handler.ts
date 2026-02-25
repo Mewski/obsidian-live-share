@@ -37,8 +37,9 @@ function toUint8Array(raw: Buffer | ArrayBuffer | Buffer[]): Uint8Array {
   return new Uint8Array(buf.buffer, buf.byteOffset, buf.byteLength);
 }
 
-const syncStep2 = 1;
-const syncUpdate = 2;
+// Yjs sync protocol sub-types (from y-protocols/sync)
+const SYNC_STEP2 = 1;
+const SYNC_UPDATE = 2;
 
 function handleMessage(ws: WebSocket, state: RoomState, data: Uint8Array) {
   const decoder = decoding.createDecoder(data);
@@ -51,7 +52,7 @@ function handleMessage(ws: WebSocket, state: RoomState, data: Uint8Array) {
       const syncType = decoding.peekVarUint(decoder);
       if (
         state.readOnlyClients.has(ws) &&
-        (syncType === syncStep2 || syncType === syncUpdate)
+        (syncType === SYNC_STEP2 || syncType === SYNC_UPDATE)
       ) {
         break;
       }
