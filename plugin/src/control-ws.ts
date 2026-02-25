@@ -61,7 +61,9 @@ export class ControlChannel {
     this.e2e = e2e ?? null;
   }
 
-  onStateChange(callback: (state: "connected" | "disconnected" | "reconnecting") => void) {
+  onStateChange(
+    callback: (state: "connected" | "disconnected" | "reconnecting") => void,
+  ) {
     this.stateChangeCallback = callback;
   }
 
@@ -83,7 +85,8 @@ export class ControlChannel {
     if (this.destroyed) return;
     const wsUrl = toWsUrl(this.settings.serverUrl);
     let url = `${wsUrl}/control/${this.settings.roomId}?token=${encodeURIComponent(this.settings.token)}`;
-    if (this.settings.jwt) url += `&jwt=${encodeURIComponent(this.settings.jwt)}`;
+    if (this.settings.jwt)
+      url += `&jwt=${encodeURIComponent(this.settings.jwt)}`;
 
     this.ws = new WebSocket(url);
 
@@ -94,10 +97,7 @@ export class ControlChannel {
       this.reconnectAttempt = 0;
       this.stateChangeCallback?.("connected");
 
-      // Flush queued messages
       this.flushQueue();
-
-      // Start periodic ping for latency measurement
       this.startPing();
 
       if (wasReconnect) {
@@ -111,13 +111,11 @@ export class ControlChannel {
           typeof event.data === "string" ? event.data : "",
         ) as ControlMessage & { encrypted?: boolean };
 
-        // Handle pong for latency measurement
         if (msg.type === "pong") {
           if (this.lastPingTime > 0) {
             this.latencyMs = Date.now() - this.lastPingTime;
             this.lastPingTime = 0;
           }
-          // Still dispatch to handlers in case anyone is listening
         }
 
         if (msg.encrypted && this.e2e?.enabled) {
@@ -148,7 +146,9 @@ export class ControlChannel {
       // Queue messages instead of silently dropping them.
       // Presence updates are ephemeral -- only keep the latest one.
       if (msg.type === "presence-update") {
-        const idx = this.sendQueue.findIndex((m) => m.type === "presence-update");
+        const idx = this.sendQueue.findIndex(
+          (m) => m.type === "presence-update",
+        );
         if (idx >= 0) {
           this.sendQueue[idx] = msg;
         } else {
@@ -160,7 +160,9 @@ export class ControlChannel {
       return;
     }
     const encryptable =
-      msg.type === "file-op" || msg.type === "file-chunk-data" || msg.type === "file-chunk-end";
+      msg.type === "file-op" ||
+      msg.type === "file-chunk-data" ||
+      msg.type === "file-chunk-end";
     if (this.e2e?.enabled && encryptable) {
       this.encryptAndSend(msg);
     } else {
@@ -180,7 +182,9 @@ export class ControlChannel {
     this.pingTimer = setInterval(() => {
       if (this.ws?.readyState === WebSocket.OPEN) {
         this.lastPingTime = Date.now();
-        this.ws.send(JSON.stringify({ type: "ping", timestamp: this.lastPingTime }));
+        this.ws.send(
+          JSON.stringify({ type: "ping", timestamp: this.lastPingTime }),
+        );
       }
     }, 30_000);
   }
@@ -197,7 +201,9 @@ export class ControlChannel {
     try {
       if (msg.type === "file-chunk-data" && typeof msg.data === "string") {
         const encrypted = await this.e2e.encryptString(msg.data as string);
-        this.ws.send(JSON.stringify({ ...msg, data: encrypted, encrypted: true }));
+        this.ws.send(
+          JSON.stringify({ ...msg, data: encrypted, encrypted: true }),
+        );
       } else {
         const op = msg.op as Record<string, unknown>;
         if (op && typeof op.content === "string") {
