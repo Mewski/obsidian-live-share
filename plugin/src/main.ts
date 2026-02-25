@@ -55,17 +55,17 @@ export default class LiveSharePlugin extends Plugin {
 
   private registerManifestChangeHandler() {
     this.manifestManager.setManifestChangeHandler(async (added, removed) => {
-      const renamedOld = new Set<string>();
-      const renamedNew = new Set<string>();
+      const renamedOldPaths = new Set<string>();
+      const renamedNewPaths = new Set<string>();
       if (added.length > 0 && removed.length > 0) {
         for (const oldPath of removed) {
           for (const newPath of added) {
-            if (renamedNew.has(newPath)) continue;
+            if (renamedNewPaths.has(newPath)) continue;
             const oldFile = this.app.vault.getAbstractFileByPath(oldPath);
             const newFile = this.app.vault.getAbstractFileByPath(newPath);
             if (oldFile && !newFile) {
-              renamedOld.add(oldPath);
-              renamedNew.add(newPath);
+              renamedOldPaths.add(oldPath);
+              renamedNewPaths.add(newPath);
               this.fileOpsManager.mutePathEvents(oldPath);
               this.fileOpsManager.mutePathEvents(newPath);
               try {
@@ -87,8 +87,8 @@ export default class LiveSharePlugin extends Plugin {
               break;
             }
             if (!oldFile && newFile) {
-              renamedOld.add(oldPath);
-              renamedNew.add(newPath);
+              renamedOldPaths.add(oldPath);
+              renamedNewPaths.add(newPath);
               if (isTextFile(oldPath)) {
                 this.backgroundSync.onFileRemoved(oldPath);
               }
@@ -101,8 +101,8 @@ export default class LiveSharePlugin extends Plugin {
         }
       }
 
-      const actuallyAdded = added.filter((path) => !renamedNew.has(path));
-      const actuallyRemoved = removed.filter((path) => !renamedOld.has(path));
+      const actuallyAdded = added.filter((path) => !renamedNewPaths.has(path));
+      const actuallyRemoved = removed.filter((path) => !renamedOldPaths.has(path));
 
       if (actuallyAdded.length > 0) {
         const syncedCount = await this.manifestManager.syncFromManifest(
@@ -425,6 +425,7 @@ export default class LiveSharePlugin extends Plugin {
         if (this.settings.role === "host") {
           await this.manifestManager.publishManifest();
           await this.backgroundSync.startAll("host");
+          this.registerManifestChangeHandler();
         } else {
           await this.cleanupStaleFiles();
           await this.manifestManager.syncFromManifest(
@@ -577,6 +578,7 @@ export default class LiveSharePlugin extends Plugin {
         await this.manifestManager.connect(this.syncManager);
         await this.manifestManager.publishManifest({ purge: true });
         await this.backgroundSync.startAll("host");
+        this.registerManifestChangeHandler();
         this.onActiveFileChange();
         new Notice("Live Share: session started, invite copied to clipboard");
       } catch {

@@ -1,5 +1,4 @@
 import { Level } from "level";
-import * as Y from "yjs";
 
 export type Permission = "read-write" | "read-only";
 export interface Room {
@@ -14,8 +13,6 @@ export interface Room {
 }
 
 export interface Persistence {
-  loadDoc(docName: string, doc: Y.Doc): Promise<void>;
-  persistDoc(docName: string, doc: Y.Doc): Promise<void>;
   loadRooms(): Promise<Room[]>;
   saveRoom(room: Room): Promise<void>;
   deleteRoom(id: string): Promise<void>;
@@ -26,24 +23,6 @@ export function createLevelPersistence(dbPath = "./data/yjs-docs"): Persistence 
   const db = new Level(dbPath, { valueEncoding: "buffer" });
 
   return {
-    async loadDoc(docName: string, doc: Y.Doc): Promise<void> {
-      try {
-        const stored = await db.get(`doc:${docName}`);
-        const update = new Uint8Array(stored as unknown as ArrayBuffer);
-        Y.applyUpdate(doc, update);
-      } catch (err: unknown) {
-        if ((err as { code?: string }).code === "LEVEL_NOT_FOUND") {
-          return;
-        }
-        throw err;
-      }
-    },
-
-    async persistDoc(docName: string, doc: Y.Doc): Promise<void> {
-      const update = Y.encodeStateAsUpdate(doc);
-      await db.put(`doc:${docName}`, Buffer.from(update) as unknown as string);
-    },
-
     async loadRooms(): Promise<Room[]> {
       const rooms: Room[] = [];
       try {
@@ -79,8 +58,6 @@ export function createLevelPersistence(dbPath = "./data/yjs-docs"): Persistence 
 }
 
 export const noopPersistence: Persistence = {
-  async loadDoc() {},
-  async persistDoc() {},
   async loadRooms() {
     return [];
   },

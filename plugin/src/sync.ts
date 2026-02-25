@@ -6,10 +6,10 @@ import * as Y from "yjs";
 
 import {
   MUX_AWARENESS,
-  MUX_ERROR,
   MUX_SUBSCRIBE,
   MUX_SUBSCRIBED,
   MUX_SYNC,
+  MUX_SYNC_REQUEST,
   MUX_UNSUBSCRIBE,
   decodeMuxMessage,
   encodeMuxMessage,
@@ -256,10 +256,11 @@ export class SyncManager {
       case MUX_SYNC:
         this.handleSync(docId, payload);
         break;
+      case MUX_SYNC_REQUEST:
+        this.handleSyncRequest(docId);
+        break;
       case MUX_AWARENESS:
         this.handleAwareness(docId, payload);
-        break;
-      case MUX_ERROR:
         break;
     }
   }
@@ -272,9 +273,24 @@ export class SyncManager {
     syncProtocol.writeSyncStep1(syncEncoder, doc);
     this.sendMux(docId, MUX_SYNC, encoding.toUint8Array(syncEncoder));
 
+    let peerCount = 0;
     if (payload.length > 0) {
-      this.handleSync(docId, payload);
+      const decoder = decoding.createDecoder(payload);
+      peerCount = decoding.readVarUint(decoder);
     }
+
+    if (peerCount === 0) {
+      this.setSynced(docId, true);
+    }
+  }
+
+  private handleSyncRequest(docId: string): void {
+    const doc = this.docs.get(docId);
+    if (!doc) return;
+
+    const syncEncoder = encoding.createEncoder();
+    syncProtocol.writeSyncStep1(syncEncoder, doc);
+    this.sendMux(docId, MUX_SYNC, encoding.toUint8Array(syncEncoder));
   }
 
   private handleSync(docId: string, payload: Uint8Array): void {
@@ -291,7 +307,7 @@ export class SyncManager {
       this.sendMux(docId, MUX_SYNC, encoding.toUint8Array(syncEncoder));
     }
 
-    if (syncType === SYNC_STEP2 || syncType === syncProtocol.messageYjsSyncStep1) {
+    if (syncType === SYNC_STEP2) {
       this.setSynced(docId, true);
     }
   }

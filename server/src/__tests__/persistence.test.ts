@@ -77,29 +77,6 @@ describe("persistence", () => {
     doc2.destroy();
   });
 
-  it("LevelDB persistence round-trips Y.Doc state", async () => {
-    const dbPath = `${TEST_DB_PATH}-roundtrip`;
-    if (existsSync(dbPath)) rmSync(dbPath, { recursive: true });
-
-    let persistence: Persistence | null = null;
-    try {
-      persistence = createLevelPersistence(dbPath);
-
-      const doc1 = new Y.Doc();
-      doc1.getText("content").insert(0, "persisted via LevelDB");
-      await persistence.persistDoc("test-doc", doc1);
-      doc1.destroy();
-
-      const doc2 = new Y.Doc();
-      await persistence.loadDoc("test-doc", doc2);
-      expect(doc2.getText("content").toString()).toBe("persisted via LevelDB");
-      doc2.destroy();
-    } finally {
-      if (persistence) await persistence.close();
-      if (existsSync(dbPath)) rmSync(dbPath, { recursive: true });
-    }
-  });
-
   it("loadRooms returns empty array when no rooms stored", async () => {
     const dbPath = `${TEST_DB_PATH}-empty-rooms`;
     if (existsSync(dbPath)) rmSync(dbPath, { recursive: true });

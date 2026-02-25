@@ -201,9 +201,7 @@ export class ManifestManager {
           }
         }
         synced++;
-      } catch {
-        // sync failed for this file, continue with others
-      }
+      } catch {}
     }
 
     return synced;

@@ -156,10 +156,46 @@ export class BackgroundSync {
       this.activeFile = normNew;
     }
 
-    if (isTextFile(normNew)) {
+    if (!isTextFile(normNew)) return;
+
+    const docHandle = this.syncManager.getDoc(normNew);
+    if (!docHandle) return;
+
+    this.subscribing.add(normNew);
+    try {
       try {
-        await this.subscribe(normNew);
-      } catch {}
+        await this.syncManager.waitForSync(normNew);
+      } catch {
+        return;
+      }
+
+      if (this.observers.has(normNew)) return;
+      if (docHandle.doc.isDestroyed) return;
+
+      if (this.role === "host") {
+        const file = this.vault.getAbstractFileByPath(normNew) as TFile | null;
+        if (file) {
+          const content = normalizeLineEndings(await this.vault.read(file));
+          applyMinimalYTextUpdate(docHandle.doc, docHandle.text, content);
+        }
+      } else if (docHandle.text.length > 0) {
+        const file = this.vault.getAbstractFileByPath(normNew) as TFile | null;
+        const remoteContent = docHandle.text.toString();
+        const localContent = file ? normalizeLineEndings(await this.vault.read(file)) : "";
+        if (remoteContent !== localContent) {
+          await this.writeToDisk(normNew, remoteContent);
+        }
+      }
+
+      const observer = (_event: Y.YTextEvent, transaction: Y.Transaction) => {
+        if (transaction.local) return;
+        if (normNew === this.activeFile) return;
+        this.scheduleDiskWrite(normNew, docHandle.text);
+      };
+      docHandle.text.observe(observer);
+      this.observers.set(normNew, () => docHandle.text.unobserve(observer));
+    } finally {
+      this.subscribing.delete(normNew);
     }
   }
 

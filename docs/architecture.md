@@ -8,7 +8,7 @@ Obsidian Live Share is a two-part system: a **relay server** and an **Obsidian p
 
 Each session uses two WebSocket channels:
 
-1. **Yjs sync channel** (`/ws/:roomId`): Binary Yjs protocol for document sync and awareness (cursors). One Y.Doc per file, keyed as `roomId:filePath`. The manifest doc (file inventory) is at `roomId:__manifest__`. Read-only clients are blocked from sending document updates (sync step2/update) server-side.
+1. **Yjs sync channel** (`/ws-mux/:roomId`): Multiplexed binary channel carrying Yjs CRDT updates and cursor awareness for all shared files. One Y.Doc per file, keyed as `roomId:filePath`. The manifest doc (file inventory) is at `roomId:__manifest__`. The server is a stateless relay that forwards messages between peers. Read-only enforcement is handled by peeking at sync message types server-side.
 
 2. **Control channel** (`/control/:roomId`): JSON messages for file operations (create/delete/rename/modify), presence updates, follow mode, focus/summon requests, guest approval, kick, ping/pong latency, and session lifecycle.
 
@@ -27,9 +27,9 @@ Each session uses two WebSocket channels:
 | Component | File | Responsibility |
 |-----------|------|----------------|
 | REST API | `rooms.ts` | Room CRUD, join validation, token-based auth |
-| Yjs handler | `ws-handler.ts` | Yjs sync protocol, awareness relay, per-doc persistence, read-only enforcement |
+| Yjs handler | `ws-handler.ts` | Stateless message relay, awareness relay, read-only enforcement |
 | Control handler | `control-handler.ts` | Message routing, host determination, rate limiting, permission enforcement |
-| Persistence | `persistence.ts` | LevelDB storage for Y.Docs and room metadata |
+| Persistence | `persistence.ts` | LevelDB storage for room metadata |
 | Permissions | `permissions.ts` | Per-user permission store for read-only enforcement |
 | Auth | `github-auth.ts` | GitHub OAuth flow, JWT signing/verification |
 | Util | `util.ts` | Timing-safe token comparison |
@@ -44,7 +44,7 @@ Each session uses two WebSocket channels:
 | Control channel | `control-ws.ts` | WebSocket client with ping/pong latency, E2E encryption |
 | File operations | `file-ops.ts` | Remote op application, per-path suppression, chunked transfer |
 | Collaboration | `collab.ts` | CodeMirror 6 Yjs integration, per-file activation, cursor awareness |
-| Sync manager | `sync.ts` | Per-file Y.Doc and WebsocketProvider management |
+| Sync manager | `sync.ts` | Per-file Y.Doc management over multiplexed WebSocket |
 | Manifest | `manifest.ts` | File inventory sync via shared Y.Map, hash-based change detection |
 | Presence view | `presence-view.ts` | Sidebar panel showing users, follow/kick/summon buttons |
 | Approval modal | `approval-modal.ts` | Host approval dialog for guest join requests |
@@ -61,16 +61,16 @@ Each session uses two WebSocket channels:
 ## Key Design Decisions
 
 - **Yjs CRDT**: Character-level conflict-free merging without coordination. Battle-tested with CodeMirror 6 via `y-codemirror.next`.
-- **One Y.Doc per file**: Each shared text file gets its own Y.Doc and WebsocketProvider for independent sync.
+- **One Y.Doc per file**: Each shared text file gets its own Y.Doc, synced peer-to-peer through the relay.
 - **Hub-and-spoke topology**: All clients connect to the central relay server. No peer-to-peer.
 - **Per-path suppression**: Ref-counted suppression map prevents vault events from echoing remote operations back to the server. Uses 50ms delayed unsuppress to handle async vault event firing.
 - **Host determination**: Server-side, not client-side. JWT-verified identity is preferred; fallback without JWT: first connected client becomes host.
-- **LevelDB persistence**: Server persists Y.Doc state with 5-second debounce after edits. Rooms are cleaned up 30 seconds after the last client disconnects.
+- **Stateless relay**: Server forwards Yjs messages without maintaining Y.Doc state. The host's vault is the single source of truth. Room metadata is persisted to LevelDB. Document rooms are cleaned up 30 seconds after the last client disconnects.
 - **Background sync**: Non-active text files are synced via Y.Text observers with debounced disk writes. The active file syncs through yCollab in the editor.
 - **Minimal Y.Text updates**: When the host re-seeds a Yjs doc (e.g., on reload), only the differing portion is replaced (prefix/suffix preserved) to avoid CRDT merge artifacts.
 - **Line ending normalization**: All text content is normalized to `\n` at every entry point to prevent cross-platform mismatches.
 - **Forward-slash path normalization**: All file paths are normalized to `/` separators for cross-platform compatibility.
-- **Fail-fast connections**: When a WebSocket connection drops, the session ends immediately and all resources are cleaned up. No automatic reconnection or message queuing.
+- **Automatic reconnection**: The Yjs sync channel reconnects with exponential backoff on connection loss. The control channel connection drop ends the session immediately.
 
 ## Control Message Types
 

@@ -18,7 +18,7 @@ The server starts on port `4321` by default. Verify it's running:
 
 ```bash
 curl http://localhost:4321/healthz
-# {"ok":true,"uptime":1.0,"rooms":0,"connections":0}
+# {"ok":true,"uptime":1.0,"sessions":0,"documents":0,"clients":0}
 ```
 
 ## Development
@@ -74,7 +74,7 @@ When auth is disabled (default), anyone with a room token can connect.
 | `POST /rooms/:id/join` | Join | Join a room. Body: `{ "token": "..." }` |
 | `GET /rooms/:id` | Info | Get room name and creation time |
 | `DELETE /rooms/:id` | Delete | Delete a room. Header: `Authorization: Bearer <token>` |
-| `GET /healthz` | Health | Server status, uptime, room/connection counts |
+| `GET /healthz` | Health | Server status, uptime, session/document/client counts |
 | `GET /auth/github` | Auth | Start GitHub OAuth flow |
 | `GET /auth/github/callback` | Auth | OAuth callback, returns JWT |
 
@@ -82,14 +82,14 @@ When auth is disabled (default), anyone with a room token can connect.
 
 | Endpoint | Protocol | Description |
 |----------|----------|-------------|
-| `/ws/:roomId` | Yjs binary | Document sync and cursor awareness |
+| `/ws-mux/:roomId` | Yjs binary (multiplexed) | Document sync and cursor awareness (stateless relay) |
 | `/control/:roomId` | JSON | File ops, presence, session management |
 
 Both require `?token=<room_token>` query parameter. When GitHub auth is enabled, also requires `&jwt=<jwt_token>`.
 
 ## Persistence
 
-Y.Doc state and room metadata are persisted to LevelDB at `./data/yjs-docs`. Documents are persisted on a 5-second debounce after every edit. Rooms are cleaned up from memory after the last client disconnects (30 seconds for Yjs state, 35 seconds for the control channel). Persisted data is retained.
+Room metadata is persisted to LevelDB at `./data/yjs-docs`. The server does not persist document state — it operates as a stateless relay. The host's local vault is the single source of truth. Document rooms are cleaned up from memory 30 seconds after the last client disconnects. Control channel rooms are cleaned up after 35 seconds.
 
 ## Rate Limiting
 
@@ -98,7 +98,7 @@ Y.Doc state and room metadata are persisted to LevelDB at `./data/yjs-docs`. Doc
 
 ## Graceful Shutdown
 
-The server handles `SIGTERM` and `SIGINT`: persists all Y.Docs to LevelDB, closes all WebSocket connections, then exits cleanly. A re-entrancy guard prevents double shutdown.
+The server handles `SIGTERM` and `SIGINT`: closes all WebSocket connections, then exits cleanly. A re-entrancy guard prevents double shutdown.
 
 ## Deployment
 

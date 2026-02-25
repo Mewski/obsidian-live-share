@@ -6,7 +6,7 @@ export const MUX_AWARENESS = 1;
 export const MUX_SUBSCRIBE = 2;
 export const MUX_UNSUBSCRIBE = 3;
 export const MUX_SUBSCRIBED = 4;
-export const MUX_ERROR = 5;
+export const MUX_SYNC_REQUEST = 6;
 
 export function encodeMuxMessage(docId: string, msgType: number, payload?: Uint8Array): Uint8Array {
   const encoder = encoding.createEncoder();

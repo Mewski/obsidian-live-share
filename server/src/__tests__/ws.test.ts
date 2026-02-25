@@ -11,6 +11,7 @@ import {
   MUX_SUBSCRIBE,
   MUX_SUBSCRIBED,
   MUX_SYNC,
+  MUX_SYNC_REQUEST,
   decodeMuxMessage,
   encodeMuxMessage,
 } from "../mux-protocol.js";
@@ -160,7 +161,7 @@ afterEach(async () => {
   await new Promise<void>((resolve) => server.close(() => resolve()));
 });
 
-describe("Mux WebSocket handler", () => {
+describe("Mux WebSocket relay", () => {
   it("connects to a valid room via /ws-mux/", async () => {
     const room = await createRoom("mux-test");
     const { ws } = await connectMux(room.id, room.token);
@@ -176,178 +177,227 @@ describe("Mux WebSocket handler", () => {
     await expect(connectMuxRaw(room.id, "wrong-token")).rejects.toThrow();
   });
 
-  it("allows connection with correct token", async () => {
-    const room = await createRoom("mux-auth-ok");
-    const { ws } = await connectMux(room.id, room.token);
-    expect(ws.readyState).toBe(WebSocket.OPEN);
-  });
-
-  it("receives SUBSCRIBED with syncStep1 after subscribing", async () => {
-    const room = await createRoom("sub-test");
+  it("receives SUBSCRIBED with peerCount=0 when first subscriber", async () => {
+    const room = await createRoom("sub-first");
     const { ws, messages } = await connectMux(room.id, room.token);
 
     subscribe(ws, "test-doc");
-
     await waitForMessages(messages, 1);
 
     const subMsgs = findMessages(messages, "test-doc", MUX_SUBSCRIBED);
     expect(subMsgs.length).toBe(1);
 
-    // The payload should be a valid sync step 1
     const decoder = decoding.createDecoder(subMsgs[0].payload);
-    const syncMsgType = decoding.readVarUint(decoder);
-    expect(syncMsgType).toBe(0); // syncProtocol.messageYjsSyncStep1
+    const peerCount = decoding.readVarUint(decoder);
+    expect(peerCount).toBe(0);
   });
 
-  it("syncs document between two clients via mux", async () => {
-    const room = await createRoom("mux-sync-two");
+  it("receives SUBSCRIBED with peerCount=1 when second subscriber", async () => {
+    const room = await createRoom("sub-second");
+
+    const clientA = await connectMux(room.id, room.token);
+    subscribe(clientA.ws, "test-doc");
+    await waitForMessages(clientA.messages, 1); // SUBSCRIBED
+
+    const clientB = await connectMux(room.id, room.token);
+    subscribe(clientB.ws, "test-doc");
+    await waitForMessages(clientB.messages, 1); // SUBSCRIBED
+
+    const subMsgs = findMessages(clientB.messages, "test-doc", MUX_SUBSCRIBED);
+    expect(subMsgs.length).toBe(1);
+
+    const decoder = decoding.createDecoder(subMsgs[0].payload);
+    const peerCount = decoding.readVarUint(decoder);
+    expect(peerCount).toBe(1);
+  });
+
+  it("sends SYNC_REQUEST to existing subscribers when new peer joins", async () => {
+    const room = await createRoom("sync-req");
+
+    const clientA = await connectMux(room.id, room.token);
+    subscribe(clientA.ws, "test-doc");
+    await waitForMessages(clientA.messages, 1); // SUBSCRIBED
+
+    const msgCountBefore = clientA.messages.length;
+
+    const clientB = await connectMux(room.id, room.token);
+    subscribe(clientB.ws, "test-doc");
+
+    await waitForMessages(clientA.messages, msgCountBefore + 1);
+    const syncReqs = findMessages(clientA.messages, "test-doc", MUX_SYNC_REQUEST);
+    expect(syncReqs.length).toBe(1);
+  });
+
+  it("relays sync messages between peers", async () => {
+    const room = await createRoom("relay-sync");
     const docId = "notes/test.md";
 
     const clientA = await connectMux(room.id, room.token);
     subscribe(clientA.ws, docId);
-    await waitForMessages(clientA.messages, 1); // SUBSCRIBED
-
-    const docA = new Y.Doc();
-    const textA = docA.getText("content");
-    docA.on("update", (update: Uint8Array) => {
-      sendUpdate(clientA.ws, docId, update);
-    });
-    sendSyncStep1(clientA.ws, docId, docA);
+    await waitForMessages(clientA.messages, 1);
 
     const clientB = await connectMux(room.id, room.token);
     subscribe(clientB.ws, docId);
-    await waitForMessages(clientB.messages, 1); // SUBSCRIBED
+    await waitForMessages(clientB.messages, 1);
 
-    const docB = new Y.Doc();
-    const textB = docB.getText("content");
-    sendSyncStep1(clientB.ws, docId, docB);
-
-    await new Promise((r) => setTimeout(r, 150));
+    await new Promise((r) => setTimeout(r, 100));
     const msgCountBefore = clientB.messages.length;
 
-    textA.insert(0, "hello from A");
+    // Client A sends a sync message
+    const docA = new Y.Doc();
+    docA.getText("content").insert(0, "hello from A");
+    const update = Y.encodeStateAsUpdate(docA);
+    sendUpdate(clientA.ws, docId, update);
 
     await waitForMessages(clientB.messages, msgCountBefore + 1);
 
-    // Find the sync message for this doc
+    // Client B should receive the relayed sync message
     const syncMsgs = findMessages(clientB.messages, docId, MUX_SYNC);
     expect(syncMsgs.length).toBeGreaterThan(0);
 
-    // Apply all sync messages to docB
+    // Apply to client B's doc
+    const docB = new Y.Doc();
     for (const msg of syncMsgs) {
       const decoder = decoding.createDecoder(msg.payload);
       const enc = encoding.createEncoder();
       syncProtocol.readSyncMessage(decoder, enc, docB, null);
     }
+    expect(docB.getText("content").toString()).toBe("hello from A");
 
-    expect(textB.toString()).toBe("hello from A");
+    docA.destroy();
+    docB.destroy();
   });
 
-  it("isolates sync between different docIds", async () => {
-    const room = await createRoom("mux-isolate");
+  it("does not echo sync messages back to sender", async () => {
+    const room = await createRoom("no-echo");
+    const docId = "test-doc";
 
     const client = await connectMux(room.id, room.token);
-    subscribe(client.ws, "doc-a");
-    subscribe(client.ws, "doc-b");
+    subscribe(client.ws, docId);
+    await waitForMessages(client.messages, 1);
 
-    // Wait for both SUBSCRIBED messages
-    await waitForMessages(client.messages, 2);
+    await new Promise((r) => setTimeout(r, 50));
+    const msgCountBefore = client.messages.length;
 
-    const docA = new Y.Doc();
-    docA.getText("content").insert(0, "content for A");
-    const updateA = Y.encodeStateAsUpdate(docA);
-    sendUpdate(client.ws, "doc-a", updateA);
+    const doc = new Y.Doc();
+    doc.getText("content").insert(0, "no echo");
+    sendUpdate(client.ws, docId, Y.encodeStateAsUpdate(doc));
 
-    await new Promise((r) => setTimeout(r, 200));
+    await new Promise((r) => setTimeout(r, 300));
+    // Only SUBSCRIBED should be in messages, no echo
+    expect(client.messages.length).toBe(msgCountBefore);
 
-    // Connect second client, subscribe only to doc-b
-    const client2 = await connectMux(room.id, room.token);
-    subscribe(client2.ws, "doc-b");
-    await waitForMessages(client2.messages, 1); // SUBSCRIBED
-
-    const docB2 = new Y.Doc();
-    sendSyncStep1(client2.ws, "doc-b", docB2);
-
-    await new Promise((r) => setTimeout(r, 200));
-
-    // Apply sync messages for doc-b
-    const syncMsgs = findMessages(client2.messages, "doc-b", MUX_SYNC);
-    for (const msg of syncMsgs) {
-      const decoder = decoding.createDecoder(msg.payload);
-      const enc = encoding.createEncoder();
-      syncProtocol.readSyncMessage(decoder, enc, docB2, null);
-    }
-
-    // doc-b should be empty since only doc-a had content
-    expect(docB2.getText("content").toString()).toBe("");
+    doc.destroy();
   });
 
-  it("enforces read-only on Yjs sync updates via mux", async () => {
-    const room = await createRoom("mux-read-only");
-    const docId = "protected-doc";
+  it("relays awareness messages between peers", async () => {
+    const room = await createRoom("relay-awareness");
+    const docId = "test-doc";
 
-    // Client A (host)
     const clientA = await connectMux(room.id, room.token);
     subscribe(clientA.ws, docId);
     await waitForMessages(clientA.messages, 1);
 
-    const docA = new Y.Doc();
-    sendSyncStep1(clientA.ws, docId, docA);
-    await new Promise((r) => setTimeout(r, 150));
+    const clientB = await connectMux(room.id, room.token);
+    subscribe(clientB.ws, docId);
+    await waitForMessages(clientB.messages, 1);
 
-    // Client B (read-only)
+    await new Promise((r) => setTimeout(r, 100));
+    const msgCountBefore = clientB.messages.length;
+
+    // Send awareness from A
+    const awarenessPayload = new Uint8Array([1, 2, 3, 4]);
+    clientA.ws.send(encodeMuxMessage(docId, MUX_AWARENESS, awarenessPayload));
+
+    await waitForMessages(clientB.messages, msgCountBefore + 1);
+
+    const awarenessMsgs = findMessages(clientB.messages, docId, MUX_AWARENESS);
+    expect(awarenessMsgs.length).toBeGreaterThan(0);
+  });
+
+  it("enforces read-only on sync updates via relay", async () => {
+    const room = await createRoom("relay-ro");
+    const docId = "protected-doc";
+
+    const clientA = await connectMux(room.id, room.token);
+    subscribe(clientA.ws, docId);
+    await waitForMessages(clientA.messages, 1);
+
+    await new Promise((r) => setTimeout(r, 100));
+
     const roUserId = "ro-user-123";
     setPermission(room.id, roUserId, "read-only");
     const clientB = await connectMux(room.id, room.token, roUserId);
     subscribe(clientB.ws, docId);
     await waitForMessages(clientB.messages, 1);
 
-    await new Promise((r) => setTimeout(r, 150));
+    // Wait for SYNC_REQUEST to arrive at clientA and settle
+    await new Promise((r) => setTimeout(r, 200));
     const msgCountBefore = clientA.messages.length;
 
-    // Read-only client tries to send an update
+    // Read-only client tries to send an update (SyncStep2/Update)
     const roDoc = new Y.Doc();
     roDoc.getText("content").insert(0, "read-only attempt");
-    const roUpdate = Y.encodeStateAsUpdate(roDoc);
-    sendUpdate(clientB.ws, docId, roUpdate);
+    sendUpdate(clientB.ws, docId, Y.encodeStateAsUpdate(roDoc));
 
     await new Promise((r) => setTimeout(r, 500));
     // Host should NOT receive the update
     expect(clientA.messages.length).toBe(msgCountBefore);
 
     roDoc.destroy();
-    docA.destroy();
+  });
+
+  it("read-only client can still send SyncStep1", async () => {
+    const room = await createRoom("relay-ro-sync1");
+    const docId = "ro-doc";
+
+    const clientA = await connectMux(room.id, room.token);
+    subscribe(clientA.ws, docId);
+    await waitForMessages(clientA.messages, 1);
+
+    const roUserId = "ro-sync1-user";
+    setPermission(room.id, roUserId, "read-only");
+    const clientB = await connectMux(room.id, room.token, roUserId);
+    subscribe(clientB.ws, docId);
+    await waitForMessages(clientB.messages, 1);
+
+    // Wait for SYNC_REQUEST to settle
+    await new Promise((r) => setTimeout(r, 200));
+    const msgCountBefore = clientA.messages.length;
+
+    // Read-only sends SyncStep1 — this should be allowed (it's a read request)
+    const roDoc = new Y.Doc();
+    sendSyncStep1(clientB.ws, docId, roDoc);
+
+    await new Promise((r) => setTimeout(r, 300));
+    // Host should receive the SyncStep1
+    expect(clientA.messages.length).toBeGreaterThan(msgCountBefore);
+
+    roDoc.destroy();
   });
 
   it("live-updates read-only status when permission changes after connect", async () => {
-    const room = await createRoom("mux-live-perm");
+    const room = await createRoom("relay-live-perm");
     const docId = "perm-doc";
     const userId = "switchable-user";
 
     setPermission(room.id, userId, "read-write");
 
-    // Client A (host)
     const clientA = await connectMux(room.id, room.token);
     subscribe(clientA.ws, docId);
     await waitForMessages(clientA.messages, 1);
 
-    const docA = new Y.Doc();
-    sendSyncStep1(clientA.ws, docId, docA);
-    await new Promise((r) => setTimeout(r, 150));
-
-    // Client B (initially read-write)
     const clientB = await connectMux(room.id, room.token, userId);
     subscribe(clientB.ws, docId);
     await waitForMessages(clientB.messages, 1);
 
-    await new Promise((r) => setTimeout(r, 150));
+    await new Promise((r) => setTimeout(r, 200));
 
     // Verify read-write works
     const rwDoc = new Y.Doc();
     rwDoc.getText("content").insert(0, "rw-allowed");
-    const rwUpdate = Y.encodeStateAsUpdate(rwDoc);
     const msgCountBefore = clientA.messages.length;
-    sendUpdate(clientB.ws, docId, rwUpdate);
+    sendUpdate(clientB.ws, docId, Y.encodeStateAsUpdate(rwDoc));
     await new Promise((r) => setTimeout(r, 500));
     expect(clientA.messages.length).toBeGreaterThan(msgCountBefore);
 
@@ -386,14 +436,12 @@ describe("Mux WebSocket handler", () => {
     // Now read-only update should be blocked
     const roDoc = new Y.Doc();
     roDoc.getText("content").insert(0, "should-be-blocked");
-    const roUpdate = Y.encodeStateAsUpdate(roDoc);
     const msgCountAfter = clientA.messages.length;
-    sendUpdate(clientB.ws, docId, roUpdate);
+    sendUpdate(clientB.ws, docId, Y.encodeStateAsUpdate(roDoc));
     await new Promise((r) => setTimeout(r, 500));
     expect(clientA.messages.length).toBe(msgCountAfter);
 
     rwDoc.destroy();
     roDoc.destroy();
-    docA.destroy();
   });
 });

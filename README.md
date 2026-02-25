@@ -112,12 +112,12 @@ Default excludes: `.obsidian/**`, `.liveshare.json`, `.trash/**`.
 
 ## How It Works
 
-Obsidian Live Share uses a relay server and two WebSocket channels per session:
+Obsidian Live Share uses a stateless relay server and two WebSocket channels per session:
 
-- **Yjs sync** (`/ws/:roomId`): Binary CRDT protocol for real-time document sync and cursor awareness. One Y.Doc per file, persisted to LevelDB with 5-second debounce.
+- **Yjs sync** (`/ws-mux/:roomId`): Multiplexed binary channel carrying Yjs CRDT updates and cursor awareness for all shared files. The server forwards messages between peers without maintaining any document state. Read-only enforcement is handled by peeking at sync message types.
 - **Control** (`/control/:roomId`): JSON messages for file operations, presence, follow/summon, session lifecycle, and ping/pong latency measurement.
 
-Text files sync character-by-character via Yjs. Binary files (images, PDFs, etc.) are transferred as base64 via the control channel with automatic chunking for files up to 50 MB.
+The host's local vault is the single source of truth. Text files sync character-by-character via Yjs. Binary files (images, PDFs, etc.) are transferred as base64 via the control channel with automatic chunking for files up to 50 MB.
 
 ## Server Configuration
 
@@ -178,7 +178,7 @@ See [Security](docs/security.md) for the full threat model.
 
 - **No offline merge**: File-level operations (create/delete/rename) don't have conflict resolution across separate sessions. Text content merges automatically via Yjs within a session.
 - **Single host**: If the host disconnects, the session ends for all participants.
-- **E2E scope**: File content in control messages is end-to-end encrypted. Real-time Yjs sync data is processed by the server for persistence and late-join support. Use TLS (`wss://`) to encrypt all traffic in transit.
+- **E2E scope**: File content in control messages is end-to-end encrypted. Yjs sync data is relayed as opaque binary by the server (no server-side processing or persistence), but the data itself is not encrypted at the application layer. Use TLS (`wss://`) to encrypt all traffic in transit.
 
 ## License
 

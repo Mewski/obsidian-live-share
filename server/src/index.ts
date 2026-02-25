@@ -43,7 +43,7 @@ export function createApp(
 
   const server = externalServer ?? createServer(app);
 
-  const yjs = createYjsWSS(persistence);
+  const yjs = createYjsWSS();
   const control = createControlWSS({
     onPermissionChange: (roomId, userId, permission) => {
       yjs.updatePermission(roomId, userId, permission);
@@ -126,7 +126,7 @@ export function createApp(
     console.info("[server] shutting down gracefully...");
     clearInterval(reaperInterval);
     control.closeAll();
-    await yjs.closeAllRooms();
+    yjs.closeAllRooms();
     if (persistence) await persistence.close();
     server.close();
   }

@@ -9,7 +9,7 @@ When a host starts a session, a random 128-bit passphrase is generated and embed
 - Chunk data and file paths in `file-chunk-start`, `file-chunk-data`, and `file-chunk-end` messages (binary file transfers)
 
 **What is NOT encrypted:**
-- Yjs CRDT sync data: the server processes sync protocol messages for persistence and late-join support
+- Yjs CRDT sync data: the server relays binary Yjs messages between peers without inspecting content (except peeking at sync message type for read-only enforcement). The binary data contains document content in plaintext.
 - Control message metadata (message types, presence info, non-chunk file paths)
 
 **Key derivation:**
@@ -73,7 +73,7 @@ Host-only operations enforced server-side:
 
 | Threat | Mitigation |
 |--------|------------|
-| Compromised server reads file content | E2E encryption of file content in control messages |
+| Compromised server reads file content | E2E encryption of file content in control messages. Yjs sync data is relayed as opaque binary but contains plaintext document content; use TLS (`wss://`) to protect in transit |
 | Brute-force room token guessing | 24-character random tokens (nanoid), REST rate limiting |
 | Path traversal via malicious file ops | Client and server-side path validation |
 | XSS via avatar URLs | Only `https:` URLs allowed, HTML escaping in OAuth page |
