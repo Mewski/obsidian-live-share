@@ -161,7 +161,9 @@ export async function ensureFolder(vault: Vault, path: string): Promise<void> {
     current = current ? `${current}/${part}` : part;
     const folder = vault.getAbstractFileByPath(current);
     if (!folder) {
-      await vault.createFolder(current);
+      try {
+        await vault.createFolder(current);
+      } catch {}
     }
   }
 }

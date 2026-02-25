@@ -84,22 +84,26 @@ export class ManifestManager {
 
     const entries = new Map<string, FileEntry>();
     for (const file of files) {
-      const binary = !isTextFile(file.path);
-      if (binary) {
-        const buf = await this.vault.readBinary(file);
-        entries.set(normalizePath(file.path), {
-          hash: await hashBuffer(buf),
-          size: file.stat.size,
-          mtime: file.stat.mtime,
-          binary: true,
-        });
-      } else {
-        const content = normalizeLineEndings(await this.vault.read(file));
-        entries.set(normalizePath(file.path), {
-          hash: await hashContent(content),
-          size: content.length,
-          mtime: file.stat.mtime,
-        });
+      try {
+        const binary = !isTextFile(file.path);
+        if (binary) {
+          const buf = await this.vault.readBinary(file);
+          entries.set(normalizePath(file.path), {
+            hash: await hashBuffer(buf),
+            size: file.stat.size,
+            mtime: file.stat.mtime,
+            binary: true,
+          });
+        } else {
+          const content = normalizeLineEndings(await this.vault.read(file));
+          entries.set(normalizePath(file.path), {
+            hash: await hashContent(content),
+            size: content.length,
+            mtime: file.stat.mtime,
+          });
+        }
+      } catch {
+        new Notice(`Live Share: failed to read ${file.path}, skipping`);
       }
     }
 

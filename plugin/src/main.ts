@@ -1218,6 +1218,8 @@ class PromptModal extends Modal {
     });
     input.addEventListener("keydown", (e) => {
       if (e.key === "Enter") {
+        e.preventDefault();
+        e.stopPropagation();
         this.result = input.value;
         this.close();
       }
