@@ -10,6 +10,7 @@ import type { Permission, SessionRole } from "./types";
 export class CollabManager {
   private compartment = new Compartment();
   private currentPath: string | null = null;
+  private currentProvider: import("y-websocket").WebsocketProvider | null = null;
 
   getBaseExtension(): Extension {
     return this.compartment.of([]);
@@ -22,6 +23,10 @@ export class CollabManager {
     role?: SessionRole,
     permission?: Permission,
   ) {
+    if (this.currentProvider && filePath !== this.currentPath) {
+      this.currentProvider.awareness.setLocalState(null);
+      this.currentProvider = null;
+    }
     this.currentPath = filePath;
     if (!filePath) {
       view.dispatch({ effects: this.compartment.reconfigure([]) });
@@ -54,6 +59,7 @@ export class CollabManager {
       }
     }
 
+    this.currentProvider = docHandle.provider;
     const extensions: Extension[] = [yCollab(docHandle.text, docHandle.provider.awareness)];
     if (permission === "read-only") {
       extensions.push(EditorState.readOnly.of(true));
@@ -64,6 +70,10 @@ export class CollabManager {
   }
 
   deactivateAll(view: EditorView) {
+    if (this.currentProvider) {
+      this.currentProvider.awareness.setLocalState(null);
+      this.currentProvider = null;
+    }
     this.currentPath = null;
     view.dispatch({ effects: this.compartment.reconfigure([]) });
   }

@@ -66,9 +66,7 @@ export class FileOpsManager {
 
   async applyRemoteOp(op: FileOp) {
     const paths = this.getOpPaths(op);
-    const waitFor = paths
-      .map((path) => this.opQueues.get(path))
-      .filter(Boolean) as Promise<void>[];
+    const waitFor = paths.map((path) => this.opQueues.get(path)).filter(Boolean) as Promise<void>[];
     if (waitFor.length > 0) await Promise.all(waitFor);
 
     const promise = this.applyRemoteOpInner(op);
@@ -164,8 +162,7 @@ export class FileOpsManager {
             try {
               await this.vault.rename(file, op.newPath);
             } catch {
-              if (!this.vault.getAbstractFileByPath(op.newPath))
-                throw new Error("rename failed");
+              if (!this.vault.getAbstractFileByPath(op.newPath)) throw new Error("rename failed");
             }
           } else if (file && alreadyExists) {
             await this.vault.trash(file, true);
@@ -174,9 +171,7 @@ export class FileOpsManager {
         }
         case "chunk-start": {
           if (op.totalSize > MAX_FILE_SIZE) {
-            new Notice(
-              `Live Share: incoming ${op.path} exceeds 50 MB limit, skipping`,
-            );
+            new Notice(`Live Share: incoming ${op.path} exceeds 50 MB limit, skipping`);
             break;
           }
           this.pendingChunks.delete(op.path);
@@ -208,9 +203,7 @@ export class FileOpsManager {
             }
           }
           if (!chunksValid) {
-            new Notice(
-              `Live Share: incomplete transfer for ${op.path}, some chunks were lost`,
-            );
+            new Notice(`Live Share: incomplete transfer for ${op.path}, some chunks were lost`);
             break;
           }
 
@@ -243,11 +236,7 @@ export class FileOpsManager {
       }
     } catch {
       const detail =
-        "path" in op
-          ? op.path
-          : "oldPath" in op
-            ? (op as { oldPath: string }).oldPath
-            : "";
+        "path" in op ? op.path : "oldPath" in op ? (op as { oldPath: string }).oldPath : "";
       new Notice(`Live Share: failed to apply remote ${op.type} for ${detail}`);
     } finally {
       setTimeout(() => {
@@ -334,16 +323,10 @@ export class FileOpsManager {
   onFileRename(file: TAbstractFile, oldPath: string) {
     const newPath = normalizePath(file.path);
     const oldNorm = normalizePath(oldPath);
-    if (
-      this.isPathSuppressed(newPath) ||
-      this.isPathSuppressed(oldNorm) ||
-      !this.sendOp
-    )
-      return;
+    if (this.isPathSuppressed(newPath) || this.isPathSuppressed(oldNorm) || !this.sendOp) return;
     const prev = this.sendQueues.get(oldNorm) ?? Promise.resolve();
     const task = prev.then(() => {
-      if (this.sendOp)
-        this.sendOp({ type: "rename", oldPath: oldNorm, newPath });
+      if (this.sendOp) this.sendOp({ type: "rename", oldPath: oldNorm, newPath });
     });
     this.sendQueues.set(oldNorm, task);
     this.sendQueues.set(newPath, task);

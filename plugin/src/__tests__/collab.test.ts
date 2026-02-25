@@ -58,7 +58,7 @@ function createMockSyncManager(opts?: {
     transact: vi.fn((fn: () => void) => fn()),
   };
   const provider = {
-    awareness: { setLocalStateField: vi.fn() },
+    awareness: { setLocalStateField: vi.fn(), setLocalState: vi.fn() },
     synced: true,
   };
 
