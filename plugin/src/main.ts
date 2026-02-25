@@ -77,7 +77,7 @@ export default class LiveSharePlugin extends Plugin {
 
     this.statusBarEl = this.addStatusBarItem();
     this.statusBarEl.addEventListener("click", () => this.activatePresenceView());
-    this.statusBarEl.style.cursor = "pointer";
+    this.statusBarEl.addClass("live-share-status-bar");
     this.updateStatusBar();
 
     this.addCommand({
@@ -229,21 +229,18 @@ export default class LiveSharePlugin extends Plugin {
     );
 
     this.registerEvent(
-      this.app.vault.on("create", (file: TAbstractFile) => {
+      this.app.vault.on("create", async (file: TAbstractFile) => {
         if (!this.manifestManager.isSharedPath(file.path)) return;
         if (this.fileOpsManager.isPathSuppressed(file.path)) return;
         this.fileOpsManager.onFileCreate(file);
         if (this.settings.role === "host" && file instanceof TFile) {
-          if (isTextFile(file.path)) {
-            this.app.vault
-              .read(file)
-              .then((content) => this.manifestManager.updateFile(file, content))
-              .catch(() => {});
-          } else {
-            this.app.vault
-              .readBinary(file)
-              .then((buf) => this.manifestManager.updateFile(file, buf))
-              .catch(() => {});
+          try {
+            const content = isTextFile(file.path)
+              ? await this.app.vault.read(file)
+              : await this.app.vault.readBinary(file);
+            await this.manifestManager.updateFile(file, content);
+          } catch {
+            // file may have been deleted before we could read it
           }
         }
       }),
@@ -278,13 +275,12 @@ export default class LiveSharePlugin extends Plugin {
     );
 
     this.registerEvent(
-      this.app.vault.on("modify", (file: TAbstractFile) => {
+      this.app.vault.on("modify", async (file: TAbstractFile) => {
         if (file.path === ".liveshare.json") {
-          this.exclusionManager.loadConfig(this.app.vault).then(() => {
-            if (this.settings.role === "host") {
-              this.manifestManager.publishManifest();
-            }
-          });
+          await this.exclusionManager.loadConfig(this.app.vault);
+          if (this.settings.role === "host") {
+            await this.manifestManager.publishManifest();
+          }
           return;
         }
         if (
@@ -295,10 +291,12 @@ export default class LiveSharePlugin extends Plugin {
           if (this.fileOpsManager.isPathSuppressed(file.path)) return;
           this.fileOpsManager.onFileModify(file);
           if (this.settings.role === "host") {
-            this.app.vault
-              .readBinary(file)
-              .then((buf) => this.manifestManager.updateFile(file, buf))
-              .catch(() => {});
+            try {
+              const buf = await this.app.vault.readBinary(file);
+              await this.manifestManager.updateFile(file, buf);
+            } catch {
+              // file may have been deleted before we could read it
+            }
           }
         }
       }),
@@ -307,26 +305,24 @@ export default class LiveSharePlugin extends Plugin {
     this.addSettingTab(new LiveShareSettingTab(this.app, this));
 
     if (this.settings.roomId && this.settings.token && this.settings.role) {
-      this.connectSync()
-        .then(() => this.manifestManager.connect())
-        .then(() => {
-          if (this.settings.role === "host") {
-            this.manifestManager.publishManifest();
-          } else {
-            this.manifestManager.syncFromManifest();
-            this.manifestManager.onManifestChange(async (added, removed) => {
-              if (added.length > 0) {
-                const n = await this.manifestManager.syncFromManifest();
-                if (n > 0) new Notice(`Live Share: synced ${n} file(s)`);
-              }
-              for (const path of removed) {
-                const file = this.app.vault.getAbstractFileByPath(path);
-                if (file) await this.app.vault.trash(file, true);
-              }
-              if (removed.length > 0) new Notice(`Live Share: removed ${removed.length} file(s)`);
-            });
+      await this.connectSync();
+      await this.manifestManager.connect();
+      if (this.settings.role === "host") {
+        await this.manifestManager.publishManifest();
+      } else {
+        await this.manifestManager.syncFromManifest();
+        this.manifestManager.onManifestChange(async (added, removed) => {
+          if (added.length > 0) {
+            const n = await this.manifestManager.syncFromManifest();
+            if (n > 0) new Notice(`Live Share: synced ${n} file(s)`);
           }
+          for (const path of removed) {
+            const file = this.app.vault.getAbstractFileByPath(path);
+            if (file) await this.app.vault.trash(file, true);
+          }
+          if (removed.length > 0) new Notice(`Live Share: removed ${removed.length} file(s)`);
         });
+      }
     }
   }
 
@@ -849,8 +845,6 @@ class PromptModal extends Modal {
       placeholder: this.placeholder,
       cls: "live-share-prompt-input",
     });
-    input.style.width = "100%";
-    input.style.marginBottom = "1em";
     input.addEventListener("keydown", (e) => {
       if (e.key === "Enter") {
         this.result = input.value;

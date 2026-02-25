@@ -171,9 +171,6 @@ export class FileOpsManager {
           let chunksValid = true;
           for (let i = 0; i < expectedChunks; i++) {
             if (completed.chunks[i] === undefined) {
-              console.error(
-                `Live Share: chunk ${i}/${expectedChunks} missing for ${op.path}, aborting assembly`,
-              );
               chunksValid = false;
               break;
             }
@@ -203,8 +200,7 @@ export class FileOpsManager {
           break;
         }
       }
-    } catch (err) {
-      console.error("Live Share: failed to apply remote file op:", err);
+    } catch {
       new Notice(`Live Share: failed to apply remote ${op.type}`);
     } finally {
       // Delay unsuppress so that vault events (which fire asynchronously after
@@ -216,50 +212,46 @@ export class FileOpsManager {
     }
   }
 
-  onFileCreate(file: TAbstractFile) {
+  async onFileCreate(file: TAbstractFile) {
     const path = normalizePath(file.path);
     if (this.isPathSuppressed(path) || !this.sendOp) return;
     if (!("extension" in file)) return;
     const binary = !isTextFile(file.path);
-    if (binary) {
-      this.vault
-        .readBinary(file as TFile)
-        .then((buf) => {
-          if (this.isPathSuppressed(path)) return;
-          if (buf.byteLength > MAX_FILE_SIZE) return;
-          this.sendFileContent(path, arrayBufferToBase64(buf), true);
-        })
-        .catch(() => {});
-    } else {
-      this.vault
-        .read(file as TFile)
-        .then((content) => {
-          if (this.isPathSuppressed(path)) return;
-          this.sendFileContent(path, content, false);
-        })
-        .catch(() => {});
+    try {
+      if (binary) {
+        const buf = await this.vault.readBinary(file as TFile);
+        if (this.isPathSuppressed(path)) return;
+        if (buf.byteLength > MAX_FILE_SIZE) return;
+        this.sendFileContent(path, arrayBufferToBase64(buf), true);
+      } else {
+        const content = await this.vault.read(file as TFile);
+        if (this.isPathSuppressed(path)) return;
+        this.sendFileContent(path, content, false);
+      }
+    } catch {
+      // file may have been deleted before we could read it
     }
   }
 
-  onFileModify(file: TAbstractFile) {
+  async onFileModify(file: TAbstractFile) {
     const path = normalizePath(file.path);
     if (this.isPathSuppressed(path) || !this.sendOp) return;
     if (!("extension" in file)) return;
     const binary = !isTextFile(file.path);
     if (!binary) return; // Text files sync via Yjs
-    this.vault
-      .readBinary(file as TFile)
-      .then((buf) => {
-        if (this.isPathSuppressed(path)) return;
-        if (buf.byteLength > MAX_FILE_SIZE) return;
-        const content = arrayBufferToBase64(buf);
-        if (content.length > CHUNK_SIZE) {
-          this.sendChunked(path, content, true);
-        } else {
-          this.sendOp?.({ type: "modify", path, content, binary: true });
-        }
-      })
-      .catch(() => {});
+    try {
+      const buf = await this.vault.readBinary(file as TFile);
+      if (this.isPathSuppressed(path)) return;
+      if (buf.byteLength > MAX_FILE_SIZE) return;
+      const content = arrayBufferToBase64(buf);
+      if (content.length > CHUNK_SIZE) {
+        this.sendChunked(path, content, true);
+      } else {
+        this.sendOp?.({ type: "modify", path, content, binary: true });
+      }
+    } catch {
+      // file may have been deleted before we could read it
+    }
   }
 
   onFileDelete(file: TAbstractFile) {

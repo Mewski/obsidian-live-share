@@ -249,7 +249,7 @@ describe("ControlChannel", () => {
       expect(dispatched.encrypted).toBeUndefined();
     });
 
-    it("handles decryption failure gracefully (logs warning)", async () => {
+    it("handles decryption failure gracefully (silently drops message)", async () => {
       const e2e = createMockE2E();
       e2e.decryptString.mockRejectedValue(new Error("bad key"));
       channel = new CC(createSettings(), e2e as any);
@@ -257,7 +257,6 @@ describe("ControlChannel", () => {
       const handler = vi.fn();
       channel.on("file-op", handler);
 
-      const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
       const ws = connectAndGetWs(channel);
 
       ws.simulateMessage(
@@ -271,9 +270,6 @@ describe("ControlChannel", () => {
       await new Promise((r) => setTimeout(r, 50));
 
       expect(handler).not.toHaveBeenCalled();
-      expect(warnSpy).toHaveBeenCalledWith("Live Share: failed to decrypt control message");
-
-      warnSpy.mockRestore();
     });
 
     it("passes through delete ops without encrypting content", async () => {

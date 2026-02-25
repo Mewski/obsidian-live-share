@@ -108,6 +108,11 @@
   color: var(--text-error);
 }
 
+/* Status bar */
+.live-share-status-bar {
+  cursor: pointer;
+}
+
 /* Prompt input (used in start/join session dialogs) */
 .live-share-prompt-input {
   width: 100%;

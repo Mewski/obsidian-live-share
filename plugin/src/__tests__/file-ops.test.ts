@@ -382,7 +382,6 @@ describe("FileOpsManager", () => {
   describe("error recovery", () => {
     it("decrements suppressCount even when vault operation throws", async () => {
       vault.create.mockRejectedValueOnce(new Error("disk full"));
-      const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
 
       await manager.applyRemoteOp({
         type: "create",
@@ -393,15 +392,12 @@ describe("FileOpsManager", () => {
       manager.onFileDelete({ path: "local.md" } as any);
       expect(sentOps).toHaveLength(1);
       expect(sentOps[0].type).toBe("delete");
-
-      consoleSpy.mockRestore();
     });
 
     it("continues processing after a failed modify", async () => {
       const file = { path: "test.md", extension: "md" };
       vault.files.set("test.md", file);
       vault.modify.mockRejectedValueOnce(new Error("locked"));
-      const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
 
       await manager.applyRemoteOp({
         type: "modify",
@@ -409,16 +405,12 @@ describe("FileOpsManager", () => {
         content: "updated",
       });
 
-      expect(consoleSpy).toHaveBeenCalled();
-
       await manager.applyRemoteOp({
         type: "create",
         path: "next.md",
         content: "ok",
       });
       expect(vault.create).toHaveBeenCalledWith("next.md", "ok");
-
-      consoleSpy.mockRestore();
     });
   });
 

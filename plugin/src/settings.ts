@@ -21,11 +21,9 @@ export class LiveShareSettingTab extends PluginSettingTab {
         .setName("GitHub account")
         .setDesc(`Logged in as ${settings.displayName}`)
         .addButton((btn) =>
-          btn.setButtonText("Log out").onClick(() => {
-            authManager
-              .logout()
-              .then(() => this.display())
-              .catch(() => {});
+          btn.setButtonText("Log out").onClick(async () => {
+            await authManager.logout();
+            this.display();
           }),
         );
     } else {
@@ -36,11 +34,9 @@ export class LiveShareSettingTab extends PluginSettingTab {
           btn
             .setButtonText("Log in with GitHub")
             .setCta()
-            .onClick(() => {
-              authManager
-                .authenticate()
-                .then(() => this.display())
-                .catch(() => {});
+            .onClick(async () => {
+              await authManager.authenticate();
+              this.display();
             }),
         );
     }

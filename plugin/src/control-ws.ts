@@ -203,8 +203,8 @@ export class ControlChannel {
           this.ws.send(JSON.stringify(msg));
         }
       }
-    } catch (err) {
-      console.error("Live Share: encryption failed, message dropped:", err);
+    } catch {
+      // encryption failed — drop the message rather than sending plaintext
     }
   }
 
@@ -233,7 +233,7 @@ export class ControlChannel {
         for (const h of handlers) h(decMsg as ControlMessage);
       }
     } catch {
-      console.warn("Live Share: failed to decrypt control message");
+      // decryption failed — ignore malformed/miskeyed message
     }
   }
 
