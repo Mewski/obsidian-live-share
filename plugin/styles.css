@@ -70,6 +70,7 @@
   height: 10px;
   border-radius: 50%;
   flex-shrink: 0;
+  background-color: var(--cursor-color, var(--text-muted));
 }
 
 .live-share-presence-info {
