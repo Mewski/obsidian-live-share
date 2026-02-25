@@ -24,6 +24,7 @@ export class FileOpsManager {
   private suppressedPaths = new Map<string, number>();
   private pendingChunks = new Map<string, ChunkAssembly>();
   private opQueues = new Map<string, Promise<void>>();
+  private sendQueues = new Map<string, Promise<void>>();
 
   constructor(vault: Vault) {
     this.vault = vault;
@@ -239,24 +240,31 @@ export class FileOpsManager {
       this.sendOp({ type: "folder-create", path });
       return;
     }
-    const binary = !isTextFile(file.path);
-    try {
-      if (binary) {
-        const buf = await this.vault.readBinary(file as TFile);
-        if (this.isPathSuppressed(path)) return;
-        if (buf.byteLength > MAX_FILE_SIZE) {
-          new Notice(`Live Share: ${path} exceeds 50 MB limit, skipping`);
-          return;
+    const prev = this.sendQueues.get(path) ?? Promise.resolve();
+    const task = prev.then(async () => {
+      if (!this.sendOp) return;
+      const binary = !isTextFile(file.path);
+      try {
+        if (binary) {
+          const buf = await this.vault.readBinary(file as TFile);
+          if (this.isPathSuppressed(path)) return;
+          if (buf.byteLength > MAX_FILE_SIZE) {
+            new Notice(`Live Share: ${path} exceeds 50 MB limit, skipping`);
+            return;
+          }
+          this.sendFileContent(path, arrayBufferToBase64(buf), true);
+        } else {
+          const content = await this.vault.read(file as TFile);
+          if (this.isPathSuppressed(path)) return;
+          this.sendFileContent(path, content, false);
         }
-        this.sendFileContent(path, arrayBufferToBase64(buf), true);
-      } else {
-        const content = await this.vault.read(file as TFile);
-        if (this.isPathSuppressed(path)) return;
-        this.sendFileContent(path, content, false);
+      } catch {
+        new Notice(`Live Share: failed to sync ${path}`);
       }
-    } catch {
-      new Notice(`Live Share: failed to sync ${path}`);
-    }
+    });
+    this.sendQueues.set(path, task);
+    await task;
+    if (this.sendQueues.get(path) === task) this.sendQueues.delete(path);
   }
 
   async onFileModify(file: TAbstractFile) {
@@ -265,35 +273,51 @@ export class FileOpsManager {
     if (!("extension" in file)) return;
     const binary = !isTextFile(file.path);
     if (!binary) return;
-    try {
-      const buf = await this.vault.readBinary(file as TFile);
-      if (this.isPathSuppressed(path)) return;
-      if (buf.byteLength > MAX_FILE_SIZE) {
-        new Notice(`Live Share: ${path} exceeds 50 MB limit, skipping`);
-        return;
+    const prev = this.sendQueues.get(path) ?? Promise.resolve();
+    const task = prev.then(async () => {
+      if (!this.sendOp) return;
+      try {
+        const buf = await this.vault.readBinary(file as TFile);
+        if (this.isPathSuppressed(path)) return;
+        if (buf.byteLength > MAX_FILE_SIZE) {
+          new Notice(`Live Share: ${path} exceeds 50 MB limit, skipping`);
+          return;
+        }
+        const content = arrayBufferToBase64(buf);
+        if (content.length > CHUNK_SIZE) {
+          this.sendChunked(path, content, true);
+        } else {
+          this.sendOp?.({ type: "modify", path, content, binary: true });
+        }
+      } catch {
+        new Notice(`Live Share: failed to sync ${path}`);
       }
-      const content = arrayBufferToBase64(buf);
-      if (content.length > CHUNK_SIZE) {
-        this.sendChunked(path, content, true);
-      } else {
-        this.sendOp?.({ type: "modify", path, content, binary: true });
-      }
-    } catch {
-      new Notice(`Live Share: failed to sync ${path}`);
-    }
+    });
+    this.sendQueues.set(path, task);
+    await task;
+    if (this.sendQueues.get(path) === task) this.sendQueues.delete(path);
   }
 
   onFileDelete(file: TAbstractFile) {
     const path = normalizePath(file.path);
     if (this.isPathSuppressed(path) || !this.sendOp) return;
-    this.sendOp({ type: "delete", path });
+    const prev = this.sendQueues.get(path) ?? Promise.resolve();
+    const task = prev.then(() => {
+      if (this.sendOp) this.sendOp({ type: "delete", path });
+    });
+    this.sendQueues.set(path, task);
   }
 
   onFileRename(file: TAbstractFile, oldPath: string) {
     const newPath = normalizePath(file.path);
     const oldNorm = normalizePath(oldPath);
     if (this.isPathSuppressed(newPath) || this.isPathSuppressed(oldNorm) || !this.sendOp) return;
-    this.sendOp({ type: "rename", oldPath: oldNorm, newPath });
+    const prev = this.sendQueues.get(oldNorm) ?? Promise.resolve();
+    const task = prev.then(() => {
+      if (this.sendOp) this.sendOp({ type: "rename", oldPath: oldNorm, newPath });
+    });
+    this.sendQueues.set(oldNorm, task);
+    this.sendQueues.set(newPath, task);
   }
 
   private sendFileContent(path: string, content: string, binary: boolean) {

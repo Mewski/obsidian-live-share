@@ -140,7 +140,7 @@ describe("FileOpsManager", () => {
       expect(sentOps.length).toBe(0);
 
       manager.onFileDelete({ path: "other.md" } as any);
-      expect(sentOps.length).toBe(1);
+      await vi.waitFor(() => expect(sentOps.length).toBe(1));
     });
   });
 
@@ -165,14 +165,18 @@ describe("FileOpsManager", () => {
       expect(sentOps).toEqual([{ type: "folder-create", path: "my-folder" }]);
     });
 
-    it("broadcasts file delete", () => {
+    it("broadcasts file delete", async () => {
       manager.onFileDelete({ path: "deleted.md" } as any);
-      expect(sentOps).toEqual([{ type: "delete", path: "deleted.md" }]);
+      await vi.waitFor(() => expect(sentOps).toEqual([{ type: "delete", path: "deleted.md" }]));
     });
 
-    it("broadcasts file rename", () => {
+    it("broadcasts file rename", async () => {
       manager.onFileRename({ path: "new-name.md" } as any, "old-name.md");
-      expect(sentOps).toEqual([{ type: "rename", oldPath: "old-name.md", newPath: "new-name.md" }]);
+      await vi.waitFor(() =>
+        expect(sentOps).toEqual([
+          { type: "rename", oldPath: "old-name.md", newPath: "new-name.md" },
+        ]),
+      );
     });
 
     it("does not broadcast when no sender is set", () => {
@@ -395,7 +399,7 @@ describe("FileOpsManager", () => {
       });
 
       manager.onFileDelete({ path: "local.md" } as any);
-      expect(sentOps).toHaveLength(1);
+      await vi.waitFor(() => expect(sentOps).toHaveLength(1));
       expect(sentOps[0].type).toBe("delete");
     });
 
