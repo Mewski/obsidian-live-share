@@ -309,4 +309,145 @@ describe("WebSocket handler", () => {
     roDoc.destroy();
     docA.destroy();
   });
+
+  it("live-updates read-only status when permission changes after connect", async () => {
+    const room = await createRoom("live-perm-update");
+    const userId = "switchable-user";
+
+    // Initially read-write
+    setPermission(room.id, userId, "read-write");
+
+    const clientA = await connectWs(room.id, room.token);
+    await waitForMessages(clientA.messages, 1);
+
+    const rwUrl = `ws://localhost:${port}/ws/${room.id}?token=${room.token}&userId=${userId}`;
+    const clientB = await new Promise<{
+      ws: WebSocket;
+      messages: Uint8Array[];
+    }>((resolve, reject) => {
+      const ws = new WebSocket(rwUrl);
+      const messages: Uint8Array[] = [];
+      ws.on("message", (data: Buffer | ArrayBuffer | Buffer[]) => {
+        if (Buffer.isBuffer(data)) messages.push(new Uint8Array(data));
+        else if (data instanceof ArrayBuffer) messages.push(new Uint8Array(data));
+        else messages.push(new Uint8Array(Buffer.concat(data as Buffer[])));
+      });
+      ws.on("open", () => {
+        openSockets.push(ws);
+        resolve({ ws, messages });
+      });
+      ws.on("error", reject);
+    });
+    await waitForMessages(clientB.messages, 1);
+
+    const docA = new Y.Doc();
+    sendSyncStep1(clientA.ws, docA);
+    await new Promise((r) => setTimeout(r, 150));
+
+    // clientB sends an update while read-write — should go through
+    const rwDoc = new Y.Doc();
+    rwDoc.getText("content").insert(0, "rw-allowed");
+    const rwUpdate = Y.encodeStateAsUpdate(rwDoc);
+    const msgCountBefore = clientA.messages.length;
+    sendUpdate(clientB.ws, rwUpdate);
+    await new Promise((r) => setTimeout(r, 500));
+    expect(clientA.messages.length).toBeGreaterThan(msgCountBefore);
+
+    // Now change permission to read-only via the shared store + live update
+    // In production this is called by the control handler's onPermissionChange callback
+    // which triggers yjs.updatePermission(). We simulate by importing it from the app.
+    // Since we can't access the yjs instance directly, we use setPermission + a control
+    // channel set-permission message. Instead, let's directly test via the permission store.
+    setPermission(room.id, userId, "read-only");
+
+    // The Yjs handler won't pick this up automatically — it requires updatePermission().
+    // In a real scenario, the control handler calls options.onPermissionChange which
+    // calls yjs.updatePermission(). We need to trigger that through the control channel.
+
+    // Connect to control channel as host and send set-permission
+    const ctrlHost = await new Promise<WebSocket>((resolve, reject) => {
+      const ws = new WebSocket(`ws://localhost:${port}/control/${room.id}?token=${room.token}`);
+      ws.on("open", () => {
+        openSockets.push(ws);
+        resolve(ws);
+      });
+      ws.on("error", reject);
+    });
+    await new Promise((r) => setTimeout(r, 50));
+
+    // Identify as host
+    ctrlHost.send(
+      JSON.stringify({
+        type: "presence-update",
+        userId: "ctrl-host",
+        displayName: "Host",
+        isHost: true,
+      }),
+    );
+    await new Promise((r) => setTimeout(r, 100));
+
+    // Set the user to read-only via set-permission (this triggers onPermissionChange → updatePermission)
+    ctrlHost.send(
+      JSON.stringify({
+        type: "set-permission",
+        userId,
+        permission: "read-only",
+      }),
+    );
+    await new Promise((r) => setTimeout(r, 200));
+
+    // Now clientB sends another update — should be BLOCKED
+    const roDoc = new Y.Doc();
+    roDoc.getText("content").insert(0, "should-be-blocked");
+    const roUpdate = Y.encodeStateAsUpdate(roDoc);
+    const msgCountAfter = clientA.messages.length;
+    sendUpdate(clientB.ws, roUpdate);
+    await new Promise((r) => setTimeout(r, 500));
+    expect(clientA.messages.length).toBe(msgCountAfter);
+
+    rwDoc.destroy();
+    roDoc.destroy();
+    docA.destroy();
+  });
+
+  it("blocks messageFileOp for read-only clients", async () => {
+    const room = await createRoom("ro-fileop");
+    const roUserId = "ro-fileop-user";
+    setPermission(room.id, roUserId, "read-only");
+
+    const clientA = await connectWs(room.id, room.token);
+    await waitForMessages(clientA.messages, 1);
+
+    const roUrl = `ws://localhost:${port}/ws/${room.id}?token=${room.token}&userId=${roUserId}`;
+    const roClient = await new Promise<{
+      ws: WebSocket;
+      messages: Uint8Array[];
+    }>((resolve, reject) => {
+      const ws = new WebSocket(roUrl);
+      const messages: Uint8Array[] = [];
+      ws.on("message", (data: Buffer | ArrayBuffer | Buffer[]) => {
+        if (Buffer.isBuffer(data)) messages.push(new Uint8Array(data));
+        else if (data instanceof ArrayBuffer) messages.push(new Uint8Array(data));
+        else messages.push(new Uint8Array(Buffer.concat(data as Buffer[])));
+      });
+      ws.on("open", () => {
+        openSockets.push(ws);
+        resolve({ ws, messages });
+      });
+      ws.on("error", reject);
+    });
+    await waitForMessages(roClient.messages, 1);
+
+    await new Promise((r) => setTimeout(r, 150));
+    const msgCountBefore = clientA.messages.length;
+
+    // Read-only client sends a fileOp — should be blocked
+    const encoder = encoding.createEncoder();
+    encoding.writeVarUint(encoder, messageFileOp);
+    encoding.writeVarString(encoder, '{"type":"create","path":"hack.md","content":"nope"}');
+    roClient.ws.send(encoding.toUint8Array(encoder));
+
+    await new Promise((r) => setTimeout(r, 500));
+    expect(clientA.messages.length).toBe(msgCountBefore);
+  });
 });

@@ -739,6 +739,130 @@ describe("Control WebSocket handler", () => {
     expect(permMsg).toBeUndefined();
   });
 
+  it("unapproved client cannot send file-ops in requireApproval room", async () => {
+    const room = await createRoom("ctrl-unapproved-fileop");
+
+    const { getRoom } = await import("../rooms.js");
+    const serverRoom = getRoom(room.id);
+    expect(serverRoom).toBeDefined();
+    serverRoom!.requireApproval = true;
+
+    // Connect host and identify
+    const host = await connectControl(room.id, room.token);
+    await new Promise((r) => setTimeout(r, 50));
+    sendJSON(host.ws, {
+      type: "presence-update",
+      userId: "host-1",
+      displayName: "Host",
+      isHost: true,
+    });
+    await new Promise((r) => setTimeout(r, 100));
+
+    // Connect guest — sends join-request but is NOT approved yet
+    const guest = await connectControl(room.id, room.token);
+    await new Promise((r) => setTimeout(r, 50));
+    sendJSON(guest.ws, {
+      type: "join-request",
+      userId: "unapproved-guest",
+      displayName: "Guest",
+    });
+    await new Promise((r) => setTimeout(r, 100));
+
+    // Guest tries to send file-op while unapproved — should be blocked
+    host.messages.length = 0;
+    sendJSON(guest.ws, {
+      type: "file-op",
+      op: "create",
+      path: "sneaky.md",
+      content: "should not arrive",
+    });
+
+    await new Promise((r) => setTimeout(r, 300));
+    const fileOpMsg = host.messages.find((m) => {
+      const parsed = JSON.parse(m);
+      return parsed.type === "file-op";
+    });
+    expect(fileOpMsg).toBeUndefined();
+  });
+
+  it("userId cannot be changed via second join-request", async () => {
+    const room = await createRoom("ctrl-userid-lock");
+
+    // First client becomes host via join-request
+    const host = await connectControl(room.id, room.token);
+    await new Promise((r) => setTimeout(r, 50));
+    sendJSON(host.ws, {
+      type: "join-request",
+      userId: "host-1",
+      displayName: "Host",
+    });
+    await new Promise((r) => setTimeout(r, 100));
+
+    // Second client sends join-request with "original-id"
+    const guest = await connectControl(room.id, room.token);
+    await new Promise((r) => setTimeout(r, 50));
+    sendJSON(guest.ws, {
+      type: "join-request",
+      userId: "original-id",
+      displayName: "Original",
+    });
+    await new Promise((r) => setTimeout(r, 100));
+
+    // Guest sends another join-request trying to change userId
+    sendJSON(guest.ws, {
+      type: "join-request",
+      userId: "spoofed-id",
+      displayName: "Spoofed",
+    });
+    await new Promise((r) => setTimeout(r, 100));
+
+    // Host kicks "spoofed-id" — should NOT affect guest (userId is still "original-id")
+    sendJSON(host.ws, { type: "kick", userId: "spoofed-id" });
+    await new Promise((r) => setTimeout(r, 300));
+    expect(guest.ws.readyState).toBe(WebSocket.OPEN);
+
+    // Host kicks "original-id" — SHOULD kick the guest
+    const guestClosed = new Promise<void>((resolve) => {
+      guest.ws.on("close", () => resolve());
+    });
+    sendJSON(host.ws, { type: "kick", userId: "original-id" });
+    await guestClosed;
+    expect(guest.ws.readyState).toBe(WebSocket.CLOSED);
+  });
+
+  it("first client becomes host via join-request (not just presence-update)", async () => {
+    const room = await createRoom("ctrl-host-via-join");
+
+    const client = await connectControl(room.id, room.token);
+    await new Promise((r) => setTimeout(r, 50));
+
+    // Send join-request (not presence-update) — should become host
+    sendJSON(client.ws, {
+      type: "join-request",
+      userId: "first-user",
+      displayName: "First",
+    });
+    await new Promise((r) => setTimeout(r, 100));
+
+    // Connect a second client
+    const guest = await connectControl(room.id, room.token);
+    await new Promise((r) => setTimeout(r, 50));
+    sendJSON(guest.ws, {
+      type: "join-request",
+      userId: "second-user",
+      displayName: "Second",
+    });
+    await new Promise((r) => setTimeout(r, 100));
+
+    // First client should be able to kick (proves they are host)
+    const guestClosed = new Promise<void>((resolve) => {
+      guest.ws.on("close", () => resolve());
+    });
+    sendJSON(client.ws, { type: "kick", userId: "second-user" });
+    await guestClosed;
+    expect(guest.ws.readyState).toBe(WebSocket.CLOSED);
+  });
+
   it("set-permission with invalid permission value is ignored", async () => {
     const room = await createRoom("ctrl-set-perm-invalid");
 
