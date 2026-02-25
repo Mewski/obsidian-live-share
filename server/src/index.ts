@@ -63,10 +63,9 @@ export function createApp(
   server.on("upgrade", (req, socket, head) => {
     const url = new URL(req.url || "", `http://${req.headers.host}`);
 
-    const wsMatch = url.pathname.match(/^\/ws\/(.+)$/);
-    if (wsMatch) {
-      const fullRoomName = wsMatch[1];
-      const baseRoomId = fullRoomName.split(":")[0];
+    const muxMatch = url.pathname.match(/^\/ws-mux\/(.+)$/);
+    if (muxMatch) {
+      const baseRoomId = muxMatch[1];
       const room = getRoom(baseRoomId);
       const token = url.searchParams.get("token");
       if (!room || !token || !safeTokenCompare(token, room.token)) {
@@ -82,8 +81,8 @@ export function createApp(
         }
       }
 
-      yjs.wss.handleUpgrade(req, socket, head, (ws) => {
-        yjs.wss.emit("connection", ws, req, fullRoomName);
+      yjs.muxWss.handleUpgrade(req, socket, head, (ws) => {
+        yjs.muxWss.emit("connection", ws, req, baseRoomId);
       });
       return;
     }

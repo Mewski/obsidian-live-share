@@ -3,7 +3,7 @@ import type * as Y from "yjs";
 
 import type { FileOpsManager } from "./file-ops";
 import type { ManifestManager } from "./manifest";
-import { type SyncManager, waitForSync } from "./sync";
+import type { SyncManager } from "./sync";
 import type { SessionRole } from "./types";
 import {
   VAULT_EVENT_SETTLE_MS,
@@ -52,7 +52,7 @@ export class BackgroundSync {
       if (!docHandle) return;
 
       try {
-        await waitForSync(docHandle.provider);
+        await this.syncManager.waitForSync(path);
       } catch {
         return;
       }

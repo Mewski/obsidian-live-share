@@ -25,13 +25,7 @@ vi.mock("@codemirror/state", () => {
   };
 });
 
-vi.mock("../sync", () => ({
-  waitForSync: vi.fn(async () => {}),
-  SyncManager: vi.fn(),
-}));
-
 const { CollabManager } = await import("../collab");
-const { waitForSync } = await import("../sync");
 
 function createMockView() {
   return {
@@ -57,19 +51,20 @@ function createMockSyncManager(opts?: {
   const doc = {
     transact: vi.fn((fn: () => void) => fn()),
   };
-  const provider = {
-    awareness: { setLocalStateField: vi.fn(), setLocalState: vi.fn() },
-    synced: true,
+  const awareness = {
+    setLocalStateField: vi.fn(),
+    setLocalState: vi.fn(),
   };
 
   return {
     getDoc: vi.fn((_path: string) => {
       if (opts?.returnNull) return null;
-      return { doc, text, provider };
+      return { doc, text, awareness };
     }),
+    waitForSync: vi.fn(async () => {}),
     _text: text,
     _doc: doc,
-    _provider: provider,
+    _awareness: awareness,
   };
 }
 
@@ -81,7 +76,6 @@ describe("CollabManager", () => {
     reconfigureCalls.length = 0;
     ofCalls.length = 0;
     vi.resetAllMocks();
-    vi.mocked(waitForSync).mockResolvedValue(undefined);
   });
 
   describe("getBaseExtension", () => {
@@ -115,9 +109,9 @@ describe("CollabManager", () => {
     });
 
     it("reconfigures to empty when sync times out", async () => {
-      vi.mocked(waitForSync).mockRejectedValueOnce(new Error("timeout"));
       const view = createMockView();
       const syncManager = createMockSyncManager();
+      syncManager.waitForSync.mockRejectedValueOnce(new Error("timeout"));
 
       await collab.activateForFile(view as any, "test.md", syncManager as any);
 
@@ -209,16 +203,15 @@ describe("CollabManager", () => {
     });
 
     it("bails out if file switched during sync wait", async () => {
+      const view = createMockView();
+      const syncManager = createMockSyncManager();
       let resolveWait!: () => void;
-      vi.mocked(waitForSync).mockImplementation(
+      syncManager.waitForSync.mockImplementation(
         () =>
           new Promise<void>((resolve) => {
             resolveWait = resolve;
           }),
       );
-
-      const view = createMockView();
-      const syncManager = createMockSyncManager();
 
       const promise = collab.activateForFile(view as any, "first.md", syncManager as any, "host");
 

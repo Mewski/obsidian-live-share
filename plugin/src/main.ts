@@ -421,7 +421,7 @@ export default class LiveSharePlugin extends Plugin {
     if (this.settings.roomId && this.settings.token && this.settings.role) {
       try {
         await this.connectSync();
-        await this.manifestManager.connect();
+        await this.manifestManager.connect(this.syncManager);
         if (this.settings.role === "host") {
           await this.manifestManager.publishManifest();
           await this.backgroundSync.startAll("host");
@@ -574,7 +574,7 @@ export default class LiveSharePlugin extends Plugin {
     if (ok) {
       try {
         await this.connectSync();
-        await this.manifestManager.connect();
+        await this.manifestManager.connect(this.syncManager);
         await this.manifestManager.publishManifest({ purge: true });
         await this.backgroundSync.startAll("host");
         this.onActiveFileChange();
@@ -598,7 +598,7 @@ export default class LiveSharePlugin extends Plugin {
     if (ok) {
       try {
         await this.connectSync();
-        await this.manifestManager.connect();
+        await this.manifestManager.connect(this.syncManager);
         await this.cleanupStaleFiles();
         const syncedCount = await this.manifestManager.syncFromManifest(
           this.mutePathEvents,
@@ -1060,7 +1060,16 @@ export default class LiveSharePlugin extends Plugin {
 
   private summonUser(userId: string) {
     if (this.settings.role !== "host" || !this.controlChannel) return;
-    const view = this.app.workspace.getActiveViewOfType(MarkdownView);
+    let view = this.app.workspace.getActiveViewOfType(MarkdownView);
+    if (!view) {
+      const leaves = this.app.workspace.getLeavesOfType("markdown");
+      for (const leaf of leaves) {
+        if (leaf.view instanceof MarkdownView) {
+          view = leaf.view;
+          break;
+        }
+      }
+    }
     const cursor = view?.editor?.getCursor();
     const filePath = view?.file?.path;
     if (!filePath) {

@@ -3,8 +3,9 @@ import type { Extension } from "@codemirror/state";
 import type { EditorView } from "@codemirror/view";
 import { Notice } from "obsidian";
 import { yCollab } from "y-codemirror.next";
+import type * as awarenessProtocol from "y-protocols/awareness";
 
-import { type SyncManager, waitForSync } from "./sync";
+import type { SyncManager } from "./sync";
 import type { Permission, SessionRole } from "./types";
 import { applyMinimalYTextUpdate, normalizeLineEndings } from "./utils";
 
@@ -17,7 +18,7 @@ export interface CursorUser {
 export class CollabManager {
   private compartment = new Compartment();
   private currentPath: string | null = null;
-  private currentProvider: import("y-websocket").WebsocketProvider | null = null;
+  private currentAwareness: awarenessProtocol.Awareness | null = null;
   private activationGen = 0;
 
   getBaseExtension(): Extension {
@@ -34,36 +35,36 @@ export class CollabManager {
   ) {
     const gen = ++this.activationGen;
 
-    if (this.currentProvider && filePath !== this.currentPath) {
-      this.currentProvider.awareness.setLocalState(null);
-      this.currentProvider = null;
+    if (this.currentAwareness && filePath !== this.currentPath) {
+      this.currentAwareness.setLocalState(null);
+      this.currentAwareness = null;
     }
     this.currentPath = filePath;
     if (!filePath) {
-      if (this.currentProvider) {
-        this.currentProvider.awareness.setLocalState(null);
-        this.currentProvider = null;
+      if (this.currentAwareness) {
+        this.currentAwareness.setLocalState(null);
+        this.currentAwareness = null;
       }
       view.dispatch({ effects: this.compartment.reconfigure([]) });
       return;
     }
     const docHandle = syncManager.getDoc(filePath);
     if (!docHandle) {
-      if (this.currentProvider) {
-        this.currentProvider.awareness.setLocalState(null);
-        this.currentProvider = null;
+      if (this.currentAwareness) {
+        this.currentAwareness.setLocalState(null);
+        this.currentAwareness = null;
       }
       view.dispatch({ effects: this.compartment.reconfigure([]) });
       return;
     }
 
     try {
-      await waitForSync(docHandle.provider);
+      await syncManager.waitForSync(filePath);
     } catch {
       new Notice("Live Share: sync timed out");
-      if (this.currentProvider) {
-        this.currentProvider.awareness.setLocalState(null);
-        this.currentProvider = null;
+      if (this.currentAwareness) {
+        this.currentAwareness.setLocalState(null);
+        this.currentAwareness = null;
       }
       view.dispatch({ effects: this.compartment.reconfigure([]) });
       return;
@@ -85,11 +86,11 @@ export class CollabManager {
       applyMinimalYTextUpdate(docHandle.doc, docHandle.text, localContent);
     }
 
-    this.currentProvider = docHandle.provider;
+    this.currentAwareness = docHandle.awareness;
     if (cursorUser) {
-      docHandle.provider.awareness.setLocalStateField("user", cursorUser);
+      docHandle.awareness.setLocalStateField("user", cursorUser);
     }
-    const extensions: Extension[] = [yCollab(docHandle.text, docHandle.provider.awareness)];
+    const extensions: Extension[] = [yCollab(docHandle.text, docHandle.awareness)];
     if (permission === "read-only") {
       extensions.push(EditorState.readOnly.of(true));
     }
@@ -100,9 +101,9 @@ export class CollabManager {
 
   deactivateAll(view: EditorView) {
     this.activationGen++;
-    if (this.currentProvider) {
-      this.currentProvider.awareness.setLocalState(null);
-      this.currentProvider = null;
+    if (this.currentAwareness) {
+      this.currentAwareness.setLocalState(null);
+      this.currentAwareness = null;
     }
     this.currentPath = null;
     view.dispatch({ effects: this.compartment.reconfigure([]) });

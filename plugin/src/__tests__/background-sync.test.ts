@@ -2,10 +2,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import * as Y from "yjs";
 import { BackgroundSync } from "../background-sync";
 
-vi.mock("y-websocket", () => ({
-  WebsocketProvider: vi.fn(),
-}));
-
 function createVault() {
   return {
     getAbstractFileByPath: vi.fn(() => null),
@@ -18,30 +14,28 @@ function createVault() {
 }
 
 function createSyncManager() {
-  const docs = new Map<string, { doc: Y.Doc; text: Y.Text; provider: any }>();
+  const docs = new Map<string, { doc: Y.Doc; text: Y.Text; awareness: any }>();
   return {
     getDoc(path: string) {
       if (!docs.has(path)) {
         const doc = new Y.Doc();
         const text = doc.getText("content");
-        const provider = {
-          synced: true,
-          once: vi.fn(),
-          on: vi.fn(),
-          destroy: vi.fn(),
+        const awareness = {
+          setLocalStateField: vi.fn(),
+          setLocalState: vi.fn(),
         };
-        docs.set(path, { doc, text, provider });
+        docs.set(path, { doc, text, awareness });
       }
       return docs.get(path)!;
     },
     releaseDoc(path: string) {
       const entry = docs.get(path);
       if (entry) {
-        entry.provider.destroy();
         entry.doc.destroy();
         docs.delete(path);
       }
     },
+    waitForSync: vi.fn(async () => {}),
     _docs: docs,
   } as any;
 }

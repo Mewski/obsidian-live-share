@@ -4,20 +4,6 @@ import { ExclusionManager } from "../exclusion";
 import { ManifestManager } from "../manifest";
 import type { LiveShareSettings } from "../types";
 
-const { MockWebsocketProvider } = vi.hoisted(() => {
-  const MockWebsocketProvider = vi.fn(function (this: any) {
-    this.destroy = vi.fn();
-    this.synced = true;
-    this.on = vi.fn();
-    this.off = vi.fn();
-    this.once = vi.fn();
-  });
-  return { MockWebsocketProvider };
-});
-vi.mock("y-websocket", () => ({
-  WebsocketProvider: MockWebsocketProvider,
-}));
-
 function createSettings(overrides: Partial<LiveShareSettings> = {}): LiveShareSettings {
   return {
     serverUrl: "http://localhost:3000",
@@ -51,10 +37,48 @@ function createVault() {
   };
 }
 
+function createMockSyncManager() {
+  const docs = new Map<string, { doc: Y.Doc; text: Y.Text }>();
+  return {
+    getDoc: vi.fn((path: string) => {
+      if (!docs.has(path)) {
+        const doc = new Y.Doc();
+        docs.set(path, { doc, text: doc.getText("content") });
+      }
+      const entry = docs.get(path)!;
+      return {
+        doc: entry.doc,
+        text: entry.text,
+        awareness: {
+          setLocalStateField: vi.fn(),
+          setLocalState: vi.fn(),
+          destroy: vi.fn(),
+        },
+      };
+    }),
+    waitForSync: vi.fn(async () => {}),
+    releaseDoc: vi.fn(),
+    connect: vi.fn(),
+    disconnect: vi.fn(),
+    destroy: vi.fn(),
+    updateSettings: vi.fn(),
+    _docs: docs,
+  };
+}
+
 function injectManifest(manager: ManifestManager) {
   const doc = new Y.Doc();
   const manifest = doc.getMap<any>("files");
-  (manager as any).doc = doc;
+  const docHandle = {
+    doc,
+    text: doc.getText("content"),
+    awareness: {
+      setLocalStateField: vi.fn(),
+      setLocalState: vi.fn(),
+      destroy: vi.fn(),
+    },
+  };
+  (manager as any).docHandle = docHandle;
   (manager as any).manifest = manifest;
   return { doc, manifest };
 }
@@ -455,6 +479,7 @@ describe("ManifestManager", () => {
     it("rejects paths starting with /", async () => {
       const manager = new ManifestManager(vault as any, createSettings());
       const { manifest } = injectManifest(manager);
+      (manager as any).syncManager = createMockSyncManager();
 
       manifest.set("/etc/passwd", { hash: "abc", size: 10, mtime: 1000 });
 
@@ -465,6 +490,7 @@ describe("ManifestManager", () => {
     it("rejects paths starting with backslash", async () => {
       const manager = new ManifestManager(vault as any, createSettings());
       const { manifest } = injectManifest(manager);
+      (manager as any).syncManager = createMockSyncManager();
 
       manifest.set("\\Windows\\system32\\bad", {
         hash: "abc",
@@ -479,6 +505,7 @@ describe("ManifestManager", () => {
     it("rejects paths with .. traversal", async () => {
       const manager = new ManifestManager(vault as any, createSettings());
       const { manifest } = injectManifest(manager);
+      (manager as any).syncManager = createMockSyncManager();
 
       manifest.set("shared/../../../etc/passwd", {
         hash: "abc",
@@ -493,6 +520,7 @@ describe("ManifestManager", () => {
     it("rejects paths starting with ..", async () => {
       const manager = new ManifestManager(vault as any, createSettings());
       const { manifest } = injectManifest(manager);
+      (manager as any).syncManager = createMockSyncManager();
 
       manifest.set("../escape.md", { hash: "abc", size: 10, mtime: 1000 });
 
@@ -503,6 +531,7 @@ describe("ManifestManager", () => {
     it("rejects empty paths", async () => {
       const manager = new ManifestManager(vault as any, createSettings());
       const { manifest } = injectManifest(manager);
+      (manager as any).syncManager = createMockSyncManager();
 
       manifest.set("", { hash: "abc", size: 10, mtime: 1000 });
 
@@ -513,6 +542,7 @@ describe("ManifestManager", () => {
     it("allows paths with consecutive dots in filenames", async () => {
       const manager = new ManifestManager(vault as any, createSettings());
       const { manifest } = injectManifest(manager);
+      (manager as any).syncManager = createMockSyncManager();
 
       manifest.set("file..name.png", {
         hash: "abc",
@@ -531,6 +561,7 @@ describe("ManifestManager", () => {
     it("skips unsafe paths and syncs only valid ones", async () => {
       const manager = new ManifestManager(vault as any, createSettings());
       const { manifest } = injectManifest(manager);
+      (manager as any).syncManager = createMockSyncManager();
 
       manifest.set("/absolute.md", { hash: "a", size: 1, mtime: 1000 });
       manifest.set("../escape.md", { hash: "b", size: 1, mtime: 1000 });
@@ -554,6 +585,7 @@ describe("ManifestManager", () => {
     it("skips text files when skipText is true", async () => {
       const manager = new ManifestManager(vault as any, createSettings());
       const { manifest } = injectManifest(manager);
+      (manager as any).syncManager = createMockSyncManager();
 
       manifest.set("notes.md", { hash: "a", size: 10, mtime: 1000 });
       manifest.set("image.png", {
@@ -576,15 +608,17 @@ describe("ManifestManager", () => {
     it("does not skip text files when skipText is not set", async () => {
       const manager = new ManifestManager(vault as any, createSettings());
       const { manifest } = injectManifest(manager);
+      const mockSyncManager = createMockSyncManager();
+      (manager as any).syncManager = mockSyncManager;
 
       manifest.set("notes.md", { hash: "a", size: 10, mtime: 1000 });
 
-      MockWebsocketProvider.mockClear();
       await manager.syncFromManifest(undefined, undefined, undefined, {
         skipText: false,
       });
 
-      expect(MockWebsocketProvider).toHaveBeenCalled();
+      expect(mockSyncManager.getDoc).toHaveBeenCalledWith("notes.md");
+      expect(mockSyncManager.waitForSync).toHaveBeenCalledWith("notes.md");
     });
   });
 
@@ -712,6 +746,7 @@ describe("ManifestManager", () => {
     it("creates directories from directory entries", async () => {
       const manager = new ManifestManager(vault as any, createSettings());
       const { manifest } = injectManifest(manager);
+      (manager as any).syncManager = createMockSyncManager();
 
       manifest.set("empty-dir", {
         hash: "",
@@ -728,6 +763,7 @@ describe("ManifestManager", () => {
     it("skips directory entries that already exist locally", async () => {
       const manager = new ManifestManager(vault as any, createSettings());
       const { manifest } = injectManifest(manager);
+      (manager as any).syncManager = createMockSyncManager();
 
       vault.getAbstractFileByPath.mockReturnValueOnce({ path: "existing-dir" });
       manifest.set("existing-dir", {
@@ -745,6 +781,7 @@ describe("ManifestManager", () => {
     it("creates nested directory paths", async () => {
       const manager = new ManifestManager(vault as any, createSettings());
       const { manifest } = injectManifest(manager);
+      (manager as any).syncManager = createMockSyncManager();
 
       manifest.set("a/b/c", {
         hash: "",
@@ -760,15 +797,17 @@ describe("ManifestManager", () => {
   });
 
   describe("destroy", () => {
-    it("cleans up doc, manifest, and observer", () => {
+    it("cleans up docHandle, manifest, syncManager, and observer", () => {
       const manager = new ManifestManager(vault as any, createSettings());
       injectManifest(manager);
+      (manager as any).syncManager = createMockSyncManager();
       manager.setManifestChangeHandler(() => {});
 
       manager.destroy();
 
-      expect((manager as any).doc).toBeNull();
+      expect((manager as any).docHandle).toBeNull();
       expect((manager as any).manifest).toBeNull();
+      expect((manager as any).syncManager).toBeNull();
       expect((manager as any).observer).toBeNull();
     });
 

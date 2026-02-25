@@ -6,27 +6,37 @@ import * as awarenessProtocol from "y-protocols/awareness";
 import * as syncProtocol from "y-protocols/sync";
 import * as Y from "yjs";
 
+import {
+  MUX_AWARENESS,
+  MUX_ERROR,
+  MUX_SUBSCRIBE,
+  MUX_SUBSCRIBED,
+  MUX_SYNC,
+  MUX_UNSUBSCRIBE,
+  decodeMuxMessage,
+  encodeMuxMessage,
+} from "./mux-protocol.js";
 import { getPermission } from "./permissions.js";
 import { type Permission, type Persistence, getDefaultPersistence } from "./persistence.js";
 
-const MESSAGE_SYNC = 0;
-const MESSAGE_AWARENESS = 1;
-const MESSAGE_FILE_OP = 2;
+const SYNC_STEP2 = 1;
+const SYNC_UPDATE = 2;
+
+interface MuxClient {
+  ws: WebSocket;
+  subscribedRooms: Set<string>;
+  userId: string | null;
+  baseRoomId: string;
+}
 
 interface RoomState {
   doc: Y.Doc;
   awareness: awarenessProtocol.Awareness;
-  clients: Set<WebSocket>;
-  clientAwarenessIds: Map<WebSocket, Set<number>>;
-  readOnlyClients: Set<WebSocket>;
-  clientUserIds: Map<WebSocket, string>;
+  clients: Set<MuxClient>;
+  clientAwarenessIds: Map<MuxClient, Set<number>>;
+  readOnlyClients: Set<MuxClient>;
   cleanupTimer?: ReturnType<typeof setTimeout>;
   persistTimer?: ReturnType<typeof setTimeout>;
-}
-
-function extractBaseRoomId(roomId: string): string {
-  const colonIndex = roomId.indexOf(":");
-  return colonIndex >= 0 ? roomId.slice(0, colonIndex) : roomId;
 }
 
 function toUint8Array(raw: Buffer | ArrayBuffer | Buffer[]): Uint8Array {
@@ -36,69 +46,11 @@ function toUint8Array(raw: Buffer | ArrayBuffer | Buffer[]): Uint8Array {
   return new Uint8Array(buf.buffer, buf.byteOffset, buf.byteLength);
 }
 
-const SYNC_STEP2 = 1;
-const SYNC_UPDATE = 2;
-
-function handleMessage(ws: WebSocket, state: RoomState, data: Uint8Array) {
-  const decoder = decoding.createDecoder(data);
-  const msgType = decoding.readVarUint(decoder);
-
-  switch (msgType) {
-    case MESSAGE_SYNC: {
-      const syncType = decoding.peekVarUint(decoder);
-      if (state.readOnlyClients.has(ws) && (syncType === SYNC_STEP2 || syncType === SYNC_UPDATE)) {
-        break;
-      }
-      const encoder = encoding.createEncoder();
-      encoding.writeVarUint(encoder, MESSAGE_SYNC);
-      syncProtocol.readSyncMessage(decoder, encoder, state.doc, ws);
-      if (encoding.length(encoder) > 1) {
-        ws.send(encoding.toUint8Array(encoder));
-      }
-      break;
-    }
-    case MESSAGE_AWARENESS: {
-      const update = decoding.readVarUint8Array(decoder);
-      awarenessProtocol.applyAwarenessUpdate(state.awareness, update, ws);
-      break;
-    }
-    case MESSAGE_FILE_OP: {
-      if (state.readOnlyClients.has(ws)) break;
-      for (const client of state.clients) {
-        if (client !== ws && client.readyState === WebSocket.OPEN) {
-          client.send(data);
-        }
-      }
-      break;
-    }
-  }
-}
-
-function sendSyncStep1(ws: WebSocket, doc: Y.Doc) {
-  const encoder = encoding.createEncoder();
-  encoding.writeVarUint(encoder, MESSAGE_SYNC);
-  syncProtocol.writeSyncStep1(encoder, doc);
-  ws.send(encoding.toUint8Array(encoder));
-}
-
-function sendAwarenessState(ws: WebSocket, awareness: awarenessProtocol.Awareness) {
-  const clients = awareness.getStates();
-  if (clients.size > 0) {
-    const encoder = encoding.createEncoder();
-    encoding.writeVarUint(encoder, MESSAGE_AWARENESS);
-    encoding.writeVarUint8Array(
-      encoder,
-      awarenessProtocol.encodeAwarenessUpdate(awareness, Array.from(clients.keys())),
-    );
-    ws.send(encoding.toUint8Array(encoder));
-  }
-}
-
 export function createYjsWSS(persist?: Persistence) {
   const persistence = persist ?? getDefaultPersistence();
   const roomStates = new Map<string, RoomState>();
   const pendingRooms = new Map<string, Promise<RoomState>>();
-  const wss = new WebSocketServer({
+  const muxWss = new WebSocketServer({
     noServer: true,
     maxPayload: 10 * 1024 * 1024,
   });
@@ -115,20 +67,20 @@ export function createYjsWSS(persist?: Persistence) {
       clients: new Set(),
       clientAwarenessIds: new Map(),
       readOnlyClients: new Set(),
-      clientUserIds: new Map(),
     };
     roomStates.set(roomId, state);
     pendingRooms.delete(roomId);
 
     doc.on("update", (update: Uint8Array, origin: unknown) => {
-      const encoder = encoding.createEncoder();
-      encoding.writeVarUint(encoder, MESSAGE_SYNC);
-      syncProtocol.writeUpdate(encoder, update);
-      const msg = encoding.toUint8Array(encoder);
+      const syncEncoder = encoding.createEncoder();
+      syncProtocol.writeUpdate(syncEncoder, update);
+      const payload = encoding.toUint8Array(syncEncoder);
+      const docId = extractDocId(roomId);
+      const msg = encodeMuxMessage(docId, MUX_SYNC, payload);
 
       for (const client of state.clients) {
-        if (client !== origin && client.readyState === WebSocket.OPEN) {
-          client.send(msg);
+        if (client !== origin && client.ws.readyState === WebSocket.OPEN) {
+          client.ws.send(msg);
         }
       }
 
@@ -154,28 +106,25 @@ export function createYjsWSS(persist?: Persistence) {
         },
         origin: unknown,
       ) => {
-        if (origin instanceof WebSocket) {
-          let ids = state.clientAwarenessIds.get(origin);
+        if (origin instanceof MuxClientMarker) {
+          const muxClient = origin.client;
+          let ids = state.clientAwarenessIds.get(muxClient);
           if (!ids) {
             ids = new Set();
-            state.clientAwarenessIds.set(origin, ids);
+            state.clientAwarenessIds.set(muxClient, ids);
           }
           for (const id of added) ids.add(id);
           for (const id of updated) ids.add(id);
         }
 
         const changedClients = added.concat(updated, removed);
-        const encoder = encoding.createEncoder();
-        encoding.writeVarUint(encoder, MESSAGE_AWARENESS);
-        encoding.writeVarUint8Array(
-          encoder,
-          awarenessProtocol.encodeAwarenessUpdate(awareness, changedClients),
-        );
-        const msg = encoding.toUint8Array(encoder);
+        const docId = extractDocId(roomId);
+        const awarenessUpdate = awarenessProtocol.encodeAwarenessUpdate(awareness, changedClients);
+        const msg = encodeMuxMessage(docId, MUX_AWARENESS, awarenessUpdate);
 
         for (const client of state.clients) {
-          if (client.readyState === WebSocket.OPEN) {
-            client.send(msg);
+          if (client.ws.readyState === WebSocket.OPEN) {
+            client.ws.send(msg);
           }
         }
       },
@@ -221,6 +170,169 @@ export function createYjsWSS(persist?: Persistence) {
     roomStates.delete(roomId);
   }
 
+  function scheduleRoomCleanup(roomId: string, state: RoomState) {
+    if (state.clients.size === 0) {
+      state.cleanupTimer = setTimeout(() => {
+        if (state.clients.size === 0) {
+          cleanupRoom(roomId, state).catch((err) => {
+            console.error(`[yjs] failed to cleanup room ${roomId}:`, err);
+          });
+        }
+      }, 30_000);
+    }
+  }
+
+  async function handleSubscribe(client: MuxClient, docId: string) {
+    const roomId = `${client.baseRoomId}:${docId}`;
+    let state: RoomState;
+    try {
+      state = await getOrCreateRoom(roomId);
+    } catch (err) {
+      console.error(`[yjs] failed to get/create room ${roomId}:`, err);
+      const msg = encodeMuxMessage(docId, MUX_ERROR);
+      if (client.ws.readyState === WebSocket.OPEN) client.ws.send(msg);
+      return;
+    }
+
+    state.clients.add(client);
+    client.subscribedRooms.add(roomId);
+
+    if (client.userId) {
+      const permission = getPermission(client.baseRoomId, client.userId);
+      if (permission === "read-only") {
+        state.readOnlyClients.add(client);
+      }
+    }
+
+    const syncEncoder = encoding.createEncoder();
+    syncProtocol.writeSyncStep1(syncEncoder, state.doc);
+    const syncStep1Payload = encoding.toUint8Array(syncEncoder);
+
+    const msg = encodeMuxMessage(docId, MUX_SUBSCRIBED, syncStep1Payload);
+    if (client.ws.readyState === WebSocket.OPEN) {
+      client.ws.send(msg);
+    }
+
+    const awarenessStates = state.awareness.getStates();
+    if (awarenessStates.size > 0) {
+      const awarenessUpdate = awarenessProtocol.encodeAwarenessUpdate(
+        state.awareness,
+        Array.from(awarenessStates.keys()),
+      );
+      const awarenessMsg = encodeMuxMessage(docId, MUX_AWARENESS, awarenessUpdate);
+      if (client.ws.readyState === WebSocket.OPEN) {
+        client.ws.send(awarenessMsg);
+      }
+    }
+  }
+
+  function handleUnsubscribe(client: MuxClient, docId: string) {
+    const roomId = `${client.baseRoomId}:${docId}`;
+    removeClientFromRoom(client, roomId);
+  }
+
+  function handleSync(client: MuxClient, docId: string, payload: Uint8Array) {
+    const roomId = `${client.baseRoomId}:${docId}`;
+    const state = roomStates.get(roomId);
+    if (!state || !state.clients.has(client)) return;
+
+    const decoder = decoding.createDecoder(payload);
+    const syncType = decoding.peekVarUint(decoder);
+
+    if (
+      state.readOnlyClients.has(client) &&
+      (syncType === SYNC_STEP2 || syncType === SYNC_UPDATE)
+    ) {
+      return;
+    }
+
+    const syncEncoder = encoding.createEncoder();
+    syncProtocol.readSyncMessage(decoder, syncEncoder, state.doc, client);
+
+    if (encoding.length(syncEncoder) > 0) {
+      const responsePayload = encoding.toUint8Array(syncEncoder);
+      const msg = encodeMuxMessage(docId, MUX_SYNC, responsePayload);
+      if (client.ws.readyState === WebSocket.OPEN) {
+        client.ws.send(msg);
+      }
+    }
+  }
+
+  function handleAwareness(client: MuxClient, docId: string, payload: Uint8Array) {
+    const roomId = `${client.baseRoomId}:${docId}`;
+    const state = roomStates.get(roomId);
+    if (!state || !state.clients.has(client)) return;
+
+    awarenessProtocol.applyAwarenessUpdate(state.awareness, payload, new MuxClientMarker(client));
+  }
+
+  function removeClientFromRoom(client: MuxClient, roomId: string) {
+    const state = roomStates.get(roomId);
+    if (!state) return;
+
+    state.clients.delete(client);
+    state.readOnlyClients.delete(client);
+    client.subscribedRooms.delete(roomId);
+
+    const clientIds = state.clientAwarenessIds.get(client);
+    if (clientIds && clientIds.size > 0) {
+      awarenessProtocol.removeAwarenessStates(state.awareness, Array.from(clientIds), null);
+    }
+    state.clientAwarenessIds.delete(client);
+
+    scheduleRoomCleanup(roomId, state);
+  }
+
+  function removeClientFromAllRooms(client: MuxClient) {
+    for (const roomId of [...client.subscribedRooms]) {
+      removeClientFromRoom(client, roomId);
+    }
+  }
+
+  muxWss.on("connection", (ws: WebSocket, req: IncomingMessage, baseRoomId: string) => {
+    const reqUrl = new URL(req.url || "", `http://${req.headers.host}`);
+    const userId = reqUrl.searchParams.get("userId");
+
+    const client: MuxClient = {
+      ws,
+      subscribedRooms: new Set(),
+      userId,
+      baseRoomId,
+    };
+
+    ws.on("error", (err) => {
+      console.error(`[yjs-mux] ws error for room ${baseRoomId}:`, err.message);
+      ws.close();
+    });
+
+    ws.on("message", (raw: Buffer | ArrayBuffer | Buffer[]) => {
+      const data = toUint8Array(raw);
+      try {
+        const { docId, msgType, payload } = decodeMuxMessage(data);
+        switch (msgType) {
+          case MUX_SUBSCRIBE:
+            handleSubscribe(client, docId);
+            break;
+          case MUX_UNSUBSCRIBE:
+            handleUnsubscribe(client, docId);
+            break;
+          case MUX_SYNC:
+            handleSync(client, docId, payload);
+            break;
+          case MUX_AWARENESS:
+            handleAwareness(client, docId, payload);
+            break;
+        }
+      } catch (err) {
+        console.error("[yjs-mux] failed to handle message:", err);
+      }
+    });
+
+    ws.on("close", () => {
+      removeClientFromAllRooms(client);
+    });
+  });
+
   async function closeAllRooms() {
     const pending = Array.from(pendingRooms.values());
     await Promise.allSettled(pending);
@@ -234,8 +346,8 @@ export function createYjsWSS(persist?: Persistence) {
       } catch (err) {
         console.error(`[yjs] failed to persist doc ${roomId} during shutdown:`, err);
       }
-      for (const ws of state.clients) {
-        ws.close(1000, "server shutting down");
+      for (const client of state.clients) {
+        client.ws.close(1000, "server shutting down");
       }
       state.doc.destroy();
     }
@@ -243,89 +355,38 @@ export function createYjsWSS(persist?: Persistence) {
   }
 
   function getStats() {
-    let connections = 0;
+    const muxConnections = new Set<WebSocket>();
     for (const state of roomStates.values()) {
-      connections += state.clients.size;
+      for (const client of state.clients) {
+        muxConnections.add(client.ws);
+      }
     }
-    return { rooms: roomStates.size, connections };
+    return { rooms: roomStates.size, connections: muxConnections.size };
   }
-
-  wss.on("connection", async (ws: WebSocket, req: IncomingMessage, roomId: string) => {
-    let state: RoomState;
-    try {
-      state = await getOrCreateRoom(roomId);
-    } catch (err) {
-      console.error(`[yjs] failed to get/create room ${roomId}:`, err);
-      ws.close(1011, "internal error");
-      return;
-    }
-    state.clients.add(ws);
-
-    const reqUrl = new URL(req.url || "", `http://${req.headers.host}`);
-    const userId = reqUrl.searchParams.get("userId");
-    const baseRoomId = extractBaseRoomId(roomId);
-    if (userId) {
-      state.clientUserIds.set(ws, userId);
-      const permission = getPermission(baseRoomId, userId);
-      if (permission === "read-only") {
-        state.readOnlyClients.add(ws);
-      }
-    }
-
-    sendSyncStep1(ws, state.doc);
-    sendAwarenessState(ws, state.awareness);
-
-    ws.on("error", (err) => {
-      console.error(`[yjs] ws error for room ${roomId}:`, err.message);
-      ws.close();
-    });
-
-    ws.on("message", (raw: Buffer | ArrayBuffer | Buffer[]) => {
-      const data = toUint8Array(raw);
-      try {
-        handleMessage(ws, state, data);
-      } catch (err) {
-        console.error("[yjs] failed to handle message:", err);
-      }
-    });
-
-    ws.on("close", () => {
-      state.clients.delete(ws);
-      state.readOnlyClients.delete(ws);
-      state.clientUserIds.delete(ws);
-
-      const clientIds = state.clientAwarenessIds.get(ws);
-      if (clientIds && clientIds.size > 0) {
-        awarenessProtocol.removeAwarenessStates(state.awareness, Array.from(clientIds), null);
-      }
-      state.clientAwarenessIds.delete(ws);
-
-      if (state.clients.size === 0) {
-        state.cleanupTimer = setTimeout(() => {
-          if (state.clients.size === 0) {
-            cleanupRoom(roomId, state).catch((err) => {
-              console.error(`[yjs] failed to cleanup room ${roomId}:`, err);
-            });
-          }
-        }, 30_000);
-      }
-    });
-  });
 
   function updatePermission(baseRoomId: string, userId: string, permission: Permission) {
     for (const [rid, state] of roomStates) {
-      if (extractBaseRoomId(rid) !== baseRoomId) continue;
-      for (const [ws, uid] of state.clientUserIds) {
-        if (uid === userId) {
+      if (!rid.startsWith(`${baseRoomId}:`)) continue;
+      for (const client of state.clients) {
+        if (client.userId === userId) {
           if (permission === "read-only") {
-            state.readOnlyClients.add(ws);
+            state.readOnlyClients.add(client);
           } else {
-            state.readOnlyClients.delete(ws);
+            state.readOnlyClients.delete(client);
           }
         }
       }
     }
   }
 
-  return { wss, closeAllRooms, getStats, updatePermission };
+  return { muxWss, closeAllRooms, getStats, updatePermission };
+}
+
+function extractDocId(roomId: string): string {
+  const colonIndex = roomId.indexOf(":");
+  return colonIndex >= 0 ? roomId.slice(colonIndex + 1) : roomId;
+}
+
+class MuxClientMarker {
+  constructor(public client: MuxClient) {}
 }
