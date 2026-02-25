@@ -388,8 +388,7 @@ export default class LiveSharePlugin extends Plugin {
           this.registerManifestChangeHandler();
         }
       } catch {
-        new Notice("Live Share: failed to reconnect to previous session");
-        await this.sessionManager.endSession();
+        await this.abortSession("Live Share: failed to reconnect to previous session");
       }
     }
   }
@@ -427,6 +426,18 @@ export default class LiveSharePlugin extends Plugin {
     this.manifestManager.updateSettings(this.settings);
   }
 
+  /** Tear down partially-initialised connection state after a failure. */
+  private async abortSession(message: string) {
+    new Notice(message);
+    this.backgroundSync.destroy();
+    this.syncManager.disconnect();
+    this.controlChannel?.destroy();
+    this.controlChannel = null;
+    this.manifestManager.destroy();
+    this.connectionState.transition({ type: "disconnect" });
+    await this.sessionManager.endSession();
+  }
+
   private async startSession() {
     if (this.sessionManager.isActive) {
       new Notice("Live Share: session already active");
@@ -435,11 +446,15 @@ export default class LiveSharePlugin extends Plugin {
 
     const ok = await this.sessionManager.startSession();
     if (ok) {
-      await this.connectSync();
-      await this.manifestManager.connect();
-      await this.manifestManager.publishManifest();
-      await this.backgroundSync.startAll("host");
-      new Notice("Live Share: session started, invite copied");
+      try {
+        await this.connectSync();
+        await this.manifestManager.connect();
+        await this.manifestManager.publishManifest();
+        await this.backgroundSync.startAll("host");
+        new Notice("Live Share: session started, invite copied");
+      } catch {
+        await this.abortSession("Live Share: failed to start session");
+      }
     }
   }
 
@@ -454,19 +469,23 @@ export default class LiveSharePlugin extends Plugin {
 
     const ok = await this.sessionManager.joinSession(invite);
     if (ok) {
-      await this.connectSync();
-      await this.manifestManager.connect();
-      const suppress = (p: string) => this.fileOpsManager.suppressPath(p);
-      const unsuppress = (p: string) => this.fileOpsManager.unsuppressPath(p);
-      const count = await this.manifestManager.syncFromManifest(
-        suppress,
-        unsuppress,
-        (path) => this.requestBinaryFile(path),
-        { skipText: true },
-      );
-      await this.backgroundSync.startAll("guest");
-      this.registerManifestChangeHandler();
-      new Notice(`Live Share: joined session, synced ${count} file(s)`);
+      try {
+        await this.connectSync();
+        await this.manifestManager.connect();
+        const suppress = (p: string) => this.fileOpsManager.suppressPath(p);
+        const unsuppress = (p: string) => this.fileOpsManager.unsuppressPath(p);
+        const count = await this.manifestManager.syncFromManifest(
+          suppress,
+          unsuppress,
+          (path) => this.requestBinaryFile(path),
+          { skipText: true },
+        );
+        await this.backgroundSync.startAll("guest");
+        this.registerManifestChangeHandler();
+        new Notice(`Live Share: joined session, synced ${count} file(s)`);
+      } catch {
+        await this.abortSession("Live Share: failed to join session");
+      }
     }
   }
 
@@ -656,13 +675,16 @@ export default class LiveSharePlugin extends Plugin {
       this.manifestManager.destroy();
       this.syncManager.updateSettings(this.settings);
       this.manifestManager.updateSettings(this.settings);
-      this.syncManager.connect();
-      await this.manifestManager.connect();
-      await this.backgroundSync.startAll(this.settings.role ?? "guest");
-      this.registerManifestChangeHandler();
-      this.onActiveFileChange();
-
-      new Notice(`Live Share: your permission was changed to ${perm}`);
+      try {
+        this.syncManager.connect();
+        await this.manifestManager.connect();
+        await this.backgroundSync.startAll(this.settings.role ?? "guest");
+        this.registerManifestChangeHandler();
+        this.onActiveFileChange();
+        new Notice(`Live Share: your permission was changed to ${perm}`);
+      } catch {
+        new Notice("Live Share: permission changed but sync reconnect failed");
+      }
     });
 
     this.controlChannel.on("focus-request", (msg) => {
