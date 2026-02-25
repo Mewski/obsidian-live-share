@@ -6,7 +6,14 @@ import * as Y from "yjs";
 import type { ExclusionManager } from "./exclusion";
 import { type SyncManager, waitForSync } from "./sync";
 import type { LiveShareSettings } from "./types";
-import { ensureFolder, getPathWarning, isTextFile, normalizePath, toWsUrl } from "./utils";
+import {
+  ensureFolder,
+  getPathWarning,
+  isTextFile,
+  normalizeLineEndings,
+  normalizePath,
+  toWsUrl,
+} from "./utils";
 
 export interface FileEntry {
   hash: string;
@@ -87,10 +94,10 @@ export class ManifestManager {
           binary: true,
         });
       } else {
-        const content = await this.vault.read(file);
+        const content = normalizeLineEndings(await this.vault.read(file));
         entries.set(normalizePath(file.path), {
           hash: await hashContent(content),
-          size: file.stat.size,
+          size: content.length,
           mtime: file.stat.mtime,
         });
       }
@@ -168,7 +175,7 @@ export class ManifestManager {
           needsSync = true;
         }
       } else {
-        const content = await this.vault.read(localFile);
+        const content = normalizeLineEndings(await this.vault.read(localFile));
         if ((await hashContent(content)) !== entry.hash) {
           needsSync = true;
         }
@@ -258,9 +265,10 @@ export class ManifestManager {
         binary: true,
       });
     } else {
+      const normalized = normalizeLineEndings(content);
       this.manifest.set(normalizePath(file.path), {
-        hash: await hashContent(content),
-        size: content.length,
+        hash: await hashContent(normalized),
+        size: normalized.length,
         mtime: file.stat.mtime,
       });
     }

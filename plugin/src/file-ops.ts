@@ -7,6 +7,7 @@ import {
   ensureFolder,
   getPathWarning,
   isTextFile,
+  normalizeLineEndings,
   normalizePath,
 } from "./utils";
 
@@ -266,7 +267,7 @@ export class FileOpsManager {
           }
           this.sendFileContent(path, arrayBufferToBase64(buf), true);
         } else {
-          const content = await this.vault.read(file as TFile);
+          const content = normalizeLineEndings(await this.vault.read(file as TFile));
           if (this.isPathSuppressed(path)) return;
           this.sendFileContent(path, content, false);
         }

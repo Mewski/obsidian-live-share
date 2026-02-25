@@ -6,6 +6,10 @@ export function normalizePath(filePath: string): string {
   return filePath.replace(/\\/g, "/");
 }
 
+export function normalizeLineEndings(content: string): string {
+  return content.replace(/\r\n/g, "\n");
+}
+
 export function toWsUrl(httpUrl: string): string {
   return httpUrl.replace(/^http/, "ws");
 }

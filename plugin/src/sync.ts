@@ -56,11 +56,6 @@ export class SyncManager {
         params,
       });
 
-      provider.awareness.setLocalStateField("user", {
-        name: this.settings.displayName,
-        color: this.settings.cursorColor,
-        colorLight: `${this.settings.cursorColor}33`,
-      });
       this.providers.set(filePath, provider);
     }
 

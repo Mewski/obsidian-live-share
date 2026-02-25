@@ -6,7 +6,7 @@ import type { FileOpsManager } from "./file-ops";
 import type { ManifestManager } from "./manifest";
 import { type SyncManager, waitForSync } from "./sync";
 import type { SessionRole } from "./types";
-import { ensureFolder, isTextFile, normalizePath } from "./utils";
+import { ensureFolder, isTextFile, normalizeLineEndings, normalizePath } from "./utils";
 
 const DEBOUNCE_MS = 1000;
 
@@ -56,7 +56,7 @@ export class BackgroundSync {
       if (this.role === "host") {
         const file = this.vault.getAbstractFileByPath(path) as TFile | null;
         if (file) {
-          const content = await this.vault.read(file);
+          const content = normalizeLineEndings(await this.vault.read(file));
           const remoteContent = docHandle.text.toString();
           if (content !== remoteContent) {
             docHandle.doc.transact(() => {
@@ -68,7 +68,7 @@ export class BackgroundSync {
       } else if (this.role === "guest" && docHandle.text.length > 0) {
         const file = this.vault.getAbstractFileByPath(path) as TFile | null;
         const remoteContent = docHandle.text.toString();
-        const localContent = file ? await this.vault.read(file) : "";
+        const localContent = file ? normalizeLineEndings(await this.vault.read(file)) : "";
         if (remoteContent !== localContent) {
           await this.writeToDisk(path, remoteContent);
         }
@@ -172,7 +172,7 @@ export class BackgroundSync {
     const file = this.vault.getAbstractFileByPath(path) as TFile | null;
     if (!file) return;
 
-    const localContent = await this.vault.read(file);
+    const localContent = normalizeLineEndings(await this.vault.read(file));
     const remoteContent = docHandle.text.toString();
     if (localContent === remoteContent) return;
 

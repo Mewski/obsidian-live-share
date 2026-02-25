@@ -6,6 +6,13 @@ import { yCollab } from "y-codemirror.next";
 
 import { type SyncManager, waitForSync } from "./sync";
 import type { Permission, SessionRole } from "./types";
+import { normalizeLineEndings } from "./utils";
+
+export interface CursorUser {
+  name: string;
+  color: string;
+  colorLight: string;
+}
 
 export class CollabManager {
   private compartment = new Compartment();
@@ -22,6 +29,7 @@ export class CollabManager {
     syncManager: SyncManager,
     role?: SessionRole,
     permission?: Permission,
+    cursorUser?: CursorUser,
   ) {
     if (this.currentProvider && filePath !== this.currentPath) {
       this.currentProvider.awareness.setLocalState(null);
@@ -29,11 +37,19 @@ export class CollabManager {
     }
     this.currentPath = filePath;
     if (!filePath) {
+      if (this.currentProvider) {
+        this.currentProvider.awareness.setLocalState(null);
+        this.currentProvider = null;
+      }
       view.dispatch({ effects: this.compartment.reconfigure([]) });
       return;
     }
     const docHandle = syncManager.getDoc(filePath);
     if (!docHandle) {
+      if (this.currentProvider) {
+        this.currentProvider.awareness.setLocalState(null);
+        this.currentProvider = null;
+      }
       view.dispatch({ effects: this.compartment.reconfigure([]) });
       return;
     }
@@ -42,6 +58,10 @@ export class CollabManager {
       await waitForSync(docHandle.provider);
     } catch {
       new Notice("Live Share: sync timed out");
+      if (this.currentProvider) {
+        this.currentProvider.awareness.setLocalState(null);
+        this.currentProvider = null;
+      }
       view.dispatch({ effects: this.compartment.reconfigure([]) });
       return;
     }
@@ -57,7 +77,7 @@ export class CollabManager {
     }
 
     if (role === "host") {
-      const localContent = view.state.doc.toString();
+      const localContent = normalizeLineEndings(view.state.doc.toString());
       const remoteContent = docHandle.text.toString();
       if (localContent !== remoteContent) {
         docHandle.doc.transact(() => {
@@ -68,6 +88,9 @@ export class CollabManager {
     }
 
     this.currentProvider = docHandle.provider;
+    if (cursorUser) {
+      docHandle.provider.awareness.setLocalStateField("user", cursorUser);
+    }
     const extensions: Extension[] = [yCollab(docHandle.text, docHandle.provider.awareness)];
     if (permission === "read-only") {
       extensions.push(EditorState.readOnly.of(true));

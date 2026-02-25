@@ -934,6 +934,11 @@ export default class LiveSharePlugin extends Plugin {
       this.syncManager,
       this.settings.role,
       this.settings.permission,
+      {
+        name: this.settings.displayName,
+        color: this.settings.cursorColor,
+        colorLight: `${this.settings.cursorColor}33`,
+      },
     );
 
     this.removeScrollListener();
