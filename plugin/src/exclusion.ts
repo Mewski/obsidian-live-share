@@ -1,5 +1,3 @@
-/** File exclusion patterns loaded from `.liveshare.json`. */
-
 import { minimatch } from "minimatch";
 import { Notice } from "obsidian";
 import type { TFile, Vault } from "obsidian";

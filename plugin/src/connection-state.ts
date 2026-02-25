@@ -1,5 +1,3 @@
-/** Connection lifecycle state machine. */
-
 export type ConnectionState =
   | "disconnected"
   | "connecting"

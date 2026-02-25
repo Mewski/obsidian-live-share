@@ -1,5 +1,3 @@
-/** Shared TypeScript types and default settings. */
-
 export type SessionRole = "host" | "guest" | null;
 
 export type Permission = "read-write" | "read-only";

@@ -1,5 +1,3 @@
-/** Control channel WebSocket client with reconnect, message queue, and encryption. */
-
 import type { E2ECrypto } from "./crypto";
 import type { LiveShareSettings } from "./types";
 import { toWsUrl } from "./utils";

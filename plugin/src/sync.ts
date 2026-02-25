@@ -1,5 +1,3 @@
-/** Per-file Y.Doc and WebsocketProvider management. */
-
 import { WebsocketProvider } from "y-websocket";
 import * as Y from "yjs";
 import type { LiveShareSettings } from "./types";

@@ -1,5 +1,3 @@
-/** GitHub OAuth token handling and JWT parsing. */
-
 import { Notice } from "obsidian";
 import type LiveSharePlugin from "./main";
 

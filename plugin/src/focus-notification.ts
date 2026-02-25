@@ -1,5 +1,3 @@
-/** "Look here" notification with a "Go to" button for focus/summon requests. */
-
 import { MarkdownView, Notice, TFile } from "obsidian";
 import type LiveSharePlugin from "./main";
 

@@ -1,5 +1,3 @@
-/** CodeMirror 6 Yjs integration for real-time collaborative editing. */
-
 import { Compartment, EditorState } from "@codemirror/state";
 import type { Extension } from "@codemirror/state";
 import type { EditorView } from "@codemirror/view";

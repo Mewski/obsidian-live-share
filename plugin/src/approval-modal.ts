@@ -1,5 +1,3 @@
-/** Host approval modal for guest join requests. */
-
 import { type App, Modal } from "obsidian";
 
 export interface JoinRequest {

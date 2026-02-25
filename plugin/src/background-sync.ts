@@ -1,5 +1,3 @@
-/** Background Y.Text observers for all shared text files with debounced disk writes. */
-
 import type { TFile, Vault } from "obsidian";
 import type * as Y from "yjs";
 

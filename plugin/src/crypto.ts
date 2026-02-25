@@ -1,5 +1,3 @@
-/** AES-256-GCM encryption with PBKDF2 key derivation from the invite-link passphrase. */
-
 import { arrayBufferToBase64, base64ToArrayBuffer } from "./utils";
 
 const SALT_BYTES = 16;

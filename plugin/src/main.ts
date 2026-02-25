@@ -1,5 +1,3 @@
-/** Plugin entry point: commands, session lifecycle, and vault event handlers. */
-
 import {
   FuzzySuggestModal,
   MarkdownView,
@@ -28,7 +26,6 @@ import { SyncManager } from "./sync";
 import { DEFAULT_SETTINGS, type LiveShareSettings } from "./types";
 import { isTextFile, normalizePath } from "./utils";
 
-// Extract the CM6 EditorView from an Obsidian MarkdownView (untyped internal).
 function getCmView(view: MarkdownView): import("@codemirror/view").EditorView | undefined {
   // biome-ignore lint/suspicious/noExplicitAny: Obsidian internal -- editor.cm is untyped
   return (view.editor as any).cm as import("@codemirror/view").EditorView | undefined;
@@ -92,7 +89,6 @@ export default class LiveSharePlugin extends Plugin {
   private presenceTimer: ReturnType<typeof setTimeout> | null = null;
 
   private currentScrollListener: (() => void) | null = null;
-  private currentScrollDOM: HTMLElement | null = null;
 
   private get userId(): string {
     return this.settings.githubUserId || this.settings.clientId;
@@ -505,7 +501,6 @@ export default class LiveSharePlugin extends Plugin {
       return;
     }
 
-    // Guard: kicked/session-end handlers can re-enter endSession during cleanup
     if (this.endingSession) return;
     this.endingSession = true;
 
@@ -792,7 +787,6 @@ export default class LiveSharePlugin extends Plugin {
       this.debouncedBroadcastPresence();
     };
     scrollDOM.addEventListener("scroll", scrollHandler);
-    this.currentScrollDOM = scrollDOM;
     this.currentScrollListener = () => scrollDOM.removeEventListener("scroll", scrollHandler);
   }
 
@@ -800,7 +794,6 @@ export default class LiveSharePlugin extends Plugin {
     if (this.currentScrollListener) {
       this.currentScrollListener();
       this.currentScrollListener = null;
-      this.currentScrollDOM = null;
     }
   }
 

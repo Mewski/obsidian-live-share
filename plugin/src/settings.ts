@@ -1,5 +1,3 @@
-/** Plugin settings tab UI. */
-
 import { type App, PluginSettingTab, Setting } from "obsidian";
 import type LiveSharePlugin from "./main";
 

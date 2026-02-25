@@ -1,5 +1,3 @@
-/** Remote file operation application, path suppression, and chunked binary transfer. */
-
 import { Notice } from "obsidian";
 import type { TAbstractFile, TFile, Vault } from "obsidian";
 import type { FileOp } from "./types";

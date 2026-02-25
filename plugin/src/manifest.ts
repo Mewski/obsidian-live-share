@@ -1,5 +1,3 @@
-/** File inventory sync via shared Y.Map with hash-based change detection. */
-
 import { type TFile, TFolder, type Vault } from "obsidian";
 import { Notice } from "obsidian";
 import { WebsocketProvider } from "y-websocket";
