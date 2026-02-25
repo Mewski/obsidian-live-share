@@ -1,4 +1,4 @@
-import type { Server } from "node:http";
+import type { IncomingMessage, Server, ServerResponse } from "node:http";
 import * as decoding from "lib0/decoding";
 import * as encoding from "lib0/encoding";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -17,11 +17,11 @@ interface RoomInfo {
   token: string;
 }
 
-let server: Server;
+let server: Server<typeof IncomingMessage, typeof ServerResponse>;
 let port: number;
 let openSockets: WebSocket[] = [];
 
-function listen(s: Server): Promise<number> {
+function listen(s: Server<typeof IncomingMessage, typeof ServerResponse>): Promise<number> {
   return new Promise((resolve) => {
     s.listen(0, () => {
       const addr = s.address();

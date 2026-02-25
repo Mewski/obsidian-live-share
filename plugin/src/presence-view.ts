@@ -92,16 +92,18 @@ export class PresenceView extends ItemView {
       const itemCls = isFollowed
         ? "live-share-presence-item is-followed"
         : "live-share-presence-item";
-      const item = list.createEl("div", { cls: itemCls });
+      const userItem = list.createEl("div", { cls: itemCls });
 
-      const cursorDot = item.createEl("span", {
+      const cursorDot = userItem.createEl("span", {
         cls: "live-share-presence-dot",
       });
       if (HEX_COLOR_RE.test(user.cursorColor)) {
         cursorDot.style.setProperty("--cursor-color", user.cursorColor);
       }
 
-      const info = item.createEl("div", { cls: "live-share-presence-info" });
+      const info = userItem.createEl("div", {
+        cls: "live-share-presence-info",
+      });
       const nameEl = info.createEl("span", {
         text: user.displayName,
         cls: "live-share-presence-name",
@@ -119,7 +121,7 @@ export class PresenceView extends ItemView {
         });
       }
 
-      const actions = item.createEl("div", {
+      const actions = userItem.createEl("div", {
         cls: "live-share-presence-actions",
       });
 

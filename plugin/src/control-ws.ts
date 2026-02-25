@@ -139,11 +139,14 @@ export class ControlChannel {
 
   destroy(): void {
     this.isDestroyed = true;
-    this.stateChangeCallback?.("disconnected");
     this.stopPing();
+    const wasOpen = this.ws !== null;
     if (this.ws) {
       this.ws.close();
       this.ws = null;
+    }
+    if (wasOpen) {
+      this.stateChangeCallback?.("disconnected");
     }
     this.handlers.clear();
   }

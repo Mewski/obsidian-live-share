@@ -1,4 +1,4 @@
-import type { Server } from "node:http";
+import type { IncomingMessage, Server, ServerResponse } from "node:http";
 import express from "express";
 import jwt from "jsonwebtoken";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -66,7 +66,7 @@ describe("verifyJWT", () => {
 });
 
 describe("createAuthRouter", () => {
-  let server: Server;
+  let server: Server<typeof IncomingMessage, typeof ServerResponse>;
   let port: number;
 
   beforeEach(async () => {

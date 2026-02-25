@@ -58,6 +58,7 @@ export class BackgroundSync {
       }
 
       if (this.observers.has(path)) return;
+      if (docHandle.doc.isDestroyed) return;
 
       if (this.role === "host" && path !== this.activeFile) {
         const file = this.vault.getAbstractFileByPath(path) as TFile | null;
@@ -149,6 +150,7 @@ export class BackgroundSync {
       unobserve();
       this.observers.delete(normOld);
     }
+    this.syncManager.releaseDoc(normOld);
 
     if (this.activeFile === normOld) {
       this.activeFile = normNew;

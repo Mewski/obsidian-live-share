@@ -151,14 +151,14 @@ if (isMain) {
           cert: readFileSync(TLS_CERT),
           key: readFileSync(TLS_KEY),
         });
-        const result = createApp(persistence, tlsServer);
-        tlsServer.on("request", result.app);
+        const appSetup = createApp(persistence, tlsServer);
+        tlsServer.on("request", appSetup.app);
         server = tlsServer;
-        shutdown = result.shutdown;
+        shutdown = appSetup.shutdown;
       } else {
-        const result = createApp(persistence);
-        server = result.server;
-        shutdown = result.shutdown;
+        const appSetup = createApp(persistence);
+        server = appSetup.server;
+        shutdown = appSetup.shutdown;
       }
 
       const port = Number.parseInt(process.env.PORT || "4321");

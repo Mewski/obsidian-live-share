@@ -1,4 +1,4 @@
-import { type Server, createServer } from "node:http";
+import { type IncomingMessage, type Server, type ServerResponse, createServer } from "node:http";
 import express from "express";
 import { beforeEach, describe, expect, it } from "vitest";
 import { getRoom, roomRouter } from "../rooms.js";
@@ -11,7 +11,7 @@ function setupApp() {
   return { app, server };
 }
 
-function listen(server: Server): Promise<number> {
+function listen(server: Server<typeof IncomingMessage, typeof ServerResponse>): Promise<number> {
   return new Promise((resolve) => {
     server.listen(0, () => {
       const addr = server.address();
@@ -33,7 +33,7 @@ async function req(port: number, method: string, path: string, body?: unknown) {
 }
 
 describe("rooms API", () => {
-  let server: Server;
+  let server: Server<typeof IncomingMessage, typeof ServerResponse>;
   let port: number;
 
   beforeEach(async () => {

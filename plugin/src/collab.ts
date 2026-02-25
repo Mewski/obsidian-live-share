@@ -17,7 +17,9 @@ export interface CursorUser {
 export class CollabManager {
   private compartment = new Compartment();
   private currentPath: string | null = null;
-  private currentProvider: import("y-websocket").WebsocketProvider | null = null;
+  private currentProvider: import("y-websocket").WebsocketProvider | null =
+    null;
+  private activationGen = 0;
 
   getBaseExtension(): Extension {
     return this.compartment.of([]);
@@ -31,6 +33,8 @@ export class CollabManager {
     permission?: Permission,
     cursorUser?: CursorUser,
   ) {
+    const gen = ++this.activationGen;
+
     if (this.currentProvider && filePath !== this.currentPath) {
       this.currentProvider.awareness.setLocalState(null);
       this.currentProvider = null;
@@ -66,12 +70,12 @@ export class CollabManager {
       return;
     }
 
-    if (this.currentPath !== filePath) return;
+    if (this.activationGen !== gen) return;
 
     if (role !== "host" && docHandle.text.length === 0) {
       for (let i = 0; i < 10; i++) {
-        await new Promise((r) => setTimeout(r, 100));
-        if (this.currentPath !== filePath) return;
+        await new Promise((resolve) => setTimeout(resolve, 100));
+        if (this.activationGen !== gen) return;
         if (docHandle.text.length > 0) break;
       }
     }
@@ -85,7 +89,9 @@ export class CollabManager {
     if (cursorUser) {
       docHandle.provider.awareness.setLocalStateField("user", cursorUser);
     }
-    const extensions: Extension[] = [yCollab(docHandle.text, docHandle.provider.awareness)];
+    const extensions: Extension[] = [
+      yCollab(docHandle.text, docHandle.provider.awareness),
+    ];
     if (permission === "read-only") {
       extensions.push(EditorState.readOnly.of(true));
     }
@@ -95,6 +101,7 @@ export class CollabManager {
   }
 
   deactivateAll(view: EditorView) {
+    this.activationGen++;
     if (this.currentProvider) {
       this.currentProvider.awareness.setLocalState(null);
       this.currentProvider = null;

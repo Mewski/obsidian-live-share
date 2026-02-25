@@ -63,10 +63,10 @@ export class E2ECrypto {
       this.key,
       plaintext as BufferSource,
     );
-    const result = new Uint8Array(IV_BYTES + ciphertext.byteLength);
-    result.set(iv, 0);
-    result.set(new Uint8Array(ciphertext), IV_BYTES);
-    return result;
+    const encrypted = new Uint8Array(IV_BYTES + ciphertext.byteLength);
+    encrypted.set(iv, 0);
+    encrypted.set(new Uint8Array(ciphertext), IV_BYTES);
+    return encrypted;
   }
 
   async decrypt(data: Uint8Array): Promise<Uint8Array> {

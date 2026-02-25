@@ -75,7 +75,7 @@ export class FileOpsManager {
   private isPathSafe(path: string): boolean {
     if (!path || path.startsWith("/") || path.startsWith("\\")) return false;
     const segments = path.split(/[\\/]/);
-    return !segments.some((s) => s === ".." || s === ".");
+    return !segments.some((segment) => segment === ".." || segment === ".");
   }
 
   private getOpPaths(op: FileOp): string[] {
@@ -150,7 +150,7 @@ export class FileOpsManager {
         case "rename": {
           let file = this.vault.getAbstractFileByPath(op.oldPath);
           if (!file) {
-            await new Promise((r) => setTimeout(r, 300));
+            await new Promise((resolve) => setTimeout(resolve, 300));
             file = this.vault.getAbstractFileByPath(op.oldPath);
           }
           const alreadyExists = this.vault.getAbstractFileByPath(op.newPath);
@@ -356,8 +356,8 @@ export class FileOpsManager {
       binary: binary || undefined,
     });
     for (let i = 0; i < totalChunks; i++) {
-      const data = content.slice(i * CHUNK_SIZE, (i + 1) * CHUNK_SIZE);
-      this.sendOp({ type: "chunk-data", path, index: i, data });
+      const chunk = content.slice(i * CHUNK_SIZE, (i + 1) * CHUNK_SIZE);
+      this.sendOp({ type: "chunk-data", path, index: i, data: chunk });
     }
     this.sendOp({ type: "chunk-end", path });
   }

@@ -150,7 +150,7 @@ export class ManifestManager {
     for (const [path, entry] of entries) {
       if (!path || path.startsWith("/") || path.startsWith("\\")) continue;
       const segments = path.split(/[\\/]/);
-      if (segments.some((s) => s === ".." || s === ".")) continue;
+      if (segments.some((segment) => segment === ".." || segment === ".")) continue;
       const warning = getPathWarning(path);
       if (warning) {
         new Notice(`Live Share: ${warning}, skipping ${path}`);
@@ -340,6 +340,6 @@ export class ManifestManager {
   }
 
   private getSharedFiles(): TFile[] {
-    return this.vault.getFiles().filter((f) => this.isSharedPath(f.path));
+    return this.vault.getFiles().filter((file) => this.isSharedPath(file.path));
   }
 }

@@ -101,8 +101,8 @@ export default class LiveSharePlugin extends Plugin {
         }
       }
 
-      const actuallyAdded = added.filter((p) => !renamedNew.has(p));
-      const actuallyRemoved = removed.filter((p) => !renamedOld.has(p));
+      const actuallyAdded = added.filter((path) => !renamedNew.has(path));
+      const actuallyRemoved = removed.filter((path) => !renamedOld.has(path));
 
       if (actuallyAdded.length > 0) {
         const syncedCount = await this.manifestManager.syncFromManifest(
@@ -378,7 +378,10 @@ export default class LiveSharePlugin extends Plugin {
         if (this.settings.role === "host") {
           this.manifestManager.renameFile(oldPath, file.path, this.syncManager);
         }
-        this.onActiveFileChange();
+        const activeFile = this.app.workspace.getActiveViewOfType(MarkdownView)?.file;
+        if (activeFile && (activeFile.path === file.path || activeFile.path === oldPath)) {
+          this.onActiveFileChange();
+        }
       }),
     );
 
@@ -432,6 +435,7 @@ export default class LiveSharePlugin extends Plugin {
           await this.backgroundSync.startAll("guest");
           this.registerManifestChangeHandler();
         }
+        this.onActiveFileChange();
       } catch {
         await this.abortSession("Live Share: failed to resume previous session");
       }
@@ -511,7 +515,7 @@ export default class LiveSharePlugin extends Plugin {
     const manifestPaths = new Set(manifest.keys());
     const localFiles = this.app.vault
       .getFiles()
-      .filter((f) => this.manifestManager.isSharedPath(f.path));
+      .filter((file) => this.manifestManager.isSharedPath(file.path));
     for (const file of localFiles) {
       if (!manifestPaths.has(normalizePath(file.path))) {
         this.fileOpsManager.mutePathEvents(file.path);
@@ -573,6 +577,7 @@ export default class LiveSharePlugin extends Plugin {
         await this.manifestManager.connect();
         await this.manifestManager.publishManifest({ purge: true });
         await this.backgroundSync.startAll("host");
+        this.onActiveFileChange();
         new Notice("Live Share: session started, invite copied to clipboard");
       } catch {
         await this.abortSession("Live Share: failed to start session");
@@ -602,6 +607,7 @@ export default class LiveSharePlugin extends Plugin {
         );
         await this.backgroundSync.startAll("guest");
         this.registerManifestChangeHandler();
+        this.onActiveFileChange();
         new Notice(`Live Share: joined session, synced ${syncedCount} file(s)`);
       } catch {
         await this.abortSession("Live Share: failed to join session");

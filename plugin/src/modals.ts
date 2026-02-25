@@ -19,10 +19,10 @@ export class PromptModal extends Modal {
       placeholder: this.placeholder,
       cls: "live-share-prompt-input",
     });
-    input.addEventListener("keydown", (e) => {
-      if (e.key === "Enter") {
-        e.preventDefault();
-        e.stopPropagation();
+    input.addEventListener("keydown", (event) => {
+      if (event.key === "Enter") {
+        event.preventDefault();
+        event.stopPropagation();
         this.result = input.value;
         this.close();
       }
