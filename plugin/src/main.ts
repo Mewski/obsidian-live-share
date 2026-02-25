@@ -136,6 +136,7 @@ export default class LiveSharePlugin extends Plugin {
   }
 
   private presenceTimer: ReturnType<typeof setTimeout> | null = null;
+  private presenceInterval: ReturnType<typeof setInterval> | null = null;
 
   private currentScrollListener: (() => void) | null = null;
 
@@ -458,6 +459,10 @@ export default class LiveSharePlugin extends Plugin {
       clearTimeout(this.presenceTimer);
       this.presenceTimer = null;
     }
+    if (this.presenceInterval) {
+      clearInterval(this.presenceInterval);
+      this.presenceInterval = null;
+    }
 
     const activeView = this.app.workspace.getActiveViewOfType(MarkdownView);
     if (activeView) {
@@ -516,6 +521,10 @@ export default class LiveSharePlugin extends Plugin {
       if (this.presenceTimer) {
         clearTimeout(this.presenceTimer);
         this.presenceTimer = null;
+      }
+      if (this.presenceInterval) {
+        clearInterval(this.presenceInterval);
+        this.presenceInterval = null;
       }
       this.remoteUsers.clear();
       this.refreshPresenceView();
@@ -608,6 +617,10 @@ export default class LiveSharePlugin extends Plugin {
       if (this.presenceTimer) {
         clearTimeout(this.presenceTimer);
         this.presenceTimer = null;
+      }
+      if (this.presenceInterval) {
+        clearInterval(this.presenceInterval);
+        this.presenceInterval = null;
       }
       this.remoteUsers.clear();
       this.refreshPresenceView();
@@ -895,6 +908,8 @@ export default class LiveSharePlugin extends Plugin {
     }
 
     this.broadcastPresence();
+    if (this.presenceInterval) clearInterval(this.presenceInterval);
+    this.presenceInterval = setInterval(() => this.broadcastPresence(), 10_000);
 
     this.onActiveFileChange();
   }
