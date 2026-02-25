@@ -1,5 +1,4 @@
-import { Notice } from "obsidian";
-import type { TAbstractFile, TFile, Vault } from "obsidian";
+import { Notice, type TAbstractFile, type TFile, type Vault } from "obsidian";
 import type { FileOp } from "./types";
 import {
   VAULT_EVENT_SETTLE_MS,
@@ -60,12 +59,6 @@ export class FileOpsManager {
     this.pendingChunks.clear();
   }
 
-  private isPathSafe(path: string): boolean {
-    if (!path || path.startsWith("/") || path.startsWith("\\")) return false;
-    const segments = path.split(/[\\/]/);
-    return !segments.some((s) => s === ".." || s === ".");
-  }
-
   async applyRemoteOp(op: FileOp) {
     const paths = this.getOpPaths(op);
     const waitFor = paths.map((path) => this.opQueues.get(path)).filter(Boolean) as Promise<void>[];
@@ -77,6 +70,12 @@ export class FileOpsManager {
     for (const path of paths) {
       if (this.opQueues.get(path) === promise) this.opQueues.delete(path);
     }
+  }
+
+  private isPathSafe(path: string): boolean {
+    if (!path || path.startsWith("/") || path.startsWith("\\")) return false;
+    const segments = path.split(/[\\/]/);
+    return !segments.some((s) => s === ".." || s === ".");
   }
 
   private getOpPaths(op: FileOp): string[] {

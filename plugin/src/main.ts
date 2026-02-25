@@ -476,6 +476,35 @@ export default class LiveSharePlugin extends Plugin {
     this.manifestManager.updateSettings(this.settings);
   }
 
+  followUser(userId: string) {
+    if (this.followTarget === userId) {
+      this.unfollowUser();
+      return;
+    }
+    this.followTarget = userId;
+    const user = this.remoteUsers.get(userId);
+    new Notice(`Live Share: following ${user?.displayName ?? userId}`);
+
+    this.clearUnfollowListeners();
+    const handler = () => {
+      if (!this.followSuppressUnfollow) this.unfollowUser();
+    };
+    const events = ["keydown", "mousedown", "wheel"] as const;
+    for (const evt of events) {
+      document.addEventListener(evt, handler);
+      this.unfollowListeners.push(() => document.removeEventListener(evt, handler));
+    }
+
+    if (user) this.applyFollowState(user);
+  }
+
+  promptText(placeholder: string): Promise<string | null> {
+    return new Promise((resolve) => {
+      const modal = new PromptModal(this.app, placeholder, resolve);
+      modal.open();
+    });
+  }
+
   private async cleanupStaleFiles() {
     const manifest = this.manifestManager.getEntries();
     if (manifest.size === 0) return;
@@ -1065,28 +1094,6 @@ export default class LiveSharePlugin extends Plugin {
     this.updateStatusBar();
   }
 
-  followUser(userId: string) {
-    if (this.followTarget === userId) {
-      this.unfollowUser();
-      return;
-    }
-    this.followTarget = userId;
-    const user = this.remoteUsers.get(userId);
-    new Notice(`Live Share: following ${user?.displayName ?? userId}`);
-
-    this.clearUnfollowListeners();
-    const handler = () => {
-      if (!this.followSuppressUnfollow) this.unfollowUser();
-    };
-    const events = ["keydown", "mousedown", "wheel"] as const;
-    for (const evt of events) {
-      document.addEventListener(evt, handler);
-      this.unfollowListeners.push(() => document.removeEventListener(evt, handler));
-    }
-
-    if (user) this.applyFollowState(user);
-  }
-
   private unfollowUser() {
     if (!this.followTarget) return;
     this.followTarget = null;
@@ -1123,13 +1130,6 @@ export default class LiveSharePlugin extends Plugin {
     }
 
     this.followSuppressUnfollow = false;
-  }
-
-  promptText(placeholder: string): Promise<string | null> {
-    return new Promise((resolve) => {
-      const modal = new PromptModal(this.app, placeholder, resolve);
-      modal.open();
-    });
   }
 
   private confirm(message: string): Promise<boolean> {

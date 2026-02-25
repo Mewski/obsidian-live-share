@@ -2,8 +2,7 @@ import { TFolder, type Vault } from "obsidian";
 
 export const VAULT_EVENT_SETTLE_MS = 100;
 
-export const HEX_COLOR_RE =
-  /^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/;
+export const HEX_COLOR_RE = /^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/;
 
 export function normalizePath(filePath: string): string {
   return filePath.replace(/\\/g, "/");
@@ -43,8 +42,7 @@ export function applyMinimalYTextUpdate(
 
   doc.transact(() => {
     if (oldSuffix > prefix) text.delete(prefix, oldSuffix - prefix);
-    if (newSuffix > prefix)
-      text.insert(prefix, newContent.slice(prefix, newSuffix));
+    if (newSuffix > prefix) text.insert(prefix, newContent.slice(prefix, newSuffix));
   });
 }
 

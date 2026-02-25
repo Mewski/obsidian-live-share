@@ -1,5 +1,4 @@
-import { type TFile, TFolder, type Vault } from "obsidian";
-import { Notice } from "obsidian";
+import { Notice, type TFile, TFolder, type Vault } from "obsidian";
 import { WebsocketProvider } from "y-websocket";
 import * as Y from "yjs";
 

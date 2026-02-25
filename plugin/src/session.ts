@@ -117,6 +117,10 @@ export class SessionManager {
     await this.plugin.saveSettings();
   }
 
+  get isActive(): boolean {
+    return this.plugin.settings.role !== null;
+  }
+
   async copyInvite(): Promise<void> {
     const { settings } = this.plugin;
     if (!settings.roomId || !settings.token) {
@@ -157,9 +161,5 @@ export class SessionManager {
     } catch {
       return null;
     }
-  }
-
-  get isActive(): boolean {
-    return this.plugin.settings.role !== null;
   }
 }

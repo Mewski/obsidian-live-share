@@ -1,5 +1,4 @@
-import { Notice } from "obsidian";
-import type { TFile, Vault } from "obsidian";
+import { Notice, type TFile, type Vault } from "obsidian";
 import type * as Y from "yjs";
 
 import type { FileOpsManager } from "./file-ops";

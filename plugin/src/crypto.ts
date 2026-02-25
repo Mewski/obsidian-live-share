@@ -4,6 +4,10 @@ const SALT_BYTES = 16;
 const IV_BYTES = 12;
 const PBKDF2_ITERATIONS = 100_000;
 
+function passphraseSaltInput(passphrase: string): string {
+  return `obsidian-live-share-salt:${passphrase}`;
+}
+
 async function deriveKey(passphrase: string, salt: Uint8Array): Promise<CryptoKey> {
   const raw = new TextEncoder().encode(passphrase);
   const base = await crypto.subtle.importKey("raw", raw, "PBKDF2", false, ["deriveKey"]);
@@ -19,6 +23,16 @@ async function deriveKey(passphrase: string, salt: Uint8Array): Promise<CryptoKe
     false,
     ["encrypt", "decrypt"],
   );
+}
+
+function uint8ToBase64(bytes: Uint8Array): string {
+  return arrayBufferToBase64(
+    bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer,
+  );
+}
+
+function base64ToUint8(base64: string): Uint8Array {
+  return new Uint8Array(base64ToArrayBuffer(base64));
 }
 
 export class E2ECrypto {
@@ -74,18 +88,4 @@ export class E2ECrypto {
     const decrypted = await this.decrypt(encrypted);
     return new TextDecoder().decode(decrypted);
   }
-}
-
-function passphraseSaltInput(passphrase: string): string {
-  return `obsidian-live-share-salt:${passphrase}`;
-}
-
-function uint8ToBase64(bytes: Uint8Array): string {
-  return arrayBufferToBase64(
-    bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer,
-  );
-}
-
-function base64ToUint8(base64: string): Uint8Array {
-  return new Uint8Array(base64ToArrayBuffer(base64));
 }

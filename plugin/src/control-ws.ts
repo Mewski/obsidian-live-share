@@ -120,6 +120,34 @@ export class ControlChannel {
     }
   }
 
+  on(type: ControlMessageType, handler: Handler): void {
+    let list = this.handlers.get(type);
+    if (!list) {
+      list = [];
+      this.handlers.set(type, list);
+    }
+    list.push(handler);
+  }
+
+  off(type: ControlMessageType, handler: Handler): void {
+    const list = this.handlers.get(type);
+    if (list) {
+      const idx = list.indexOf(handler);
+      if (idx >= 0) list.splice(idx, 1);
+    }
+  }
+
+  destroy(): void {
+    this.isDestroyed = true;
+    this.stateChangeCallback?.("disconnected");
+    this.stopPing();
+    if (this.ws) {
+      this.ws.close();
+      this.ws = null;
+    }
+    this.handlers.clear();
+  }
+
   private startPing(): void {
     this.stopPing();
     this.pingTimer = setInterval(() => {
@@ -246,33 +274,5 @@ export class ControlChannel {
         for (const handler of handlers) handler(decryptedMsg as ControlMessage);
       }
     } catch {}
-  }
-
-  on(type: ControlMessageType, handler: Handler): void {
-    let list = this.handlers.get(type);
-    if (!list) {
-      list = [];
-      this.handlers.set(type, list);
-    }
-    list.push(handler);
-  }
-
-  off(type: ControlMessageType, handler: Handler): void {
-    const list = this.handlers.get(type);
-    if (list) {
-      const idx = list.indexOf(handler);
-      if (idx >= 0) list.splice(idx, 1);
-    }
-  }
-
-  destroy(): void {
-    this.isDestroyed = true;
-    this.stateChangeCallback?.("disconnected");
-    this.stopPing();
-    if (this.ws) {
-      this.ws.close();
-      this.ws = null;
-    }
-    this.handlers.clear();
   }
 }
