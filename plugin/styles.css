@@ -136,7 +136,7 @@
   padding: 1px 4px;
   border-radius: 3px 3px 3px 0;
   white-space: nowrap;
-  color: #fff;
+  color: var(--text-on-accent);
   background: inherit;
   background-color: currentColor;
   pointer-events: none;
