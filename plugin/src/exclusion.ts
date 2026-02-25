@@ -20,9 +20,7 @@ export class ExclusionManager {
           this.patterns = [...DEFAULT_EXCLUDES, ...config.exclude];
         }
       }
-    } catch {
-      // Use defaults
-    }
+    } catch {}
   }
 
   isExcluded(path: string): boolean {

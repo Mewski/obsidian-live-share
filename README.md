@@ -65,7 +65,7 @@ npm run lint         # Lint with Biome
 
 - **No offline merge** — File-level operations (create/delete/rename) don't have conflict resolution when reconnecting after offline edits
 - **Single host** — If the host disconnects, the session ends
-- **E2E covers file transfers, not real-time sync** — File content transferred via the control channel is end-to-end encrypted. Real-time CRDT sync data is processed by the server (same model as VS Code Live Share). Use TLS (`wss://`) in production.
+- **E2E covers file transfers, not real-time sync** — File content transferred via the control channel is end-to-end encrypted. Real-time CRDT sync data is processed by the server for persistence and late-join support.
 
 ## Documentation
 

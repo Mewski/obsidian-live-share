@@ -89,9 +89,7 @@ export class ControlChannel {
       }
     };
 
-    this.ws.onerror = () => {
-      // onclose will fire after this
-    };
+    this.ws.onerror = () => {};
   }
 
   send(msg: ControlMessage): void {

@@ -8,7 +8,7 @@ When a host starts a session, a random 128-bit passphrase is generated and embed
 - File content in `file-op` create messages (the actual text of new/synced files)
 
 **What is NOT encrypted:**
-- Yjs CRDT sync data -- the server processes sync protocol messages to provide persistence, late-join sync, and reconnection recovery. This is the same model used by VS Code Live Share and other real-time collaboration tools.
+- Yjs CRDT sync data -- the server processes sync protocol messages for persistence, late-join sync, and reconnection recovery.
 - Control message metadata (message types, file paths, presence info)
 
 **Flow:**
@@ -18,7 +18,7 @@ When a host starts a session, a random 128-bit passphrase is generated and embed
 4. Both peers derive the same AES-256-GCM key from the passphrase
 5. File content is encrypted before sending, decrypted on receipt
 
-Use TLS (`wss://`) in production to encrypt all traffic in transit, including real-time sync data.
+TLS (`wss://`) encrypts all traffic in transit, including real-time sync data.
 
 ## Authentication
 
@@ -42,7 +42,7 @@ When enabled, connections require a valid JWT signed with `JWT_SECRET` (expires 
 | Message type whitelist | The control channel only accepts known message types |
 | REST rate limiting | 30 requests/min per IP on room endpoints, 10 requests/min on auth endpoints |
 | WebSocket rate limiting | 100 messages per 10-second window per client; excess closes the connection |
-| Payload limits | Yjs WebSocket: 10 MB max. Control WebSocket: 1 MB max |
+| Payload limits | Yjs WebSocket: 10 MB max. Control WebSocket: 2 MB max |
 
 ## Threat Model
 
@@ -57,7 +57,7 @@ When enabled, connections require a valid JWT signed with `JWT_SECRET` (expires 
 
 ## Recommendations
 
-- Use TLS (`wss://`) in production to encrypt all traffic in transit
-- Self-host the server for maximum control over your data
+- Enable TLS (`wss://`) to encrypt all traffic in transit
+- Self-host the server for full control over your data
 - Enable GitHub OAuth for authenticated sessions
 - Use `.liveshare.json` exclusion patterns to avoid sharing sensitive files

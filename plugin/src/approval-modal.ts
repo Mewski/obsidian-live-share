@@ -35,9 +35,7 @@ export class ApprovalModal extends Modal {
             cls: "live-share-approval-avatar",
           });
         }
-      } catch {
-        // Skip invalid avatar URLs
-      }
+      } catch {}
     }
     info.createEl("p", {
       text: `${this.request.displayName} wants to join your session.`,

@@ -135,7 +135,6 @@ export function createYjsWSS(persist?: Persistence) {
         },
         origin: unknown,
       ) => {
-        // Track which awareness clientIDs belong to which WebSocket
         if (origin instanceof WebSocket) {
           let ids = state.clientAwarenessIds.get(origin);
           if (!ids) {
