@@ -428,14 +428,20 @@ export default class LiveSharePlugin extends Plugin {
 
   /** Tear down partially-initialised connection state after a failure. */
   private async abortSession(message: string) {
-    new Notice(message);
-    this.backgroundSync.destroy();
-    this.syncManager.disconnect();
-    this.controlChannel?.destroy();
-    this.controlChannel = null;
-    this.manifestManager.destroy();
-    this.connectionState.transition({ type: "disconnect" });
-    await this.sessionManager.endSession();
+    if (this.endingSession) return;
+    this.endingSession = true;
+    try {
+      new Notice(message);
+      this.backgroundSync.destroy();
+      this.syncManager.disconnect();
+      this.controlChannel?.destroy();
+      this.controlChannel = null;
+      this.manifestManager.destroy();
+      this.connectionState.transition({ type: "disconnect" });
+    } finally {
+      await this.sessionManager.endSession();
+      this.endingSession = false;
+    }
   }
 
   private async startSession() {
@@ -559,6 +565,12 @@ export default class LiveSharePlugin extends Plugin {
           break;
         case "disconnected":
           this.connectionState.transition({ type: "disconnect" });
+          // If the control channel gave up reconnecting (not our own destroy),
+          // tear down the session so stale settings don't persist.
+          if (this.sessionManager.isActive && !this.endingSession) {
+            new Notice("Live Share: connection lost, session ended");
+            this.endSession();
+          }
           break;
       }
     });

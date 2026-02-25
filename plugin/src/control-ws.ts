@@ -49,6 +49,7 @@ export class ControlChannel {
   private reconnectCallback: (() => void) | null = null;
 
   private hasConnected = false;
+  private static MAX_RECONNECT_ATTEMPTS = 20;
 
   private latencyMs = 0;
   private pingTimer: ReturnType<typeof setInterval> | null = null;
@@ -271,6 +272,11 @@ export class ControlChannel {
   private scheduleReconnect(): void {
     if (this.reconnectTimer) return;
     this.reconnectAttempt++;
+    if (this.reconnectAttempt > ControlChannel.MAX_RECONNECT_ATTEMPTS) {
+      this.destroyed = true;
+      this.stateChangeCallback?.("disconnected");
+      return;
+    }
     this.stateChangeCallback?.("reconnecting");
     const jitter = this.reconnectDelay * 0.2 * (Math.random() * 2 - 1);
     this.reconnectTimer = setTimeout(() => {

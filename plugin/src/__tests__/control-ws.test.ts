@@ -483,6 +483,27 @@ describe("ControlChannel", () => {
 
       expect((channel as any).reconnectTimer).toBeNull();
     });
+
+    it("fires disconnected after max reconnect attempts", () => {
+      channel = new CC(createSettings());
+      const ws = connectAndGetWs(channel);
+      ws.onopen?.();
+
+      const stateCallback = vi.fn();
+      channel.onStateChange(stateCallback);
+
+      const maxAttempts = (CC as any).MAX_RECONNECT_ATTEMPTS as number;
+
+      // Simulate being at the limit — next close will exceed MAX
+      (channel as any).reconnectAttempt = maxAttempts;
+
+      ws.readyState = MockWebSocket.CLOSED;
+      ws.onclose?.();
+
+      expect(stateCallback).toHaveBeenCalledWith("disconnected");
+      expect((channel as any).destroyed).toBe(true);
+      expect((channel as any).reconnectTimer).toBeNull();
+    });
   });
 
   describe("URL construction", () => {
