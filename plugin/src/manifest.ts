@@ -148,14 +148,9 @@ export class ManifestManager {
           token: this.settings.token,
         };
         if (this.settings.jwt) fileParams.jwt = this.settings.jwt;
-        const fileProvider = new WebsocketProvider(
-          `${wsUrl}/ws`,
-          roomName,
-          fileDoc,
-          {
-            params: fileParams,
-          },
-        );
+        const fileProvider = new WebsocketProvider(`${wsUrl}/ws`, roomName, fileDoc, {
+          params: fileParams,
+        });
 
         try {
           await waitForSync(fileProvider);
@@ -193,9 +188,7 @@ export class ManifestManager {
     return synced;
   }
 
-  onManifestChange(
-    callback: (added: string[], removed: string[]) => void,
-  ): void {
+  onManifestChange(callback: (added: string[], removed: string[]) => void): void {
     if (!this.manifest) return;
 
     if (this.observer && this.manifest) {
@@ -206,8 +199,7 @@ export class ManifestManager {
       const added: string[] = [];
       const removed: string[] = [];
       event.changes.keys.forEach((change, key) => {
-        if (change.action === "add" || change.action === "update")
-          added.push(key);
+        if (change.action === "add" || change.action === "update") added.push(key);
         else if (change.action === "delete") removed.push(key);
       });
       if (added.length > 0 || removed.length > 0) {
@@ -240,11 +232,7 @@ export class ManifestManager {
     this.manifest.delete(normalizePath(path));
   }
 
-  renameFile(
-    oldPath: string,
-    newPath: string,
-    syncManager?: SyncManager,
-  ): void {
+  renameFile(oldPath: string, newPath: string, syncManager?: SyncManager): void {
     if (!this.manifest) return;
     const normOld = normalizePath(oldPath);
     const normNew = normalizePath(newPath);
@@ -267,10 +255,7 @@ export class ManifestManager {
         ? this.settings.sharedFolder
         : `${this.settings.sharedFolder}/`,
     );
-    return (
-      path.startsWith(folder) ||
-      path === normalizePath(this.settings.sharedFolder)
-    );
+    return path.startsWith(folder) || path === normalizePath(this.settings.sharedFolder);
   }
 
   destroy(): void {

@@ -51,11 +51,7 @@ export class PresenceView extends ItemView {
     this.render();
   }
 
-  updateState(
-    users: Map<string, PresenceUser>,
-    isHost: boolean,
-    followedUserId: string | null,
-  ) {
+  updateState(users: Map<string, PresenceUser>, isHost: boolean, followedUserId: string | null) {
     this.users = users;
     this.isHost = isHost;
     this.followedUserId = followedUserId;
@@ -120,9 +116,7 @@ export class PresenceView extends ItemView {
 
       const followBtn = actions.createEl("button", {
         text: "Follow",
-        cls: isFollowed
-          ? "live-share-presence-follow is-active"
-          : "live-share-presence-follow",
+        cls: isFollowed ? "live-share-presence-follow is-active" : "live-share-presence-follow",
       });
       followBtn.addEventListener("click", () => {
         this.onFollowRequest?.(userId);

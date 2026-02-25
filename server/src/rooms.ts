@@ -70,21 +70,14 @@ const CONTROL_CHARS = /[\x00-\x1f\x7f]/;
 
 roomRouter.post("/", async (req, res) => {
   const rawName = req.body.name;
-  const name =
-    typeof rawName === "string" && rawName.length > 0
-      ? rawName
-      : `session-${nanoid(6)}`;
+  const name = typeof rawName === "string" && rawName.length > 0 ? rawName : `session-${nanoid(6)}`;
   if (name.length > 100 || CONTROL_CHARS.test(name)) {
     res.status(400).json({ error: "invalid name" });
     return;
   }
 
-  const hostUserId =
-    typeof req.body.hostUserId === "string" ? req.body.hostUserId : undefined;
-  if (
-    hostUserId &&
-    (hostUserId.length > 128 || CONTROL_CHARS.test(hostUserId))
-  ) {
+  const hostUserId = typeof req.body.hostUserId === "string" ? req.body.hostUserId : undefined;
+  if (hostUserId && (hostUserId.length > 128 || CONTROL_CHARS.test(hostUserId))) {
     res.status(400).json({ error: "invalid hostUserId" });
     return;
   }

@@ -9,19 +9,13 @@ export interface JoinRequest {
 
 export class ApprovalModal extends Modal {
   private request: JoinRequest;
-  private onDecision: (
-    approved: boolean,
-    permission: "read-write" | "read-only",
-  ) => void;
+  private onDecision: (approved: boolean, permission: "read-write" | "read-only") => void;
   private decided = false;
 
   constructor(
     app: App,
     request: JoinRequest,
-    onDecision: (
-      approved: boolean,
-      permission: "read-write" | "read-only",
-    ) => void,
+    onDecision: (approved: boolean, permission: "read-write" | "read-only") => void,
   ) {
     super(app);
     this.request = request;

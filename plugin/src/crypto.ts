@@ -9,14 +9,9 @@ const SALT_BYTES = 16;
 const IV_BYTES = 12;
 const PBKDF2_ITERATIONS = 100_000;
 
-async function deriveKey(
-  passphrase: string,
-  salt: Uint8Array,
-): Promise<CryptoKey> {
+async function deriveKey(passphrase: string, salt: Uint8Array): Promise<CryptoKey> {
   const raw = new TextEncoder().encode(passphrase);
-  const base = await crypto.subtle.importKey("raw", raw, "PBKDF2", false, [
-    "deriveKey",
-  ]);
+  const base = await crypto.subtle.importKey("raw", raw, "PBKDF2", false, ["deriveKey"]);
   return crypto.subtle.deriveKey(
     {
       name: "PBKDF2",
@@ -73,11 +68,7 @@ export class E2ECrypto {
     if (!this.key) throw new Error("E2E not initialised");
     const iv = data.slice(0, IV_BYTES);
     const ciphertext = data.slice(IV_BYTES);
-    const plaintext = await crypto.subtle.decrypt(
-      { name: "AES-GCM", iv },
-      this.key,
-      ciphertext,
-    );
+    const plaintext = await crypto.subtle.decrypt({ name: "AES-GCM", iv }, this.key, ciphertext);
     return new Uint8Array(plaintext);
   }
 

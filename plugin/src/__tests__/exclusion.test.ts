@@ -25,29 +25,16 @@ describe("ExclusionManager", () => {
       expect(manager.isExcluded(".trash/deleted.md")).toBe(true);
     });
 
-    it("includes a normal note file", () => {
-      expect(manager.isIncluded("notes/hello.md")).toBe(true);
+    it("does not exclude a normal note file", () => {
+      expect(manager.isExcluded("notes/hello.md")).toBe(false);
     });
 
-    it("includes a root-level file", () => {
-      expect(manager.isIncluded("README.md")).toBe(true);
+    it("does not exclude a root-level file", () => {
+      expect(manager.isExcluded("README.md")).toBe(false);
     });
 
-    it("includes a deeply nested normal file", () => {
-      expect(manager.isIncluded("folder/subfolder/note.md")).toBe(true);
-    });
-
-    it("isIncluded is the inverse of isExcluded", () => {
-      const paths = [
-        ".obsidian/config",
-        ".liveshare.json",
-        ".trash/old.md",
-        "notes/hello.md",
-        "README.md",
-      ];
-      for (const path of paths) {
-        expect(manager.isIncluded(path)).toBe(!manager.isExcluded(path));
-      }
+    it("does not exclude a deeply nested normal file", () => {
+      expect(manager.isExcluded("folder/subfolder/note.md")).toBe(false);
     });
   });
 
@@ -70,7 +57,7 @@ describe("ExclusionManager", () => {
       expect(manager.isExcluded(".liveshare.json")).toBe(true);
       expect(manager.isExcluded(".trash/deleted.md")).toBe(true);
 
-      expect(manager.isIncluded("notes/hello.md")).toBe(true);
+      expect(manager.isExcluded("notes/hello.md")).toBe(false);
     });
   });
 
@@ -86,7 +73,7 @@ describe("ExclusionManager", () => {
       expect(mockVault.read).not.toHaveBeenCalled();
 
       expect(manager.isExcluded(".obsidian/config")).toBe(true);
-      expect(manager.isIncluded("notes/hello.md")).toBe(true);
+      expect(manager.isExcluded("notes/hello.md")).toBe(false);
     });
   });
 });

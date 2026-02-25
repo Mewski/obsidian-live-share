@@ -141,9 +141,7 @@ export function createApp(
 }
 
 // Only auto-start when run directly (works on all platforms including Windows)
-const isMain =
-  process.argv[1] &&
-  resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+const isMain = process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url);
 
 if (isMain) {
   const persistence = getDefaultPersistence();

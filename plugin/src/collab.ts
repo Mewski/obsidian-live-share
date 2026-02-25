@@ -54,9 +54,7 @@ export class CollabManager {
     }
 
     view.dispatch({
-      effects: this.compartment.reconfigure(
-        yCollab(result.text, result.provider.awareness),
-      ),
+      effects: this.compartment.reconfigure(yCollab(result.text, result.provider.awareness)),
     });
   }
 

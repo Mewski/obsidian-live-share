@@ -9,10 +9,7 @@ export interface FocusRequest {
   ch: number;
 }
 
-export function showFocusNotification(
-  plugin: LiveSharePlugin,
-  req: FocusRequest,
-) {
+export function showFocusNotification(plugin: LiveSharePlugin, req: FocusRequest) {
   const fragment = document.createDocumentFragment();
   fragment.createEl("span", {
     text: `Live Share: ${req.fromDisplayName} wants your attention at ${req.filePath}:${req.line + 1}`,

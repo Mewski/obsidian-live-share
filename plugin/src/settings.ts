@@ -4,7 +4,7 @@ import type LiveSharePlugin from "./main";
 import { HEX_COLOR_RE } from "./utils";
 
 export class LiveShareSettingTab extends PluginSettingTab {
-  plugin: LiveSharePlugin;
+  private plugin: LiveSharePlugin;
 
   constructor(app: App, plugin: LiveSharePlugin) {
     super(app, plugin);
@@ -55,10 +55,12 @@ export class LiveShareSettingTab extends PluginSettingTab {
               ? "Connecting..."
               : connState === "error"
                 ? "Error"
-                : connState;
+                : connState === "auth-required"
+                  ? "Auth required"
+                  : connState;
       new Setting(containerEl)
         .setName("Session active")
-        .setDesc(`${role} — Room: ${settings.roomId} — ${stateLabel}`);
+        .setDesc(`${role} -- Room: ${settings.roomId} -- ${stateLabel}`);
     }
 
     new Setting(containerEl)
@@ -132,17 +134,15 @@ export class LiveShareSettingTab extends PluginSettingTab {
         .setName("End-to-end encryption")
         .setDesc(
           settings.encryptionPassphrase
-            ? "Active — file content in control messages is encrypted"
-            : "Inactive — no encryption passphrase set",
+            ? "Active -- file content in control messages is encrypted"
+            : "Inactive -- no encryption passphrase set",
         );
     }
 
     new Setting(containerEl)
       .setName("File exclusion")
       .setDesc(
-        "Create a .liveshare.json file in your vault root to exclude files. " +
-          'Format: { "exclude": ["*.tmp", "drafts/**"] }. ' +
-          "Default excludes: .obsidian/**, .liveshare.json, .trash/**",
+        `Create a .liveshare.json file in your vault root to exclude files. Format: { "exclude": ["*.tmp", "drafts/**"] }. Default excludes: .obsidian/**, .liveshare.json, .trash/**`,
       );
   }
 }

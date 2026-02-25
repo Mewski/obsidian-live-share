@@ -1,8 +1,7 @@
 /** Path normalization, URL conversion, file type detection, and base64 helpers. */
 import { TFolder, type Vault } from "obsidian";
 
-export const HEX_COLOR_RE =
-  /^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/;
+export const HEX_COLOR_RE = /^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/;
 
 export function normalizePath(p: string): string {
   return p.replace(/\\/g, "/");
