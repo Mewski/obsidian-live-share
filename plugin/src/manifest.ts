@@ -24,19 +24,15 @@ export interface FileEntry {
   binary?: boolean;
 }
 
-async function hashContent(content: string): Promise<string> {
-  const buf = new TextEncoder().encode(content);
+async function hashBuffer(buf: ArrayBuffer): Promise<string> {
   const hash = await crypto.subtle.digest("SHA-256", buf);
   return Array.from(new Uint8Array(hash))
     .map((byte) => byte.toString(16).padStart(2, "0"))
     .join("");
 }
 
-async function hashBinaryContent(buf: ArrayBuffer): Promise<string> {
-  const hash = await crypto.subtle.digest("SHA-256", buf);
-  return Array.from(new Uint8Array(hash))
-    .map((byte) => byte.toString(16).padStart(2, "0"))
-    .join("");
+function hashContent(content: string): Promise<string> {
+  return hashBuffer(new TextEncoder().encode(content).buffer as ArrayBuffer);
 }
 
 export class ManifestManager {
@@ -93,7 +89,7 @@ export class ManifestManager {
       if (binary) {
         const buf = await this.vault.readBinary(file);
         entries.set(normalizePath(file.path), {
-          hash: await hashBinaryContent(buf),
+          hash: await hashBuffer(buf),
           size: file.stat.size,
           mtime: file.stat.mtime,
           binary: true,
@@ -147,7 +143,7 @@ export class ManifestManager {
         needsSync = true;
       } else if (fileEntry.binary) {
         const buf = await this.vault.readBinary(localFile);
-        if ((await hashBinaryContent(buf)) !== fileEntry.hash) {
+        if ((await hashBuffer(buf)) !== fileEntry.hash) {
           needsSync = true;
         }
       } else {
@@ -174,9 +170,14 @@ export class ManifestManager {
       if (this.settings.jwt) fileParams.jwt = this.settings.jwt;
       const fileUserId = this.settings.githubUserId || this.settings.clientId;
       if (fileUserId) fileParams.userId = fileUserId;
-      const fileProvider = new WebsocketProvider(`${wsUrl}/ws`, roomName, fileDoc, {
-        params: fileParams,
-      });
+      const fileProvider = new WebsocketProvider(
+        `${wsUrl}/ws`,
+        roomName,
+        fileDoc,
+        {
+          params: fileParams,
+        },
+      );
 
       try {
         await waitForSync(fileProvider);
@@ -210,7 +211,9 @@ export class ManifestManager {
     return synced;
   }
 
-  onManifestChange(callback: (added: string[], removed: string[]) => void): void {
+  onManifestChange(
+    callback: (added: string[], removed: string[]) => void,
+  ): void {
     if (!this.manifest) return;
 
     if (this.observer && this.manifest) {
@@ -221,7 +224,8 @@ export class ManifestManager {
       const added: string[] = [];
       const removed: string[] = [];
       event.changes.keys.forEach((change, key) => {
-        if (change.action === "add" || change.action === "update") added.push(key);
+        if (change.action === "add" || change.action === "update")
+          added.push(key);
         else if (change.action === "delete") removed.push(key);
       });
       if (added.length > 0 || removed.length > 0) {
@@ -235,7 +239,7 @@ export class ManifestManager {
     if (!this.manifest || !this.isSharedPath(file.path)) return;
     if (content instanceof ArrayBuffer) {
       this.manifest.set(normalizePath(file.path), {
-        hash: await hashBinaryContent(content),
+        hash: await hashBuffer(content),
         size: content.byteLength,
         mtime: file.stat.mtime,
         binary: true,
@@ -254,7 +258,11 @@ export class ManifestManager {
     this.manifest.delete(normalizePath(path));
   }
 
-  renameFile(oldPath: string, newPath: string, syncManager?: SyncManager): void {
+  renameFile(
+    oldPath: string,
+    newPath: string,
+    syncManager?: SyncManager,
+  ): void {
     if (!this.manifest) return;
     const normOld = normalizePath(oldPath);
     const normNew = normalizePath(newPath);
@@ -282,7 +290,10 @@ export class ManifestManager {
         ? this.settings.sharedFolder
         : `${this.settings.sharedFolder}/`,
     );
-    return path.startsWith(folder) || path === normalizePath(this.settings.sharedFolder);
+    return (
+      path.startsWith(folder) ||
+      path === normalizePath(this.settings.sharedFolder)
+    );
   }
 
   destroy(): void {

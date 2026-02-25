@@ -57,19 +57,20 @@ export default class LiveSharePlugin extends Plugin {
   // Prevents re-entrant endSession calls from kicked/session-end handlers.
   private endingSession = false;
 
-  private requestBinaryFile(path: string) {
+  private requestBinaryFile = (path: string) => {
     this.controlChannel?.send({ type: "sync-request", path });
-  }
+  };
+
+  private suppressPath = (path: string) => this.fileOpsManager.suppressPath(path);
+  private unsuppressPath = (path: string) => this.fileOpsManager.unsuppressPath(path);
 
   private registerManifestChangeHandler() {
     this.manifestManager.onManifestChange(async (added, removed) => {
       if (added.length > 0) {
-        const suppress = (p: string) => this.fileOpsManager.suppressPath(p);
-        const unsuppress = (p: string) => this.fileOpsManager.unsuppressPath(p);
         const n = await this.manifestManager.syncFromManifest(
-          suppress,
-          unsuppress,
-          (path) => this.requestBinaryFile(path),
+          this.suppressPath,
+          this.unsuppressPath,
+          this.requestBinaryFile,
           { skipText: true },
         );
         if (n > 0) new Notice(`Live Share: synced ${n} file(s)`);
@@ -376,12 +377,10 @@ export default class LiveSharePlugin extends Plugin {
           await this.manifestManager.publishManifest();
           await this.backgroundSync.startAll("host");
         } else {
-          const suppress = (p: string) => this.fileOpsManager.suppressPath(p);
-          const unsuppress = (p: string) => this.fileOpsManager.unsuppressPath(p);
           await this.manifestManager.syncFromManifest(
-            suppress,
-            unsuppress,
-            (path) => this.requestBinaryFile(path),
+            this.suppressPath,
+            this.unsuppressPath,
+            this.requestBinaryFile,
             { skipText: true },
           );
           await this.backgroundSync.startAll("guest");
@@ -478,12 +477,10 @@ export default class LiveSharePlugin extends Plugin {
       try {
         await this.connectSync();
         await this.manifestManager.connect();
-        const suppress = (p: string) => this.fileOpsManager.suppressPath(p);
-        const unsuppress = (p: string) => this.fileOpsManager.unsuppressPath(p);
         const count = await this.manifestManager.syncFromManifest(
-          suppress,
-          unsuppress,
-          (path) => this.requestBinaryFile(path),
+          this.suppressPath,
+          this.unsuppressPath,
+          this.requestBinaryFile,
           { skipText: true },
         );
         await this.backgroundSync.startAll("guest");
@@ -905,10 +902,10 @@ export default class LiveSharePlugin extends Plugin {
     }
     if (!this.controlChannel) return;
     new Notice("Live Share: reloading all files from host...");
-    const suppress = (path: string) => this.fileOpsManager.suppressPath(path);
-    const unsuppress = (path: string) => this.fileOpsManager.unsuppressPath(path);
-    const n = await this.manifestManager.syncFromManifest(suppress, unsuppress, (path) =>
-      this.requestBinaryFile(path),
+    const n = await this.manifestManager.syncFromManifest(
+      this.suppressPath,
+      this.unsuppressPath,
+      this.requestBinaryFile,
     );
     if (n > 0) new Notice(`Live Share: reloaded ${n} file(s) from host`);
   }
