@@ -271,9 +271,7 @@ describe("ControlChannel", () => {
       await new Promise((r) => setTimeout(r, 50));
 
       expect(handler).not.toHaveBeenCalled();
-      expect(warnSpy).toHaveBeenCalledWith(
-        "Obsidian Live Share: failed to decrypt control message",
-      );
+      expect(warnSpy).toHaveBeenCalledWith("Live Share: failed to decrypt control message");
 
       warnSpy.mockRestore();
     });

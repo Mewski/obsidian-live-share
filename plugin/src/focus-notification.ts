@@ -11,7 +11,7 @@ export interface FocusRequest {
 export function showFocusNotification(plugin: LiveSharePlugin, req: FocusRequest) {
   const fragment = document.createDocumentFragment();
   fragment.createEl("span", {
-    text: `Obsidian Live Share: ${req.fromDisplayName} wants your attention at ${req.filePath}:${req.line + 1}`,
+    text: `Live Share: ${req.fromDisplayName} wants your attention at ${req.filePath}:${req.line + 1}`,
   });
   fragment.createEl("br");
   const btn = fragment.createEl("button", {

@@ -68,7 +68,7 @@ export class ManifestManager {
     try {
       await waitForSync(this.provider);
     } catch {
-      new Notice("Obsidian Live Share: manifest sync timed out");
+      new Notice("Live Share: manifest sync timed out");
     }
   }
 

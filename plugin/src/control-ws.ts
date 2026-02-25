@@ -238,7 +238,7 @@ export class ControlChannel {
         for (const h of handlers) h(decMsg as ControlMessage);
       }
     } catch {
-      console.warn("Obsidian Live Share: failed to decrypt control message");
+      console.warn("Live Share: failed to decrypt control message");
     }
   }
 

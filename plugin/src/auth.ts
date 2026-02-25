@@ -26,10 +26,10 @@ export class AuthManager {
       this.plugin.settings.displayName = payload.displayName || payload.username;
       this.plugin.settings.avatarUrl = payload.avatar || "";
       await this.plugin.saveSettings();
-      new Notice(`Obsidian Live Share: authenticated as ${this.plugin.settings.displayName}`);
+      new Notice(`Live Share: authenticated as ${this.plugin.settings.displayName}`);
       return true;
     } catch {
-      new Notice("Obsidian Live Share: invalid auth token");
+      new Notice("Live Share: invalid auth token");
       return false;
     }
   }
@@ -39,6 +39,6 @@ export class AuthManager {
     this.plugin.settings.githubUserId = "";
     this.plugin.settings.avatarUrl = "";
     await this.plugin.saveSettings();
-    new Notice("Obsidian Live Share: logged out");
+    new Notice("Live Share: logged out");
   }
 }

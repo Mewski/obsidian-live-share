@@ -138,7 +138,7 @@ export default class LiveSharePlugin extends Plugin {
           line: cursor.line,
           ch: cursor.ch,
         });
-        new Notice("Obsidian Live Share: focus request sent");
+        new Notice("Live Share: focus request sent");
       },
     });
 
@@ -147,7 +147,7 @@ export default class LiveSharePlugin extends Plugin {
       name: "Summon all participants here",
       editorCallback: (editor, view) => {
         if (this.settings.role !== "host") {
-          new Notice("Obsidian Live Share: only the host can summon all participants");
+          new Notice("Live Share: only the host can summon all participants");
           return;
         }
         const cursor = editor.getCursor();
@@ -162,7 +162,7 @@ export default class LiveSharePlugin extends Plugin {
           line: cursor.line,
           ch: cursor.ch,
         });
-        new Notice("Obsidian Live Share: summon sent to all participants");
+        new Notice("Live Share: summon sent to all participants");
       },
     });
 
@@ -177,11 +177,11 @@ export default class LiveSharePlugin extends Plugin {
       name: "Summon a specific participant here",
       editorCallback: () => {
         if (this.settings.role !== "host") {
-          new Notice("Obsidian Live Share: only the host can summon");
+          new Notice("Live Share: only the host can summon");
           return;
         }
         if (this.remoteUsers.size === 0) {
-          new Notice("Obsidian Live Share: no participants to summon");
+          new Notice("Live Share: no participants to summon");
           return;
         }
         new UserPickerModal(this.app, this.remoteUsers, (userId) => {
@@ -317,14 +317,13 @@ export default class LiveSharePlugin extends Plugin {
             this.manifestManager.onManifestChange(async (added, removed) => {
               if (added.length > 0) {
                 const n = await this.manifestManager.syncFromManifest();
-                if (n > 0) new Notice(`Obsidian Live Share: synced ${n} file(s)`);
+                if (n > 0) new Notice(`Live Share: synced ${n} file(s)`);
               }
               for (const path of removed) {
                 const file = this.app.vault.getAbstractFileByPath(path);
                 if (file) await this.app.vault.trash(file, true);
               }
-              if (removed.length > 0)
-                new Notice(`Obsidian Live Share: removed ${removed.length} file(s)`);
+              if (removed.length > 0) new Notice(`Live Share: removed ${removed.length} file(s)`);
             });
           }
         });
@@ -365,7 +364,7 @@ export default class LiveSharePlugin extends Plugin {
 
   private async startSession() {
     if (this.sessionManager.isActive) {
-      new Notice("Obsidian Live Share: session already active");
+      new Notice("Live Share: session already active");
       return;
     }
 
@@ -377,13 +376,13 @@ export default class LiveSharePlugin extends Plugin {
       await this.connectSync();
       await this.manifestManager.connect();
       await this.manifestManager.publishManifest();
-      new Notice("Obsidian Live Share: session started, invite copied");
+      new Notice("Live Share: session started, invite copied");
     }
   }
 
   private async joinSession() {
     if (this.sessionManager.isActive) {
-      new Notice("Obsidian Live Share: session already active");
+      new Notice("Live Share: session already active");
       return;
     }
 
@@ -398,22 +397,21 @@ export default class LiveSharePlugin extends Plugin {
       this.manifestManager.onManifestChange(async (added, removed) => {
         if (added.length > 0) {
           const n = await this.manifestManager.syncFromManifest();
-          if (n > 0) new Notice(`Obsidian Live Share: synced ${n} file(s)`);
+          if (n > 0) new Notice(`Live Share: synced ${n} file(s)`);
         }
         for (const path of removed) {
           const file = this.app.vault.getAbstractFileByPath(path);
           if (file) await this.app.vault.trash(file, true);
         }
-        if (removed.length > 0)
-          new Notice(`Obsidian Live Share: removed ${removed.length} file(s)`);
+        if (removed.length > 0) new Notice(`Live Share: removed ${removed.length} file(s)`);
       });
-      new Notice(`Obsidian Live Share: joined session, synced ${count} file(s)`);
+      new Notice(`Live Share: joined session, synced ${count} file(s)`);
     }
   }
 
   private async endSession() {
     if (!this.sessionManager.isActive) {
-      new Notice("Obsidian Live Share: no active session");
+      new Notice("Live Share: no active session");
       return;
     }
 
@@ -444,7 +442,7 @@ export default class LiveSharePlugin extends Plugin {
       this.manifestManager.destroy();
       await this.sessionManager.endSession();
       this.connectionState.transition({ type: "disconnect" });
-      new Notice("Obsidian Live Share: session ended");
+      new Notice("Live Share: session ended");
     } finally {
       this.endingSession = false;
     }
@@ -566,12 +564,12 @@ export default class LiveSharePlugin extends Plugin {
     });
 
     this.controlChannel.on("kicked", () => {
-      new Notice("Obsidian Live Share: you have been removed from the session");
+      new Notice("Live Share: you have been removed from the session");
       this.endSession();
     });
 
     this.controlChannel.on("session-end", () => {
-      new Notice("Obsidian Live Share: the host ended the session");
+      new Notice("Live Share: the host ended the session");
       this.endSession();
     });
 
@@ -617,10 +615,10 @@ export default class LiveSharePlugin extends Plugin {
     const state = this.connectionState.getState();
     switch (state) {
       case "disconnected":
-        this.statusBarEl.setText("Obsidian Live Share: off");
+        this.statusBarEl.setText("Live Share: off");
         break;
       case "connecting":
-        this.statusBarEl.setText("Obsidian Live Share: connecting...");
+        this.statusBarEl.setText("Live Share: connecting...");
         break;
       case "connected": {
         const count = this.remoteUsers.size;
@@ -629,17 +627,17 @@ export default class LiveSharePlugin extends Plugin {
         const latency = this.controlChannel?.getLatency();
         const latencyStr = latency ? ` ${latency}ms` : "";
         const pres = this.presenting ? " [presenting]" : "";
-        this.statusBarEl.setText(`Obsidian Live Share: ${role}${users}${latencyStr}${pres}`);
+        this.statusBarEl.setText(`Live Share: ${role}${users}${latencyStr}${pres}`);
         break;
       }
       case "reconnecting":
-        this.statusBarEl.setText("Obsidian Live Share: reconnecting...");
+        this.statusBarEl.setText("Live Share: reconnecting...");
         break;
       case "error":
-        this.statusBarEl.setText("Obsidian Live Share: error");
+        this.statusBarEl.setText("Live Share: error");
         break;
       case "auth-required":
-        this.statusBarEl.setText("Obsidian Live Share: auth needed");
+        this.statusBarEl.setText("Live Share: auth needed");
         break;
     }
   }
@@ -704,25 +702,25 @@ export default class LiveSharePlugin extends Plugin {
     this.remoteUsers.delete(userId);
     this.refreshPresenceView();
     this.updateStatusBar();
-    new Notice("Obsidian Live Share: kicked user");
+    new Notice("Live Share: kicked user");
   }
 
   private async reloadFromHost() {
     if (!this.sessionManager.isActive) {
-      new Notice("Obsidian Live Share: no active session");
+      new Notice("Live Share: no active session");
       return;
     }
     if (this.settings.role !== "guest") {
-      new Notice("Obsidian Live Share: only guests can reload from host");
+      new Notice("Live Share: only guests can reload from host");
       return;
     }
     if (!this.controlChannel) return;
-    new Notice("Obsidian Live Share: reloading all files from host...");
+    new Notice("Live Share: reloading all files from host...");
     this.controlChannel.send({ type: "sync-request" });
     const suppress = (p: string) => this.fileOpsManager.suppressPath(p);
     const unsuppress = (p: string) => this.fileOpsManager.unsuppressPath(p);
     const n = await this.manifestManager.syncFromManifest(suppress, unsuppress);
-    if (n > 0) new Notice(`Obsidian Live Share: reloaded ${n} file(s) from host`);
+    if (n > 0) new Notice(`Live Share: reloaded ${n} file(s) from host`);
   }
 
   private summonUser(userId: string) {
@@ -731,7 +729,7 @@ export default class LiveSharePlugin extends Plugin {
     const cursor = view?.editor?.getCursor();
     const filePath = view?.file?.path;
     if (!filePath) {
-      new Notice("Obsidian Live Share: open a file first to summon");
+      new Notice("Live Share: open a file first to summon");
       return;
     }
     this.controlChannel.send({
@@ -744,23 +742,23 @@ export default class LiveSharePlugin extends Plugin {
       ch: cursor?.ch ?? 0,
     });
     const user = this.remoteUsers.get(userId);
-    new Notice(`Obsidian Live Share: summoned ${user?.displayName ?? userId}`);
+    new Notice(`Live Share: summoned ${user?.displayName ?? userId}`);
   }
 
   private togglePresent() {
     if (this.settings.role !== "host") {
-      new Notice("Obsidian Live Share: only the host can present");
+      new Notice("Live Share: only the host can present");
       return;
     }
     if (!this.sessionManager.isActive) {
-      new Notice("Obsidian Live Share: no active session");
+      new Notice("Live Share: no active session");
       return;
     }
     this.presenting = !this.presenting;
     if (this.presenting) {
-      new Notice("Obsidian Live Share: presentation mode ON");
+      new Notice("Live Share: presentation mode ON");
     } else {
-      new Notice("Obsidian Live Share: presentation mode OFF");
+      new Notice("Live Share: presentation mode OFF");
     }
     this.updateStatusBar();
   }
@@ -772,7 +770,7 @@ export default class LiveSharePlugin extends Plugin {
     }
     this.followTarget = userId;
     const user = this.remoteUsers.get(userId);
-    new Notice(`Obsidian Live Share: following ${user?.displayName ?? userId}`);
+    new Notice(`Live Share: following ${user?.displayName ?? userId}`);
 
     this.clearUnfollowListeners();
     const handler = () => {
@@ -791,7 +789,7 @@ export default class LiveSharePlugin extends Plugin {
     if (!this.followTarget) return;
     this.followTarget = null;
     this.clearUnfollowListeners();
-    new Notice("Obsidian Live Share: stopped following");
+    new Notice("Live Share: stopped following");
   }
 
   private clearUnfollowListeners() {

@@ -32,13 +32,13 @@ export class SessionManager {
         }),
       });
     } catch {
-      new Notice("Obsidian Live Share: cannot reach server");
+      new Notice("Live Share: cannot reach server");
       return false;
     }
 
     if (!res.ok) {
       const err = await res.json().catch(() => ({ error: "unknown" }));
-      new Notice(`Obsidian Live Share: ${(err as { error: string }).error}`);
+      new Notice(`Live Share: ${(err as { error: string }).error}`);
       return false;
     }
 
@@ -61,7 +61,7 @@ export class SessionManager {
   async joinSession(inviteString: string): Promise<boolean> {
     const parsed = this.parseInvite(inviteString);
     if (!parsed) {
-      new Notice("Obsidian Live Share: invalid invite string");
+      new Notice("Live Share: invalid invite string");
       return false;
     }
 
@@ -76,13 +76,13 @@ export class SessionManager {
         body: JSON.stringify({ token: parsed.t }),
       });
     } catch {
-      new Notice("Obsidian Live Share: cannot reach server");
+      new Notice("Live Share: cannot reach server");
       return false;
     }
 
     if (!res.ok) {
       const err = await res.json().catch(() => ({ error: "unknown" }));
-      new Notice(`Obsidian Live Share: ${(err as { error: string }).error}`);
+      new Notice(`Live Share: ${(err as { error: string }).error}`);
       return false;
     }
 
@@ -121,7 +121,7 @@ export class SessionManager {
   async copyInvite(): Promise<void> {
     const { settings } = this.plugin;
     if (!settings.roomId || !settings.token) {
-      new Notice("Obsidian Live Share: no active session");
+      new Notice("Live Share: no active session");
       return;
     }
 
@@ -133,7 +133,7 @@ export class SessionManager {
     };
     const invite = `obsliveshare:${btoa(JSON.stringify(payload))}`;
     await navigator.clipboard.writeText(invite);
-    new Notice("Obsidian Live Share: invite link copied to clipboard");
+    new Notice("Live Share: invite link copied to clipboard");
   }
 
   private parseInvite(raw: string): InvitePayload | null {

@@ -175,7 +175,7 @@ export class FileOpsManager {
           for (let i = 0; i < expectedChunks; i++) {
             if (completed.chunks[i] === undefined) {
               console.error(
-                `Obsidian Live Share: chunk ${i}/${expectedChunks} missing for ${op.path}, aborting assembly`,
+                `Live Share: chunk ${i}/${expectedChunks} missing for ${op.path}, aborting assembly`,
               );
               chunksValid = false;
               break;
@@ -207,8 +207,8 @@ export class FileOpsManager {
         }
       }
     } catch (err) {
-      console.error("Obsidian Live Share: failed to apply remote file op:", err);
-      new Notice(`Obsidian Live Share: failed to apply remote ${op.type}`);
+      console.error("Live Share: failed to apply remote file op:", err);
+      new Notice(`Live Share: failed to apply remote ${op.type}`);
     } finally {
       // Delay unsuppress so that vault events (which fire asynchronously after
       // the vault operation resolves) still see the path as suppressed.
