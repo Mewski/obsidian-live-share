@@ -46,7 +46,11 @@ export function createApp(
   const server = externalServer ?? createServer(app);
 
   const yjs = createYjsWSS(persistence);
-  const control = createControlWSS();
+  const control = createControlWSS({
+    onPermissionChange: (roomId, userId, permission) => {
+      yjs.updatePermission(roomId, userId, permission);
+    },
+  });
 
   app.get("/healthz", (_req, res) => {
     const stats = yjs.getStats();

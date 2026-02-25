@@ -21,6 +21,7 @@ interface RoomState {
   clients: Set<WebSocket>;
   clientAwarenessIds: Map<WebSocket, Set<number>>;
   readOnlyClients: Set<WebSocket>;
+  clientUserIds: Map<WebSocket, string>;
   cleanupTimer?: ReturnType<typeof setTimeout>;
   persistTimer?: ReturnType<typeof setTimeout>;
 }
@@ -114,6 +115,7 @@ export function createYjsWSS(persist?: Persistence) {
       clients: new Set(),
       clientAwarenessIds: new Map(),
       readOnlyClients: new Set(),
+      clientUserIds: new Map(),
     };
     roomStates.set(roomId, state);
     pendingRooms.delete(roomId);
@@ -263,6 +265,7 @@ export function createYjsWSS(persist?: Persistence) {
     const colonIdx = roomId.indexOf(":");
     const baseRoomId = colonIdx >= 0 ? roomId.slice(0, colonIdx) : roomId;
     if (userId) {
+      state.clientUserIds.set(ws, userId);
       const perm = getPermission(baseRoomId, userId);
       if (perm === "read-only") {
         state.readOnlyClients.add(ws);
@@ -289,6 +292,7 @@ export function createYjsWSS(persist?: Persistence) {
     ws.on("close", () => {
       state.clients.delete(ws);
       state.readOnlyClients.delete(ws);
+      state.clientUserIds.delete(ws);
 
       const clientIds = state.clientAwarenessIds.get(ws);
       if (clientIds && clientIds.size > 0) {
@@ -308,5 +312,27 @@ export function createYjsWSS(persist?: Persistence) {
     });
   });
 
-  return { wss, closeAllRooms, getStats };
+  /** Update read-only status for a userId across all Yjs rooms matching a base room ID. */
+  function updatePermission(
+    baseRoomId: string,
+    userId: string,
+    permission: "read-write" | "read-only",
+  ) {
+    for (const [rid, state] of roomStates) {
+      const colonIdx = rid.indexOf(":");
+      const base = colonIdx >= 0 ? rid.slice(0, colonIdx) : rid;
+      if (base !== baseRoomId) continue;
+      for (const [ws, uid] of state.clientUserIds) {
+        if (uid === userId) {
+          if (permission === "read-only") {
+            state.readOnlyClients.add(ws);
+          } else {
+            state.readOnlyClients.delete(ws);
+          }
+        }
+      }
+    }
+  }
+
+  return { wss, closeAllRooms, getStats, updatePermission };
 }

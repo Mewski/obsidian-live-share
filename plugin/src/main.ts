@@ -645,6 +645,7 @@ export default class LiveSharePlugin extends Plugin {
       await this.manifestManager.connect();
       await this.backgroundSync.startAll(this.settings.role ?? "guest");
       this.registerManifestChangeHandler();
+      this.onActiveFileChange();
 
       new Notice(`Live Share: your permission was changed to ${perm}`);
     });

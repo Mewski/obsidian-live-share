@@ -45,9 +45,18 @@ interface ControlClient {
 interface ControlRoom {
   clients: Map<WebSocket, ControlClient>;
   pendingApprovals: Map<string, WebSocket>;
+  cleanupTimer?: ReturnType<typeof setTimeout>;
 }
 
-export function createControlWSS() {
+export interface ControlWSSOptions {
+  onPermissionChange?: (
+    roomId: string,
+    userId: string,
+    permission: "read-write" | "read-only",
+  ) => void;
+}
+
+export function createControlWSS(options?: ControlWSSOptions) {
   const rooms = new Map<string, ControlRoom>();
   const wss = new WebSocketServer({
     noServer: true,
@@ -59,6 +68,10 @@ export function createControlWSS() {
     if (!room) {
       room = { clients: new Map(), pendingApprovals: new Map() };
       rooms.set(roomId, room);
+    }
+    if (room.cleanupTimer) {
+      clearTimeout(room.cleanupTimer);
+      room.cleanupTimer = undefined;
     }
     return room;
   }
@@ -155,7 +168,17 @@ export function createControlWSS() {
       }
 
       if (msg.type === "join-request") {
-        client.userId = typeof msg.userId === "string" ? msg.userId.slice(0, 128) : "";
+        // Lock userId on first identification — same as presence-update
+        if (!client.userId) {
+          client.userId = typeof msg.userId === "string" ? msg.userId.slice(0, 128) : "";
+
+          // Assign host if not yet assigned
+          if (client.verifiedUserId && serverRoom?.hostUserId) {
+            client.isHost = client.verifiedUserId === serverRoom.hostUserId;
+          } else {
+            client.isHost = !findHost(room);
+          }
+        }
         client.displayName =
           typeof msg.displayName === "string" ? msg.displayName.slice(0, 100) : "";
 
@@ -226,6 +249,7 @@ export function createControlWSS() {
         const perm = msg.permission;
         if (perm !== "read-write" && perm !== "read-only") return;
         setPermission(roomId, targetUserId as string, perm);
+        options?.onPermissionChange?.(roomId, targetUserId as string, perm);
         for (const [clientWs, targetClient] of room.clients) {
           if (targetClient.userId === targetUserId) {
             targetClient.permission = perm;
@@ -234,6 +258,8 @@ export function createControlWSS() {
         }
         return;
       }
+
+      if (!client.approved) return;
 
       const isFileWrite =
         msg.type === "file-op" ||
@@ -250,8 +276,6 @@ export function createControlWSS() {
       if (msg.type === "session-end" && !client.isHost) {
         return;
       }
-
-      if (!client.approved) return;
 
       if (
         msg.type === "summon" &&
@@ -300,17 +324,23 @@ export function createControlWSS() {
       }
       room.clients.delete(ws);
       if (room.clients.size === 0) {
-        clearRoom(roomId);
-        rooms.delete(roomId);
-        removeRoom(roomId).catch((err) => {
-          console.error(`[control] failed to remove room ${roomId}:`, err);
-        });
+        // Delay room removal so Yjs clients can persist and disconnect first
+        room.cleanupTimer = setTimeout(() => {
+          if (room.clients.size === 0) {
+            clearRoom(roomId);
+            rooms.delete(roomId);
+            removeRoom(roomId).catch((err) => {
+              console.error(`[control] failed to remove room ${roomId}:`, err);
+            });
+          }
+        }, 35_000);
       }
     });
   });
 
   function closeAll() {
     for (const [, room] of rooms) {
+      if (room.cleanupTimer) clearTimeout(room.cleanupTimer);
       for (const [ws] of room.clients) {
         ws.close(1000, "server shutting down");
       }

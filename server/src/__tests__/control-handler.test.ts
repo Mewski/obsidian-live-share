@@ -56,7 +56,11 @@ function connectControl(
   });
 }
 
-function waitForMessages(messages: string[], count: number, timeoutMs = 3000): Promise<void> {
+function waitForMessages(
+  messages: string[],
+  count: number,
+  timeoutMs = 3000,
+): Promise<void> {
   if (messages.length >= count) return Promise.resolve();
   return new Promise((resolve, reject) => {
     const start = Date.now();
@@ -85,7 +89,10 @@ beforeEach(async () => {
 
 afterEach(async () => {
   for (const ws of openSockets) {
-    if (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING) {
+    if (
+      ws.readyState === WebSocket.OPEN ||
+      ws.readyState === WebSocket.CONNECTING
+    ) {
       ws.close();
     }
   }
@@ -405,8 +412,11 @@ describe("Control WebSocket handler", () => {
 
     await new Promise((r) => setTimeout(r, 300));
 
-    // Room metadata should be deleted after all clients disconnect
-    await expect(connectControl(room.id, room.token)).rejects.toThrow();
+    // Room cleanup is delayed (35s) to let Yjs clients persist first.
+    // Verify reconnection still works during the grace period.
+    const reconnected = await connectControl(room.id, room.token);
+    expect(reconnected.ws.readyState).toBe(WebSocket.OPEN);
+    reconnected.ws.close();
   });
 
   it("auto-approves join-request when room does not require approval", async () => {
