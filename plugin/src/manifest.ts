@@ -116,6 +116,8 @@ export class ManifestManager {
         }
       }
       for (const [filePath, fileEntry] of entries) {
+        const existing = this.manifest?.get(filePath);
+        if (existing && existing.hash === fileEntry.hash) continue;
         this.manifest?.set(filePath, fileEntry);
       }
     });
@@ -234,7 +236,7 @@ export class ManifestManager {
       const added: string[] = [];
       const removed: string[] = [];
       event.changes.keys.forEach((change, key) => {
-        if (change.action === "add" || change.action === "update") added.push(key);
+        if (change.action === "add") added.push(key);
         else if (change.action === "delete") removed.push(key);
       });
       if (added.length > 0 || removed.length > 0) {

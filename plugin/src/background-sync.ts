@@ -179,7 +179,9 @@ export class BackgroundSync {
       docHandle.text.insert(0, localContent);
     });
 
-    await this.manifestManager.updateFile(file, localContent);
+    if (this.role === "host") {
+      await this.manifestManager.updateFile(file, localContent);
+    }
   }
 
   isWrittenByUs(rawPath: string): boolean {

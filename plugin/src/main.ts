@@ -377,17 +377,11 @@ export default class LiveSharePlugin extends Plugin {
         )
           return;
         this.fileOpsManager.onFileRename(file, oldPath);
+        await this.backgroundSync.onFileRenamed(oldPath, file.path);
         if (this.settings.role === "host") {
-          if (file instanceof TFile && isTextFile(file.path)) {
-            await this.backgroundSync.onFileRenamed(oldPath, file.path);
-          }
           this.manifestManager.renameFile(oldPath, file.path, this.syncManager);
-          if (!(file instanceof TFile && isTextFile(file.path))) {
-            this.backgroundSync.onFileRenamed(oldPath, file.path);
-          }
-        } else {
-          this.backgroundSync.onFileRenamed(oldPath, file.path);
         }
+        this.onActiveFileChange();
       }),
     );
 
@@ -405,11 +399,7 @@ export default class LiveSharePlugin extends Plugin {
 
         if (isTextFile(file.path)) {
           if (this.backgroundSync.isWrittenByUs(file.path)) return;
-          if (this.settings.role === "host") {
-            await this.backgroundSync.handleLocalTextModify(file.path);
-            const content = await this.app.vault.read(file);
-            await this.manifestManager.updateFile(file, content);
-          }
+          await this.backgroundSync.handleLocalTextModify(file.path);
           return;
         }
         this.fileOpsManager.onFileModify(file);
