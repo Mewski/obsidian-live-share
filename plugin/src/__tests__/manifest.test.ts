@@ -40,7 +40,7 @@ function createVault() {
   };
 }
 
-/** Inject a Y.Doc and Y.Map directly onto the manager's private fields. */
+// Inject a Y.Doc and Y.Map directly onto the manager's private fields.
 function injectManifest(manager: ManifestManager) {
   const doc = new Y.Doc();
   const manifest = doc.getMap<any>("files");
