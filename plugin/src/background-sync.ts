@@ -13,6 +13,7 @@ const DEBOUNCE_MS = 1000;
 
 export class BackgroundSync {
   private observers = new Map<string, () => void>();
+  private subscribing = new Set<string>();
   private writeTimers = new Map<string, ReturnType<typeof setTimeout>>();
   private activeFile: string | null = null;
   private writtenByUs = new Set<string>();
@@ -30,49 +31,62 @@ export class BackgroundSync {
     const entries = this.manifestManager.getEntries();
     for (const [path, entry] of entries) {
       if (!isTextFile(path) || entry.binary) continue;
-      await this.subscribe(path);
+      try {
+        await this.subscribe(path);
+      } catch {
+        // Individual file failure should not abort remaining files
+      }
     }
   }
 
   async subscribe(rawPath: string): Promise<void> {
     const path = normalizePath(rawPath);
-    if (this.observers.has(path)) return;
-
-    const result = this.syncManager.getDoc(path);
-    if (!result) return;
+    if (this.observers.has(path) || this.subscribing.has(path)) return;
+    this.subscribing.add(path);
 
     try {
-      await waitForSync(result.provider);
-    } catch {
-      return;
-    }
+      const result = this.syncManager.getDoc(path);
+      if (!result) return;
 
-    if (this.role === "host" && result.text.length === 0) {
-      const file = this.vault.getAbstractFileByPath(path) as TFile | null;
-      if (file) {
-        const content = await this.vault.read(file);
-        if (content.length > 0) {
-          result.doc.transact(() => {
-            result.text.insert(0, content);
-          });
+      try {
+        await waitForSync(result.provider);
+      } catch {
+        return;
+      }
+
+      // Re-check after await — another call may have completed first
+      if (this.observers.has(path)) return;
+
+      // Re-check text.length after await to avoid double-seeding
+      if (this.role === "host" && result.text.length === 0) {
+        const file = this.vault.getAbstractFileByPath(path) as TFile | null;
+        if (file) {
+          const content = await this.vault.read(file);
+          if (result.text.length === 0 && content.length > 0) {
+            result.doc.transact(() => {
+              result.text.insert(0, content);
+            });
+          }
+        }
+      } else if (this.role === "guest" && result.text.length > 0) {
+        const file = this.vault.getAbstractFileByPath(path) as TFile | null;
+        const remoteContent = result.text.toString();
+        const localContent = file ? await this.vault.read(file) : "";
+        if (remoteContent !== localContent) {
+          await this.writeToDisk(path, remoteContent);
         }
       }
-    } else if (this.role === "guest" && result.text.length > 0) {
-      const file = this.vault.getAbstractFileByPath(path) as TFile | null;
-      const remoteContent = result.text.toString();
-      const localContent = file ? await this.vault.read(file) : "";
-      if (remoteContent !== localContent) {
-        await this.writeToDisk(path, remoteContent);
-      }
-    }
 
-    const observer = (_event: Y.YTextEvent, transaction: Y.Transaction) => {
-      if (transaction.local) return;
-      if (path === this.activeFile) return;
-      this.scheduleDiskWrite(path, result.text);
-    };
-    result.text.observe(observer);
-    this.observers.set(path, () => result.text.unobserve(observer));
+      const observer = (_event: Y.YTextEvent, transaction: Y.Transaction) => {
+        if (transaction.local) return;
+        if (path === this.activeFile) return;
+        this.scheduleDiskWrite(path, result.text);
+      };
+      result.text.observe(observer);
+      this.observers.set(path, () => result.text.unobserve(observer));
+    } finally {
+      this.subscribing.delete(path);
+    }
   }
 
   unsubscribe(rawPath: string): void {
@@ -106,7 +120,49 @@ export class BackgroundSync {
   }
 
   onFileRemoved(rawPath: string): void {
-    this.unsubscribe(rawPath);
+    const path = normalizePath(rawPath);
+    // Cancel any pending write — do NOT flush (the file is being deleted)
+    const timer = this.writeTimers.get(path);
+    if (timer) {
+      clearTimeout(timer);
+      this.writeTimers.delete(path);
+    }
+    const unobserve = this.observers.get(path);
+    if (unobserve) {
+      unobserve();
+      this.observers.delete(path);
+    }
+    // Release the orphaned WebSocket provider
+    this.syncManager.releaseDoc(path);
+  }
+
+  async onFileRenamed(oldPath: string, newPath: string): Promise<void> {
+    const normOld = normalizePath(oldPath);
+    const normNew = normalizePath(newPath);
+
+    // Cancel any pending write for the old path
+    const timer = this.writeTimers.get(normOld);
+    if (timer) {
+      clearTimeout(timer);
+      this.writeTimers.delete(normOld);
+    }
+    const unobserve = this.observers.get(normOld);
+    if (unobserve) {
+      unobserve();
+      this.observers.delete(normOld);
+    }
+
+    if (this.activeFile === normOld) {
+      this.activeFile = normNew;
+    }
+
+    if (isTextFile(normNew)) {
+      try {
+        await this.subscribe(normNew);
+      } catch {
+        // Non-fatal — file will sync when opened
+      }
+    }
   }
 
   async handleLocalTextModify(rawPath: string): Promise<void> {

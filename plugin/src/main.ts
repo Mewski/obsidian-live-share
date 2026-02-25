@@ -326,6 +326,7 @@ export default class LiveSharePlugin extends Plugin {
         if (this.settings.role === "host") {
           this.manifestManager.renameFile(oldPath, file.path, this.syncManager);
         }
+        this.backgroundSync.onFileRenamed(oldPath, file.path);
       }),
     );
 
@@ -363,17 +364,22 @@ export default class LiveSharePlugin extends Plugin {
     this.addSettingTab(new LiveShareSettingTab(this.app, this));
 
     if (this.settings.roomId && this.settings.token && this.settings.role) {
-      await this.connectSync();
-      await this.manifestManager.connect();
-      if (this.settings.role === "host") {
-        await this.manifestManager.publishManifest();
-        await this.backgroundSync.startAll("host");
-      } else {
-        await this.manifestManager.syncFromManifest(undefined, undefined, (path) =>
-          this.requestBinaryFile(path),
-        );
-        await this.backgroundSync.startAll("guest");
-        this.registerManifestChangeHandler();
+      try {
+        await this.connectSync();
+        await this.manifestManager.connect();
+        if (this.settings.role === "host") {
+          await this.manifestManager.publishManifest();
+          await this.backgroundSync.startAll("host");
+        } else {
+          await this.manifestManager.syncFromManifest(undefined, undefined, (path) =>
+            this.requestBinaryFile(path),
+          );
+          await this.backgroundSync.startAll("guest");
+          this.registerManifestChangeHandler();
+        }
+      } catch {
+        new Notice("Live Share: failed to reconnect to previous session");
+        await this.sessionManager.endSession();
       }
     }
   }
@@ -477,6 +483,10 @@ export default class LiveSharePlugin extends Plugin {
       this.followTarget = null;
       this.clearUnfollowListeners();
       this.removeScrollListener();
+      if (this.presenceTimer) {
+        clearTimeout(this.presenceTimer);
+        this.presenceTimer = null;
+      }
       this.remoteUsers.clear();
       this.refreshPresenceView();
       this.fileOpsManager.clearPendingChunks();

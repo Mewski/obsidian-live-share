@@ -4,6 +4,7 @@ import type { IncomingMessage } from "node:http";
 import { WebSocket, WebSocketServer } from "ws";
 
 import { verifyJWT } from "./github-auth.js";
+import { clearPermission, clearRoom, setPermission } from "./permissions.js";
 import { getRoom, removeRoom, touchRoom } from "./rooms.js";
 
 // Message types accepted on the control channel; all others are silently dropped
@@ -173,6 +174,7 @@ export function createControlWSS() {
           }
         } else {
           client.approved = true;
+          setPermission(roomId, client.userId, client.permission);
           sendTo(ws, {
             type: "join-response",
             approved: true,
@@ -192,6 +194,9 @@ export function createControlWSS() {
             targetClient.approved = msg.approved as boolean;
             if (msg.permission) {
               targetClient.permission = msg.permission as "read-write" | "read-only";
+            }
+            if (targetClient.approved && targetClient.userId) {
+              setPermission(roomId, targetClient.userId, targetClient.permission);
             }
             sendTo(targetWs, {
               type: "join-response",
@@ -220,6 +225,7 @@ export function createControlWSS() {
         if (typeof targetUserId !== "string" || !targetUserId) return;
         const perm = msg.permission;
         if (perm !== "read-write" && perm !== "read-only") return;
+        setPermission(roomId, targetUserId as string, perm);
         for (const [clientWs, targetClient] of room.clients) {
           if (targetClient.userId === targetUserId) {
             targetClient.permission = perm;
@@ -263,20 +269,15 @@ export function createControlWSS() {
       }
 
       if (msg.type === "presence-update") {
-        if (msg.userId) {
-          if (!client.userId) {
-            // Determine host status on first identification.
-            // Use JWT-verified identity when available to prevent spoofing.
-            // Without JWT, fall back to first-come-first-serve: the first
-            // client to identify becomes host. This is safe because the room
-            // creator always connects before sharing the invite link.
-            if (client.verifiedUserId && serverRoom?.hostUserId) {
-              client.isHost = client.verifiedUserId === serverRoom.hostUserId;
-            } else {
-              client.isHost = !findHost(room);
-            }
-          }
+        if (msg.userId && !client.userId) {
+          // Lock userId on first identification — cannot be changed later
           client.userId = (msg.userId as string).slice(0, 128);
+
+          if (client.verifiedUserId && serverRoom?.hostUserId) {
+            client.isHost = client.verifiedUserId === serverRoom.hostUserId;
+          } else {
+            client.isHost = !findHost(room);
+          }
         }
         if (msg.displayName) client.displayName = (msg.displayName as string).slice(0, 100);
       }
@@ -289,6 +290,7 @@ export function createControlWSS() {
       if (closingClient) {
         room.pendingApprovals.delete(closingClient.userId);
         if (closingClient.userId) {
+          clearPermission(roomId, closingClient.userId);
           const leaveMsg = JSON.stringify({
             type: "presence-leave",
             userId: closingClient.userId,
@@ -298,6 +300,7 @@ export function createControlWSS() {
       }
       room.clients.delete(ws);
       if (room.clients.size === 0) {
+        clearRoom(roomId);
         rooms.delete(roomId);
         removeRoom(roomId).catch((err) => {
           console.error(`[control] failed to remove room ${roomId}:`, err);

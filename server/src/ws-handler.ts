@@ -8,6 +8,7 @@ import * as awarenessProtocol from "y-protocols/awareness";
 import * as syncProtocol from "y-protocols/sync";
 import * as Y from "yjs";
 
+import { getPermission } from "./permissions.js";
 import { type Persistence, getDefaultPersistence } from "./persistence.js";
 
 const messageSync = 0; // Yjs sync protocol
@@ -61,6 +62,7 @@ function handleMessage(ws: WebSocket, state: RoomState, data: Uint8Array) {
       break;
     }
     case messageFileOp: {
+      if (state.readOnlyClients.has(ws)) break;
       for (const client of state.clients) {
         if (client !== ws && client.readyState === WebSocket.OPEN) {
           client.send(data);
@@ -256,8 +258,15 @@ export function createYjsWSS(persist?: Persistence) {
     state.clients.add(ws);
 
     const reqUrl = new URL(req.url || "", `http://${req.headers.host}`);
-    if (reqUrl.searchParams.get("permission") === "read-only") {
-      state.readOnlyClients.add(ws);
+    const userId = reqUrl.searchParams.get("userId");
+    // Extract base room ID (strip `:encodedPath` suffix from Yjs room names)
+    const colonIdx = roomId.indexOf(":");
+    const baseRoomId = colonIdx >= 0 ? roomId.slice(0, colonIdx) : roomId;
+    if (userId) {
+      const perm = getPermission(baseRoomId, userId);
+      if (perm === "read-only") {
+        state.readOnlyClients.add(ws);
+      }
     }
 
     sendSyncStep1(ws, state.doc);

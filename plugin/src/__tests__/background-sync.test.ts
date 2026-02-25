@@ -24,10 +24,23 @@ function createSyncManager() {
       if (!docs.has(path)) {
         const doc = new Y.Doc();
         const text = doc.getText("content");
-        const provider = { synced: true, once: vi.fn(), on: vi.fn(), destroy: vi.fn() };
+        const provider = {
+          synced: true,
+          once: vi.fn(),
+          on: vi.fn(),
+          destroy: vi.fn(),
+        };
         docs.set(path, { doc, text, provider });
       }
       return docs.get(path)!;
+    },
+    releaseDoc(path: string) {
+      const entry = docs.get(path);
+      if (entry) {
+        entry.provider.destroy();
+        entry.doc.destroy();
+        docs.delete(path);
+      }
     },
     _docs: docs,
   } as any;
@@ -149,7 +162,9 @@ describe("BackgroundSync", () => {
       ["b.md", { hash: "def", size: 5, mtime: 1 }],
     ]);
     manifestManager = createManifestManager(entries);
-    vault.getAbstractFileByPath.mockImplementation((p: string) => ({ path: p }));
+    vault.getAbstractFileByPath.mockImplementation((p: string) => ({
+      path: p,
+    }));
     vault.read.mockResolvedValue("");
     bg = new BackgroundSync(vault, syncManager, manifestManager, fileOpsManager);
 

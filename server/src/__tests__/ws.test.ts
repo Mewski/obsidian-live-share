@@ -6,6 +6,7 @@ import { WebSocket } from "ws";
 import * as syncProtocol from "y-protocols/sync";
 import * as Y from "yjs";
 import { createApp } from "../index.js";
+import { setPermission } from "../permissions.js";
 import { noopPersistence } from "../persistence.js";
 
 const messageSync = 0;
@@ -265,8 +266,10 @@ describe("WebSocket handler", () => {
     sendSyncStep1(clientA.ws, docA);
     await new Promise((r) => setTimeout(r, 150));
 
-    // Connect a read-only client using the permission query param
-    const readOnlyUrl = `ws://localhost:${port}/ws/${room.id}?token=${room.token}&permission=read-only`;
+    // Register read-only permission in the shared store, then connect with userId
+    const readOnlyUserId = "ro-user-123";
+    setPermission(room.id, readOnlyUserId, "read-only");
+    const readOnlyUrl = `ws://localhost:${port}/ws/${room.id}?token=${room.token}&userId=${readOnlyUserId}`;
     const readOnlyClient = await new Promise<{
       ws: WebSocket;
       messages: Uint8Array[];

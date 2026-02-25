@@ -68,7 +68,8 @@ export class ManifestManager {
     const wsUrl = toWsUrl(this.settings.serverUrl);
     const params: Record<string, string> = { token: this.settings.token };
     if (this.settings.jwt) params.jwt = this.settings.jwt;
-    if (this.settings.permission === "read-only") params.permission = "read-only";
+    const userId = this.settings.githubUserId || this.settings.clientId;
+    if (userId) params.userId = userId;
     this.provider = new WebsocketProvider(`${wsUrl}/ws`, roomName, this.doc, {
       params,
     });
@@ -166,7 +167,8 @@ export class ManifestManager {
         token: this.settings.token,
       };
       if (this.settings.jwt) fileParams.jwt = this.settings.jwt;
-      if (this.settings.permission === "read-only") fileParams.permission = "read-only";
+      const fileUserId = this.settings.githubUserId || this.settings.clientId;
+      if (fileUserId) fileParams.userId = fileUserId;
       const fileProvider = new WebsocketProvider(`${wsUrl}/ws`, roomName, fileDoc, {
         params: fileParams,
       });
