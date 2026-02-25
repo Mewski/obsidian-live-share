@@ -803,35 +803,8 @@ export default class LiveSharePlugin extends Plugin {
       if (permission !== "read-only" && permission !== "read-write") return;
       this.settings.permission = permission;
       await this.saveSettings();
-
-      const activeView = this.app.workspace.getActiveViewOfType(MarkdownView);
-      const cmView = activeView ? getCmView(activeView) : undefined;
-      if (cmView) this.collabManager.deactivateAll(cmView);
-
-      const activeFilePath = activeView?.file?.path ?? null;
-      const activeSharedPath =
-        activeFilePath &&
-        this.manifestManager.isSharedPath(activeFilePath) &&
-        isTextFile(activeFilePath)
-          ? activeFilePath
-          : null;
-
-      this.backgroundSync.destroy();
-      this.syncManager.disconnect();
-      this.manifestManager.destroy();
-      this.syncManager.updateSettings(this.settings);
-      this.manifestManager.updateSettings(this.settings);
-      try {
-        this.syncManager.connect();
-        await this.manifestManager.connect();
-        this.backgroundSync.setActiveFile(activeSharedPath);
-        await this.backgroundSync.startAll(this.settings.role ?? "guest");
-        this.registerManifestChangeHandler();
-        this.onActiveFileChange();
-        new Notice(`Live Share: your permission was changed to ${permission}`);
-      } catch {
-        new Notice("Live Share: permission changed but sync restart failed");
-      }
+      this.onActiveFileChange();
+      new Notice(`Live Share: your permission was changed to ${permission}`);
     });
 
     this.controlChannel.on("focus-request", (msg) => {
