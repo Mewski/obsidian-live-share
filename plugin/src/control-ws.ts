@@ -124,7 +124,9 @@ export class ControlChannel {
         if (handlers) {
           for (const handler of handlers) handler(msg);
         }
-      } catch {}
+      } catch {
+        // Malformed JSON; ignore non-parseable messages
+      }
     };
 
     this.ws.onclose = () => {

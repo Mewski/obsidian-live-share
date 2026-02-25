@@ -87,7 +87,6 @@ export function createControlWSS() {
   }
 
   wss.on("connection", (ws: WebSocket, req: IncomingMessage, roomId: string) => {
-    console.log(`control: new connection for room ${roomId}`);
     const room = getOrCreateRoom(roomId);
     const serverRoom = getRoom(roomId);
 
@@ -99,7 +98,9 @@ export function createControlWSS() {
         const payload = verifyJWT(jwtToken);
         if (payload) verifiedUserId = payload.sub;
       }
-    } catch {}
+    } catch {
+      // JWT parsing failed; proceed without verified identity
+    }
 
     const client: ControlClient = {
       ws,

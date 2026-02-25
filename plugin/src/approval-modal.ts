@@ -42,7 +42,9 @@ export class ApprovalModal extends Modal {
             cls: "live-share-approval-avatar",
           });
         }
-      } catch {}
+      } catch {
+        // Invalid avatar URL; skip rendering the image
+      }
     }
     info.createEl("p", {
       text: `${this.request.displayName} wants to join your session.`,

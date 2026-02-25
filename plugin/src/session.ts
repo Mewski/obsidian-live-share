@@ -113,7 +113,9 @@ export class SessionManager {
           method: "DELETE",
           headers: { Authorization: `Bearer ${settings.token}` },
         });
-      } catch {}
+      } catch {
+        // Best-effort room cleanup; session ends regardless of server reachability
+      }
     }
 
     settings.roomId = "";
