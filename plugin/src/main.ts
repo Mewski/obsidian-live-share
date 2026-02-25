@@ -325,6 +325,7 @@ export default class LiveSharePlugin extends Plugin {
     this.registerEvent(
       this.app.workspace.on("active-leaf-change", () => {
         this.onActiveFileChange();
+        setTimeout(() => this.onActiveFileChange(), 50);
         this.debouncedBroadcastPresence();
       }),
     );
@@ -579,7 +580,6 @@ export default class LiveSharePlugin extends Plugin {
         await this.manifestManager.publishManifest({ purge: true });
         await this.backgroundSync.startAll("host");
         this.registerManifestChangeHandler();
-        setTimeout(() => this.onActiveFileChange(), 100);
         new Notice("Live Share: session started, invite copied to clipboard");
       } catch {
         await this.abortSession("Live Share: failed to start session");
@@ -609,7 +609,6 @@ export default class LiveSharePlugin extends Plugin {
         );
         await this.backgroundSync.startAll("guest");
         this.registerManifestChangeHandler();
-        setTimeout(() => this.onActiveFileChange(), 100);
         new Notice(`Live Share: joined session, synced ${syncedCount} file(s)`);
       } catch {
         await this.abortSession("Live Share: failed to join session");
@@ -648,6 +647,7 @@ export default class LiveSharePlugin extends Plugin {
   }
 
   private async connectSync() {
+    this.settings.permission = "read-write";
     this.connectionState.transition({ type: "connect" });
     this.syncManager.connect();
 
@@ -666,6 +666,7 @@ export default class LiveSharePlugin extends Plugin {
     this.controlChannel.onStateChange((controlState) => {
       if (controlState === "connected") {
         this.connectionState.transition({ type: "connected" });
+        this.onActiveFileChange();
       } else if (controlState === "reconnecting") {
         this.connectionState.transition({ type: "reconnecting" });
       } else {
@@ -753,6 +754,10 @@ export default class LiveSharePlugin extends Plugin {
     this.controlChannel.on("presence-update", (msg) => {
       const user = msg as unknown as PresenceUser;
       const isNew = !this.remoteUsers.has(user.userId);
+      const existing = this.remoteUsers.get(user.userId);
+      if (existing?.permission && !user.permission) {
+        user.permission = existing.permission;
+      }
       this.remoteUsers.set(user.userId, user);
       this.refreshPresenceView();
       this.updateStatusBar();
@@ -806,7 +811,6 @@ export default class LiveSharePlugin extends Plugin {
       const permission = msg.permission as string | undefined;
       if (permission === "read-only" || permission === "read-write") {
         this.settings.permission = permission;
-        await this.saveSettings();
       }
       this.broadcastPresence();
     });
@@ -815,7 +819,6 @@ export default class LiveSharePlugin extends Plugin {
       const permission = msg.permission as string | undefined;
       if (permission !== "read-only" && permission !== "read-write") return;
       this.settings.permission = permission;
-      await this.saveSettings();
       this.onActiveFileChange();
       new Notice(`Live Share: your permission was changed to ${permission}`);
     });
@@ -1126,30 +1129,37 @@ export default class LiveSharePlugin extends Plugin {
     this.unfollowListeners = [];
   }
 
-  private async applyFollowState(user: PresenceUser) {
-    if (!user.currentFile) return;
+  private isApplyingFollow = false;
 
+  private async applyFollowState(user: PresenceUser) {
+    if (!user.currentFile || this.isApplyingFollow) return;
+
+    this.isApplyingFollow = true;
     this.followSuppressUnfollow = true;
 
-    const currentView = this.app.workspace.getActiveViewOfType(MarkdownView);
-    if (currentView?.file?.path !== user.currentFile) {
-      const file = this.app.vault.getAbstractFileByPath(user.currentFile);
-      if (file instanceof TFile) {
-        await this.app.workspace.getLeaf().openFile(file);
-      }
-    }
-
-    if (user.scrollTop !== undefined) {
-      const view = this.app.workspace.getActiveViewOfType(MarkdownView);
-      if (view) {
-        const cmView = getCmView(view);
-        if (cmView) {
-          cmView.scrollDOM.scrollTop = user.scrollTop;
+    try {
+      const currentView = this.app.workspace.getActiveViewOfType(MarkdownView);
+      if (currentView?.file?.path !== user.currentFile) {
+        const file = this.app.vault.getAbstractFileByPath(user.currentFile);
+        if (file instanceof TFile) {
+          await this.app.workspace.getLeaf().openFile(file);
+          this.onActiveFileChange();
         }
       }
-    }
 
-    this.followSuppressUnfollow = false;
+      if (user.scrollTop !== undefined) {
+        const view = this.app.workspace.getActiveViewOfType(MarkdownView);
+        if (view) {
+          const cmView = getCmView(view);
+          if (cmView) {
+            cmView.scrollDOM.scrollTop = user.scrollTop;
+          }
+        }
+      }
+    } finally {
+      this.followSuppressUnfollow = false;
+      this.isApplyingFollow = false;
+    }
   }
 
   private confirm(message: string): Promise<boolean> {
