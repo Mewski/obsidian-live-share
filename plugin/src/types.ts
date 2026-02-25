@@ -4,6 +4,7 @@
  * Defines the LiveShareSettings interface, file operation discriminated unions,
  * and the DEFAULT_SETTINGS constant used across the plugin.
  */
+
 export type SessionRole = "host" | "guest" | null;
 
 export interface LiveShareSettings {

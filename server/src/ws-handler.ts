@@ -4,6 +4,7 @@
  * Each room gets a shared Y.Doc that is loaded from LevelDB on first connect
  * and persisted on updates with a debounce. Awareness state is relayed between clients.
  */
+
 import type { IncomingMessage } from "node:http";
 import * as decoding from "lib0/decoding";
 import * as encoding from "lib0/encoding";

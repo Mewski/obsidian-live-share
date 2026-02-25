@@ -4,6 +4,7 @@
  * Registers all Obsidian commands, manages the control channel and sync
  * connections, wires up vault events, and owns the presence/follow state.
  */
+
 import {
   FuzzySuggestModal,
   MarkdownView,

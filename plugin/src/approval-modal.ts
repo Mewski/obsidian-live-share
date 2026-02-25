@@ -4,6 +4,7 @@
  * Shows the requesting user's avatar and name with approve (read-write or
  * read-only) and deny buttons. The response is sent back via the control channel.
  */
+
 import { type App, Modal } from "obsidian";
 
 export interface JoinRequest {

@@ -4,6 +4,7 @@
  * Shared utility functions and constants used across the plugin, including the
  * canonical hex color regex and recursive folder creation.
  */
+
 import { TFolder, type Vault } from "obsidian";
 
 export const HEX_COLOR_RE = /^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/;

@@ -4,6 +4,7 @@
  * Renders the Live Share settings page with server URL, display name, cursor
  * color picker, session state, and file exclusion configuration.
  */
+
 import { type App, PluginSettingTab, Setting } from "obsidian";
 import type LiveSharePlugin from "./main";
 

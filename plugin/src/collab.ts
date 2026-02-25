@@ -4,6 +4,7 @@
  * Manages yCollab extensions per editor view, swapping them when the active
  * file changes and tearing them down on disconnect.
  */
+
 import { Compartment } from "@codemirror/state";
 import type { Extension } from "@codemirror/state";
 import type { EditorView } from "@codemirror/view";

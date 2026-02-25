@@ -4,6 +4,7 @@
  * Opens a browser window for the GitHub OAuth flow, polls for the resulting JWT,
  * and extracts the user's display name and avatar from the token payload.
  */
+
 import { Notice } from "obsidian";
 import type LiveSharePlugin from "./main";
 

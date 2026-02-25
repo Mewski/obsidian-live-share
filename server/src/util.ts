@@ -4,6 +4,7 @@
  * Uses constant-time string comparison to prevent timing side-channel attacks
  * when validating room tokens and other secrets.
  */
+
 import { createHmac, timingSafeEqual } from "node:crypto";
 
 const COMPARE_KEY = "live-share-token-compare";

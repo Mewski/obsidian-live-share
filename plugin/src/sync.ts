@@ -4,6 +4,7 @@
  * Each shared text file gets its own Y.Doc identified by roomId:path. Providers
  * are created on demand and destroyed when the file is released or the session ends.
  */
+
 import { WebsocketProvider } from "y-websocket";
 import * as Y from "yjs";
 import type { LiveShareSettings } from "./types";

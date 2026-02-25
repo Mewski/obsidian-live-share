@@ -4,6 +4,7 @@
  * Handles the REST calls to create or join a room, encodes session details
  * into a shareable invite link, and persists session state across restarts.
  */
+
 import { Notice } from "obsidian";
 import type LiveSharePlugin from "./main";
 

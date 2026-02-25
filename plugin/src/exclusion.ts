@@ -4,6 +4,7 @@
  * Merges user-defined glob patterns with built-in defaults (.obsidian/**,
  * .liveshare.json, .trash/**) and tests paths against the combined set.
  */
+
 import { minimatch } from "minimatch";
 import { Notice } from "obsidian";
 import type { TFile, Vault } from "obsidian";

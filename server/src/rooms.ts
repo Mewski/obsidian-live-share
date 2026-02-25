@@ -4,6 +4,7 @@
  * Manages in-memory room state backed by LevelDB persistence. Rooms are
  * created with a host token and cleaned up after a configurable TTL of inactivity.
  */
+
 import { Router } from "express";
 import { nanoid } from "nanoid";
 import { type Persistence, type Room, noopPersistence } from "./persistence.js";
