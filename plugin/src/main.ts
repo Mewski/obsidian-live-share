@@ -368,10 +368,7 @@ export default class LiveSharePlugin extends Plugin {
       return;
     }
 
-    const name = await this.promptText("Session name");
-    if (!name) return;
-
-    const ok = await this.sessionManager.startSession(name);
+    const ok = await this.sessionManager.startSession();
     if (ok) {
       await this.connectSync();
       await this.manifestManager.connect();

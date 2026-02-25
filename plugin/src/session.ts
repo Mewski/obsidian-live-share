@@ -17,7 +17,7 @@ interface InvitePayload {
 export class SessionManager {
   constructor(private plugin: LiveSharePlugin) {}
 
-  async startSession(name: string): Promise<boolean> {
+  async startSession(): Promise<boolean> {
     const { settings } = this.plugin;
     const baseUrl = settings.serverUrl.replace(/\/+$/, "");
 
@@ -27,7 +27,6 @@ export class SessionManager {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          name,
           hostUserId: settings.githubUserId || settings.displayName,
         }),
       });

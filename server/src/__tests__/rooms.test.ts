@@ -26,7 +26,10 @@ async function req(port: number, method: string, path: string, body?: unknown) {
     headers: body ? { "Content-Type": "application/json" } : {},
     body: body ? JSON.stringify(body) : undefined,
   });
-  return { status: res.status, data: (await res.json()) as Record<string, unknown> };
+  return {
+    status: res.status,
+    data: (await res.json()) as Record<string, unknown>,
+  };
 }
 
 describe("rooms API", () => {
@@ -42,7 +45,9 @@ describe("rooms API", () => {
   });
 
   it("creates a room", async () => {
-    const { status, data } = await req(port, "POST", "/rooms", { name: "test" });
+    const { status, data } = await req(port, "POST", "/rooms", {
+      name: "test",
+    });
     expect(status).toBe(201);
     expect(data.id).toBeTypeOf("string");
     expect(data.token).toBeTypeOf("string");
@@ -51,10 +56,11 @@ describe("rooms API", () => {
     expect((data.token as string).length).toBeGreaterThan(0);
   });
 
-  it("rejects room creation without name", async () => {
+  it("auto-generates name when none is provided", async () => {
     const { status, data } = await req(port, "POST", "/rooms", {});
-    expect(status).toBe(400);
-    expect(data.error).toBe("name is required");
+    expect(status).toBe(201);
+    expect(data.name).toBeTypeOf("string");
+    expect((data.name as string).startsWith("session-")).toBe(true);
   });
 
   it("gets room info", async () => {

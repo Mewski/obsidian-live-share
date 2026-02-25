@@ -26,11 +26,8 @@ export const roomRouter = Router();
 const CONTROL_CHARS = /[\x00-\x1f\x7f]/;
 
 roomRouter.post("/", async (req, res) => {
-  const { name } = req.body;
-  if (!name || typeof name !== "string") {
-    res.status(400).json({ error: "name is required" });
-    return;
-  }
+  const rawName = req.body.name;
+  const name = typeof rawName === "string" && rawName.length > 0 ? rawName : `session-${nanoid(6)}`;
   if (name.length > 100 || CONTROL_CHARS.test(name)) {
     res.status(400).json({ error: "invalid name" });
     return;
