@@ -63,16 +63,13 @@ describe("ExclusionManager", () => {
 
       await manager.loadConfig(mockVault as any);
 
-      // Custom patterns take effect
       expect(manager.isExcluded("test.tmp")).toBe(true);
       expect(manager.isExcluded("drafts/wip.md")).toBe(true);
 
-      // Default patterns still apply
       expect(manager.isExcluded(".obsidian/config")).toBe(true);
       expect(manager.isExcluded(".liveshare.json")).toBe(true);
       expect(manager.isExcluded(".trash/deleted.md")).toBe(true);
 
-      // Normal files still included
       expect(manager.isIncluded("notes/hello.md")).toBe(true);
     });
   });
@@ -86,10 +83,8 @@ describe("ExclusionManager", () => {
 
       await manager.loadConfig(mockVault as any);
 
-      // read should never have been called
       expect(mockVault.read).not.toHaveBeenCalled();
 
-      // Defaults still work
       expect(manager.isExcluded(".obsidian/config")).toBe(true);
       expect(manager.isIncluded("notes/hello.md")).toBe(true);
     });

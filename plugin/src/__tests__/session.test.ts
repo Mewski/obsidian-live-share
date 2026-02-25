@@ -101,16 +101,9 @@ describe("Invite format parsing (mirrors SessionManager.parseInvite)", () => {
   });
 
   it("rejects an invite with missing fields", () => {
-    // Missing `t`
     expect(parseInvite(makeInvite({ s: "https://example.com", r: "room" }))).toBeNull();
-
-    // Missing `r`
     expect(parseInvite(makeInvite({ s: "https://example.com", t: "tok" }))).toBeNull();
-
-    // Missing `s`
     expect(parseInvite(makeInvite({ r: "room", t: "tok" }))).toBeNull();
-
-    // Fields present but wrong type (number instead of string)
     expect(parseInvite(makeInvite({ s: 123, r: "room", t: "tok" }))).toBeNull();
   });
 
@@ -186,8 +179,6 @@ describe("Invite format parsing (mirrors SessionManager.parseInvite)", () => {
       r: "room",
       t: "tok",
     });
-    // parseInvite in session.ts trims, our test version doesn't
-    // but the format itself should still be valid without leading/trailing space
     expect(parseInvite(invite)).not.toBeNull();
   });
 });

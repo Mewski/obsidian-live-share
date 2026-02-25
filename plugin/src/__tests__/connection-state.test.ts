@@ -85,7 +85,6 @@ describe("ConnectionStateManager", () => {
       csm.transition({ type: "connect" }); // disconnected -> connecting
       csm.onChange(listener);
 
-      // connecting -> connecting: no actual state change
       csm.transition({ type: "connect" });
       expect(listener).not.toHaveBeenCalled();
     });
@@ -250,7 +249,6 @@ describe("ConnectionStateManager", () => {
       csm.transition({ type: "disconnect" });
 
       expect(csm.getState()).toBe("disconnected");
-      // Each transition changed state, so listener should have been called 9 times
       expect(listener).toHaveBeenCalledTimes(9);
     });
   });

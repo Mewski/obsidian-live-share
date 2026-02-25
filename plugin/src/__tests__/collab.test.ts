@@ -193,13 +193,11 @@ describe("CollabManager", () => {
 
       const promise = collab.activateForFile(view as any, "first.md", syncManager as any, "host");
 
-      // While waiting, switch to a different file
       collab.deactivateAll(view as any);
 
       resolveWait();
       await promise;
 
-      // The first.md activation should have bailed out
       const yCollabDispatches = reconfigureCalls.filter((c) => c === "yCollab-extension");
       expect(yCollabDispatches).toHaveLength(0);
     });

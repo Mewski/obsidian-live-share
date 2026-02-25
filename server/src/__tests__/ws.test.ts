@@ -184,21 +184,17 @@ describe("WebSocket handler", () => {
 
     sendSyncStep1(clientB.ws, docB);
 
-    // Let initial sync settle
     await new Promise((r) => setTimeout(r, 150));
     const msgCountBefore = clientB.messages.length;
 
-    // A inserts text
     textA.insert(0, "hello from A");
 
-    // B receives the update
     await waitForMessages(clientB.messages, msgCountBefore + 1);
     const msg = clientB.messages[clientB.messages.length - 1];
     const decoder = decoding.createDecoder(msg);
     const msgType = decoding.readVarUint(decoder);
     expect(msgType).toBe(messageSync);
 
-    // Apply to docB
     const encoder = encoding.createEncoder();
     syncProtocol.readSyncMessage(decoder, encoder, docB, null);
 
@@ -217,7 +213,6 @@ describe("WebSocket handler", () => {
     await new Promise((r) => setTimeout(r, 100));
     const msgCountBefore = clientB.messages.length;
 
-    // A sends a file op
     const fileOp = JSON.stringify({
       type: "create",
       path: "test.md",
@@ -228,7 +223,6 @@ describe("WebSocket handler", () => {
     encoding.writeVarString(encoder, fileOp);
     clientA.ws.send(encoding.toUint8Array(encoder));
 
-    // B receives it
     await waitForMessages(clientB.messages, msgCountBefore + 1);
     const msg = clientB.messages[clientB.messages.length - 1];
     const decoder = decoding.createDecoder(msg);
@@ -256,7 +250,6 @@ describe("WebSocket handler", () => {
     encoding.writeVarString(encoder, '{"type":"delete","path":"x.md"}');
     client.ws.send(encoding.toUint8Array(encoder));
 
-    // Wait and confirm no new messages arrive
     await new Promise((r) => setTimeout(r, 300));
     expect(client.messages.length).toBe(msgCountBefore);
   });

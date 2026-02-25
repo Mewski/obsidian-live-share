@@ -119,10 +119,9 @@ describe("FileOpsManager", () => {
         content: "hi",
       });
 
-      // The onFileCreate during applyRemoteOp should have been suppressed
       expect(sentOps.length).toBe(0);
 
-      // After applyRemoteOp, suppress is off -- local events should go through
+      // Suppression is off after applyRemoteOp — local events should go through
       manager.onFileDelete({ path: "other.md" } as any);
       expect(sentOps.length).toBe(1);
     });
@@ -133,7 +132,6 @@ describe("FileOpsManager", () => {
       const file = { path: "created.md", extension: "md" } as any;
       manager.onFileCreate(file);
 
-      // read is async, wait a tick
       await new Promise((r) => setTimeout(r, 10));
 
       expect(sentOps.length).toBe(1);
@@ -145,7 +143,6 @@ describe("FileOpsManager", () => {
     });
 
     it("does not broadcast folder creation", () => {
-      // Folders don't have 'extension' property
       const folder = { path: "my-folder" } as any;
       manager.onFileCreate(folder);
       expect(sentOps.length).toBe(0);
@@ -163,9 +160,7 @@ describe("FileOpsManager", () => {
 
     it("does not broadcast when no sender is set", () => {
       const mgr = new FileOpsManager(vault as any);
-      // No setSender called
       mgr.onFileDelete({ path: "x.md" } as any);
-      // Should not throw, just silently skip
     });
   });
 
@@ -323,7 +318,6 @@ describe("FileOpsManager", () => {
         path: "big.md",
       });
 
-      // modify should be called since the file exists
       expect(vault.modify).toHaveBeenCalled();
     });
 
@@ -396,7 +390,6 @@ describe("FileOpsManager", () => {
         content: "data",
       });
 
-      // After the error, suppressCount should be back to 0, so local events fire
       manager.onFileDelete({ path: "local.md" } as any);
       expect(sentOps).toHaveLength(1);
       expect(sentOps[0].type).toBe("delete");
@@ -418,7 +411,6 @@ describe("FileOpsManager", () => {
 
       expect(consoleSpy).toHaveBeenCalled();
 
-      // Subsequent operations should work
       await manager.applyRemoteOp({
         type: "create",
         path: "next.md",
@@ -473,7 +465,6 @@ describe("FileOpsManager", () => {
     it("does not broadcast binary modify for text files (they use Yjs)", () => {
       const file = { path: "notes.md", extension: "md" } as any;
       manager.onFileModify(file);
-      // onFileModify returns early for text files
       expect(sentOps.length).toBe(0);
     });
 

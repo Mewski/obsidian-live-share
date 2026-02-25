@@ -352,7 +352,6 @@ describe("ControlChannel", () => {
         totalSize: 1000,
       });
 
-      // file-chunk-start is NOT encryptable, sent immediately
       expect(ws.sent).toHaveLength(1);
       const sent = JSON.parse(ws.sent[0]);
       expect(sent.encrypted).toBeUndefined();

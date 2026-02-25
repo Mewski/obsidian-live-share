@@ -2,16 +2,9 @@ import { existsSync, rmSync } from "node:fs";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import * as Y from "yjs";
 
-// Persistence uses LevelDB at ./data/yjs-docs — we need to test against it.
-// We import it dynamically so each test can start clean.
-
 const TEST_DB_PATH = "./data/yjs-docs-test";
 
 describe("persistence", () => {
-  // We'll test the persistence logic directly with Yjs
-  // without importing the module (which creates a hardcoded DB path).
-  // Instead, test the round-trip logic: encode → decode.
-
   it("round-trips Y.Doc state via encodeStateAsUpdate", () => {
     const doc1 = new Y.Doc();
     const text1 = doc1.getText("content");
@@ -51,23 +44,19 @@ describe("persistence", () => {
     const doc1 = new Y.Doc();
     const doc2 = new Y.Doc();
 
-    // Sync initial state
     const sv1 = Y.encodeStateVector(doc1);
     const sv2 = Y.encodeStateVector(doc2);
     Y.applyUpdate(doc1, Y.encodeStateAsUpdate(doc2, sv1));
     Y.applyUpdate(doc2, Y.encodeStateAsUpdate(doc1, sv2));
 
-    // Both edit concurrently
     doc1.getText("content").insert(0, "from-1");
     doc2.getText("content").insert(0, "from-2");
 
-    // Merge
     const update1 = Y.encodeStateAsUpdate(doc1, Y.encodeStateVector(doc2));
     const update2 = Y.encodeStateAsUpdate(doc2, Y.encodeStateVector(doc1));
     Y.applyUpdate(doc1, update2);
     Y.applyUpdate(doc2, update1);
 
-    // Both should converge
     expect(doc1.getText("content").toString()).toBe(doc2.getText("content").toString());
     const merged = doc1.getText("content").toString();
     expect(merged).toContain("from-1");

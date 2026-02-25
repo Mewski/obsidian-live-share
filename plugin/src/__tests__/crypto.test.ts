@@ -20,9 +20,7 @@ describe("E2ECrypto", () => {
     const plaintext = new TextEncoder().encode("Hello, Live Share!");
     const encrypted = await e2e.encrypt(plaintext);
 
-    // Encrypted output should differ from plaintext
     expect(encrypted).not.toEqual(plaintext);
-    // Should be longer (IV prepended)
     expect(encrypted.byteLength).toBeGreaterThan(plaintext.byteLength);
 
     const decrypted = await e2e.decrypt(encrypted);
@@ -36,7 +34,6 @@ describe("E2ECrypto", () => {
     const original = "# My Secret Note\n\nThis is private content.";
     const encrypted = await e2e.encryptString(original);
 
-    // Encrypted is a base64 string, not the original
     expect(encrypted).not.toBe(original);
     expect(typeof encrypted).toBe("string");
 
@@ -105,10 +102,8 @@ describe("E2ECrypto", () => {
     const enc1 = await e2e.encryptString(plaintext);
     const enc2 = await e2e.encryptString(plaintext);
 
-    // Two encryptions of the same plaintext should produce different ciphertext
     expect(enc1).not.toBe(enc2);
 
-    // But both decrypt to the same value
     expect(await e2e.decryptString(enc1)).toBe(plaintext);
     expect(await e2e.decryptString(enc2)).toBe(plaintext);
   });
