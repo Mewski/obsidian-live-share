@@ -23,6 +23,7 @@ export class BackgroundSync {
   private activeFile: string | null = null;
   private recentDiskWrites = new Set<string>();
   private role: SessionRole = "host";
+  private destroyed = false;
 
   constructor(
     private vault: Vault,
@@ -32,6 +33,7 @@ export class BackgroundSync {
   ) {}
 
   async startAll(role: SessionRole): Promise<void> {
+    this.destroyed = false;
     this.role = role;
     const entries = this.manifestManager.getEntries();
     for (const [path, entry] of entries) {
@@ -225,9 +227,11 @@ export class BackgroundSync {
   }
 
   destroy(): void {
-    for (const path of this.writeTimers.keys()) {
-      this.flushWrite(path);
+    this.destroyed = true;
+    for (const timer of this.writeTimers.values()) {
+      clearTimeout(timer);
     }
+    this.writeTimers.clear();
     for (const [, unobserve] of this.observers) {
       unobserve();
     }
@@ -272,7 +276,7 @@ export class BackgroundSync {
         await this.vault.create(path, content);
       }
     } catch {
-      new Notice(`Live Share: failed to write ${path} to disk`);
+      if (!this.destroyed) new Notice(`Live Share: failed to write ${path} to disk`);
     } finally {
       setTimeout(() => {
         this.recentDiskWrites.delete(path);

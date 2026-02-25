@@ -14,8 +14,7 @@ import {
   encodeMuxMessage,
 } from "./mux-protocol.js";
 import { getPermission } from "./permissions.js";
-
-export type Permission = "read-write" | "read-only";
+import type { Permission } from "./persistence.js";
 
 const SYNC_STEP2 = 1;
 const SYNC_UPDATE = 2;

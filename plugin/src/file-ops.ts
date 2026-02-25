@@ -143,7 +143,9 @@ export class FileOpsManager {
         case "delete": {
           const file = this.vault.getAbstractFileByPath(op.path);
           if (file) {
-            await this.vault.trash(file, true);
+            try {
+              await this.vault.trash(file, true);
+            } catch {}
           }
           break;
         }

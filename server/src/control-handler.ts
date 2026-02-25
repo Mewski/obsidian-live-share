@@ -165,7 +165,7 @@ export function createControlWSS(options?: ControlWSSOptions) {
       }
 
       if (typeof msg.type !== "string" || !ALLOWED_TYPES.has(msg.type)) {
-        console.log(`[control] dropped unknown type from ${client.userId}:`, msg.type);
+        console.warn(`[control] dropped unknown type from ${client.userId}:`, msg.type);
         return;
       }
 

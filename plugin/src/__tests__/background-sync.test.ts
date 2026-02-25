@@ -313,7 +313,7 @@ describe("BackgroundSync", () => {
     expect(vault.modify).not.toHaveBeenCalled();
   });
 
-  it("destroy flushes pending writes and cleans up", async () => {
+  it("destroy cancels pending writes and cleans up", async () => {
     const entries = new Map([["flush.md", { hash: "abc", size: 5, mtime: 1 }]]);
     manifestManager = createManifestManager(entries);
     vault.getAbstractFileByPath.mockReturnValue({ path: "flush.md" });
@@ -332,6 +332,6 @@ describe("BackgroundSync", () => {
 
     bg.destroy();
 
-    expect(vault.modify).toHaveBeenCalledWith({ path: "flush.md" }, "pending content");
+    expect(vault.modify).not.toHaveBeenCalled();
   });
 });
