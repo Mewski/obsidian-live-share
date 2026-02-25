@@ -12,8 +12,9 @@ Real-time collaborative editing for [Obsidian](https://obsidian.md). Share your 
 - **Follow mode** -- Follow a user's navigation and scroll position; auto-unfollows on interaction
 - **Presentation mode** -- Host broadcasts navigation to all participants automatically
 - **Focus and summon** -- Request attention or navigate specific participants to your location
-- **Host-only controls** -- Summon, kick, presentation mode, and session end are host-only (enforced server-side)
+- **Host-only controls** -- Summon, kick, permission changes, presentation mode, and session end are host-only (enforced server-side)
 - **Guest approval** -- Optionally require host approval with read-write, read-only, or deny
+- **Mid-session permission changes** -- Host can toggle any guest between read-write and read-only at any time via the presence panel
 - **Read-only enforcement** -- Read-only guests are blocked from editing server-side on both Yjs and control channels
 - **Confirmation dialogs** -- End session and kick actions ask for confirmation before proceeding
 - **Host disconnect notice** -- Guests are notified when the host leaves the session
@@ -139,13 +140,13 @@ See [Server Setup](docs/server.md) for TLS, OAuth, persistence, and deployment d
 # Server
 cd server
 npm run dev          # Dev server with auto-reload
-npm test             # 47 tests
+npm test             # 58 tests
 npm run lint         # Biome linter
 
 # Plugin
 cd plugin
 npm run dev          # Watch mode (esbuild)
-npm test             # 155 tests
+npm test             # 202 tests
 npm run lint         # Biome linter
 ```
 
@@ -154,7 +155,7 @@ npm run lint         # Biome linter
 - **E2E encryption**: AES-256-GCM with PBKDF2 (100k iterations). Passphrase is in the invite link, never sent to the server.
 - **Timing-safe token comparison** on all room token checks
 - **Path traversal protection**: `..`, `.`, and absolute paths are rejected
-- **Server-side enforcement**: read-only permissions, host-only summon/kick/session-end, message type whitelist
+- **Server-side enforcement**: read-only permissions, host-only summon/kick/set-permission/session-end, message type whitelist
 - **Rate limiting**: REST (30 req/min), WebSocket (100 msg/10s), auth (10 req/min)
 - **Payload limits**: Yjs 10 MB, control 2 MB
 

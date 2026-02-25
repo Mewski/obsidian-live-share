@@ -57,7 +57,7 @@ Each session uses two WebSocket channels:
 - **One Y.Doc per file** -- Keeps memory bounded; only open files have active sync providers.
 - **Hub-and-spoke topology** -- All clients connect to the central relay server. No peer-to-peer.
 - **Per-path suppression** -- Ref-counted suppression map prevents vault events from echoing remote operations back to the server. Uses 50ms delayed unsuppress to handle async vault event firing.
-- **Host determination** -- Server-side, not client-side. JWT-verified identity is preferred; fallback: first client to send `presence-update` becomes host.
+- **Host determination** -- Server-side, not client-side. JWT-verified identity is preferred; fallback without JWT: first connected client becomes host.
 - **LevelDB persistence** -- Server persists Y.Doc state with 5-second debounce after edits. Rooms are cleaned up 30 seconds after the last client disconnects.
 - **Forward-slash path normalization** -- All file paths are normalized to `/` separators for cross-platform compatibility.
 - **Send queue with presence dedup** -- Messages sent while disconnected are queued and flushed on reconnect. Queued presence updates are deduplicated (only the latest is kept).
@@ -78,6 +78,8 @@ Each session uses two WebSocket channels:
 | `join-response` | Host -> Guest | Approve/deny with permission level |
 | `kick` | Host -> Server | Request to remove a participant |
 | `kicked` | Server -> Guest | Notification that you were removed |
+| `set-permission` | Host -> Server | Change a guest's permission (read-write / read-only) |
+| `permission-update` | Server -> Guest | Notification that your permission was changed |
 | `session-end` | Host -> All | Host ended the session |
 | `sync-request` | Guest -> Host | Request full file resync |
 | `ping` / `pong` | Client <-> Server | Latency measurement (30s interval) |

@@ -72,6 +72,7 @@ The collaborators panel (right sidebar) shows each connected user with:
 - **Display name** with a "Host" badge if applicable
 - **Current file** they're viewing
 - **Follow button** -- Click to follow their navigation and scroll. Click again to unfollow. Any keyboard, mouse, or scroll interaction automatically unfollows.
+- **Permission toggle** (host only) -- Toggle a guest between read-write and read-only. Takes effect immediately; the guest's providers reconnect with the new permission.
 - **Summon button** (host only) -- Navigate that specific user to your cursor
 - **Kick button** (host only) -- Remove the user from the session (asks for confirmation)
 
@@ -95,6 +96,8 @@ When **Require approval** is enabled and a guest joins, the host sees a modal to
 - **Read-only** -- Can view all shared files but cannot modify content. Enforced server-side on both Yjs document updates and control channel file operations.
 
 When approval is disabled (default), all guests join with read-write access.
+
+The host can change a guest's permission at any time via the permission toggle button in the presence panel. The change takes effect immediately -- the guest's sync providers reconnect with the new permission level.
 
 ## Host Disconnect
 

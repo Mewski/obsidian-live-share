@@ -37,12 +37,13 @@ The JWT payload includes the GitHub user ID, username, display name, and avatar 
 The server determines host status, not the client. Two modes:
 
 1. **JWT mode**: If the room has a `hostUserId` and the client's JWT-verified identity matches, they become host
-2. **Fallback mode**: The first client to send a `presence-update` becomes host (used when no JWT is present)
+2. **Fallback mode**: The first connected client becomes host (used when no JWT is present)
 
 Host-only operations enforced server-side:
 - `summon` -- Only the host can summon participants
 - `session-end` -- Only the host can end the session
 - `kick` -- Only the host can kick participants
+- `set-permission` -- Only the host can change guest permissions
 
 ## Defenses
 
@@ -77,7 +78,7 @@ Host-only operations enforced server-side:
 | XSS via avatar URLs | Only `https:` URLs allowed, HTML escaping in OAuth page |
 | Message flooding | WebSocket rate limiting (100 msgs/10s), connection closed on violation |
 | Unauthorized edits by read-only guests | Server-side enforcement: Yjs writes and file ops dropped |
-| Guest impersonating host | Server determines host via JWT or first-to-identify; `isHost` in messages is ignored |
+| Guest impersonating host | Server determines host via JWT or first-connected; `isHost` in messages is ignored |
 | Incomplete chunk injection | Chunk assembly validates all expected chunks are present |
 | Re-entrant session cleanup | Guard prevents double cleanup from concurrent kicked/session-end handlers |
 
