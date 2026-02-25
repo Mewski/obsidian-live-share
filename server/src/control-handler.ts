@@ -11,6 +11,7 @@ import { WebSocket, WebSocketServer } from "ws";
 import { verifyJWT } from "./github-auth.js";
 import { getRoom, removeRoom, touchRoom } from "./rooms.js";
 
+// Message types accepted on the control channel; all others are silently dropped
 const ALLOWED_TYPES = new Set([
   "file-op",
   "file-chunk-start",
@@ -29,8 +30,8 @@ const ALLOWED_TYPES = new Set([
   "pong",
 ]);
 
-const MSG_RATE_WINDOW = 10_000;
-const MSG_RATE_LIMIT = 100;
+const MSG_RATE_WINDOW = 10_000; // 10-second sliding window
+const MSG_RATE_LIMIT = 100; // Max messages per window before disconnect
 
 interface ControlClient {
   ws: WebSocket;

@@ -13,6 +13,7 @@ import { safeTokenCompare } from "./util.js";
 
 export type { Room };
 
+// Rooms with no activity for 24 hours are cleaned up on startup
 const ROOM_MAX_AGE_MS = 24 * 60 * 60 * 1000;
 
 const rooms = new Map<string, Room>();

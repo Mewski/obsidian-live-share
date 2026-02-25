@@ -15,9 +15,9 @@ import * as Y from "yjs";
 
 import { type Persistence, getDefaultPersistence } from "./persistence.js";
 
-const messageSync = 0;
-const messageAwareness = 1;
-const messageFileOp = 2;
+const messageSync = 0; // Yjs sync protocol
+const messageAwareness = 1; // Awareness state (cursors, presence)
+const messageFileOp = 2; // Non-Yjs file operations broadcast
 
 interface RoomState {
   doc: Y.Doc;
