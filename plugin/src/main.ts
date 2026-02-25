@@ -579,7 +579,7 @@ export default class LiveSharePlugin extends Plugin {
         await this.manifestManager.publishManifest({ purge: true });
         await this.backgroundSync.startAll("host");
         this.registerManifestChangeHandler();
-        this.onActiveFileChange();
+        setTimeout(() => this.onActiveFileChange(), 100);
         new Notice("Live Share: session started, invite copied to clipboard");
       } catch {
         await this.abortSession("Live Share: failed to start session");
@@ -609,7 +609,7 @@ export default class LiveSharePlugin extends Plugin {
         );
         await this.backgroundSync.startAll("guest");
         this.registerManifestChangeHandler();
-        this.onActiveFileChange();
+        setTimeout(() => this.onActiveFileChange(), 100);
         new Notice(`Live Share: joined session, synced ${syncedCount} file(s)`);
       } catch {
         await this.abortSession("Live Share: failed to join session");
