@@ -1125,7 +1125,7 @@ class UserPickerModal extends FuzzySuggestModal<string> {
 class ConfirmModal extends Modal {
   private message: string;
   private resolve: (value: boolean) => void;
-  private decided = false;
+  private hasDecided = false;
 
   constructor(app: import("obsidian").App, message: string, resolve: (value: boolean) => void) {
     super(app);
@@ -1142,20 +1142,20 @@ class ConfirmModal extends Modal {
       cls: "mod-warning",
     });
     confirm.addEventListener("click", () => {
-      this.decided = true;
+      this.hasDecided = true;
       this.resolve(true);
       this.close();
     });
     const cancel = buttons.createEl("button", { text: "Cancel" });
     cancel.addEventListener("click", () => {
-      this.decided = true;
+      this.hasDecided = true;
       this.resolve(false);
       this.close();
     });
   }
 
   onClose() {
-    if (!this.decided) this.resolve(false);
+    if (!this.hasDecided) this.resolve(false);
     this.contentEl.empty();
   }
 }

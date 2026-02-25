@@ -23,7 +23,7 @@ export class SyncManager {
   private docs = new Map<string, Y.Doc>();
   private providers = new Map<string, WebsocketProvider>();
   private settings: LiveShareSettings;
-  private connected = false;
+  private isConnected = false;
 
   constructor(settings: LiveShareSettings) {
     this.settings = settings;
@@ -34,7 +34,7 @@ export class SyncManager {
   }
 
   getDoc(rawPath: string): { doc: Y.Doc; text: Y.Text; provider: WebsocketProvider } | null {
-    if (!this.connected || !this.settings.roomId) return null;
+    if (!this.isConnected || !this.settings.roomId) return null;
 
     const filePath = normalizePath(rawPath);
     let doc = this.docs.get(filePath);
@@ -60,6 +60,7 @@ export class SyncManager {
         if (event.status === "disconnected") {
           thisProvider.off("status", onDisconnect);
           thisProvider.destroy();
+          this.providers.delete(filePath);
         }
       };
       thisProvider.on("status", onDisconnect);
@@ -90,11 +91,11 @@ export class SyncManager {
   }
 
   connect() {
-    this.connected = true;
+    this.isConnected = true;
   }
 
   disconnect() {
-    this.connected = false;
+    this.isConnected = false;
     for (const path of [...this.providers.keys()]) {
       this.releaseDoc(path);
     }

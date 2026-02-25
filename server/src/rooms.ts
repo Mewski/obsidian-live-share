@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { nanoid } from "nanoid";
 
+import { clearRoomPermissions } from "./permissions.js";
 import { type Persistence, type Room, noopPersistence } from "./persistence.js";
 import { safeTokenCompare } from "./util.js";
 
@@ -10,16 +11,16 @@ export type { Room };
 const ROOM_MAX_AGE_MS = 24 * 60 * 60 * 1000;
 
 const rooms = new Map<string, Room>();
-let _persistence: Persistence = noopPersistence;
+let persistence: Persistence = noopPersistence;
 
-export async function initRooms(persistence: Persistence) {
-  _persistence = persistence;
-  const stored = await persistence.loadRooms();
+export async function initRooms(store: Persistence) {
+  persistence = store;
+  const stored = await store.loadRooms();
   const now = Date.now();
   for (const room of stored) {
     const age = now - (room.lastActivityAt || room.createdAt);
     if (age > ROOM_MAX_AGE_MS) {
-      await persistence.deleteRoom(room.id);
+      await store.deleteRoom(room.id);
       continue;
     }
     rooms.set(room.id, room);
@@ -30,7 +31,7 @@ export function touchRoom(id: string) {
   const room = rooms.get(id);
   if (room) {
     room.lastActivityAt = Date.now();
-    _persistence.saveRoom(room).catch((err) => {
+    persistence.saveRoom(room).catch((err) => {
       console.error(`[rooms] failed to persist room ${id}:`, err);
     });
   }
@@ -39,7 +40,7 @@ export function touchRoom(id: string) {
 export async function removeRoom(id: string) {
   rooms.delete(id);
   try {
-    await _persistence.deleteRoom(id);
+    await persistence.deleteRoom(id);
   } catch (err) {
     console.error(`[rooms] failed to delete room ${id}:`, err);
   }
@@ -52,7 +53,7 @@ export async function reapStaleRooms() {
     if (age > ROOM_MAX_AGE_MS) {
       rooms.delete(id);
       try {
-        await _persistence.deleteRoom(id);
+        await persistence.deleteRoom(id);
       } catch (err) {
         console.error(`[rooms] failed to reap stale room ${id}:`, err);
       }
@@ -96,7 +97,7 @@ roomRouter.post("/", async (req, res) => {
     requireApproval,
   };
   rooms.set(room.id, room);
-  await _persistence.saveRoom(room);
+  await persistence.saveRoom(room);
 
   res.status(201).json({ id: room.id, token: room.token, name: room.name });
 });
@@ -147,7 +148,8 @@ roomRouter.delete("/:id", async (req, res) => {
   }
 
   rooms.delete(req.params.id);
-  await _persistence.deleteRoom(req.params.id);
+  clearRoomPermissions(req.params.id);
+  await persistence.deleteRoom(req.params.id);
 
   res.json({ ok: true });
 });

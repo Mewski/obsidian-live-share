@@ -58,9 +58,7 @@ describe("persistence", () => {
     Y.applyUpdate(doc1, update2);
     Y.applyUpdate(doc2, update1);
 
-    expect(doc1.getText("content").toString()).toBe(
-      doc2.getText("content").toString(),
-    );
+    expect(doc1.getText("content").toString()).toBe(doc2.getText("content").toString());
     const merged = doc1.getText("content").toString();
     expect(merged).toContain("from-1");
     expect(merged).toContain("from-2");

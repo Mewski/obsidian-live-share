@@ -24,7 +24,7 @@ export function clearPermission(roomId: string, userId: string): void {
   permissions.delete(permissionKey(roomId, userId));
 }
 
-export function clearRoom(roomId: string): void {
+export function clearRoomPermissions(roomId: string): void {
   for (const key of permissions.keys()) {
     if (key.startsWith(`${roomId}:`)) {
       permissions.delete(key);

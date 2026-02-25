@@ -89,11 +89,11 @@ export const noopPersistence: Persistence = {
   async close() {},
 };
 
-let _defaultPersistence: Persistence | null = null;
+let defaultPersistence: Persistence | null = null;
 
 export function getDefaultPersistence(): Persistence {
-  if (!_defaultPersistence) {
-    _defaultPersistence = createLevelPersistence();
+  if (!defaultPersistence) {
+    defaultPersistence = createLevelPersistence();
   }
-  return _defaultPersistence;
+  return defaultPersistence;
 }

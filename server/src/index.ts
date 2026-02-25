@@ -168,10 +168,10 @@ if (isMain) {
         console.info(`[server] listening on :${port}`);
       });
 
-      let shuttingDown = false;
+      let isShuttingDown = false;
       const onSignal = () => {
-        if (shuttingDown) return;
-        shuttingDown = true;
+        if (isShuttingDown) return;
+        isShuttingDown = true;
         shutdown()
           .then(() => process.exit(0))
           .catch((err) => {

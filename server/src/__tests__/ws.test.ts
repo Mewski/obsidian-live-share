@@ -9,8 +9,8 @@ import { createApp } from "../index.js";
 import { setPermission } from "../permissions.js";
 import { noopPersistence } from "../persistence.js";
 
-const messageSync = 0;
-const messageFileOp = 2;
+const MESSAGE_SYNC = 0;
+const MESSAGE_FILE_OP = 2;
 
 interface RoomInfo {
   id: string;
@@ -82,7 +82,11 @@ function connectWsRaw(roomId: string, token?: string): Promise<WebSocket> {
 }
 
 // Wait until the messages array has at least `count` entries
-function waitForMessages(messages: Uint8Array[], count: number, timeoutMs = 3000): Promise<void> {
+function waitForMessages(
+  messages: Uint8Array[],
+  count: number,
+  timeoutMs = 3000,
+): Promise<void> {
   if (messages.length >= count) return Promise.resolve();
   return new Promise((resolve, reject) => {
     const start = Date.now();
@@ -100,14 +104,14 @@ function waitForMessages(messages: Uint8Array[], count: number, timeoutMs = 3000
 
 function sendSyncStep1(ws: WebSocket, doc: Y.Doc) {
   const encoder = encoding.createEncoder();
-  encoding.writeVarUint(encoder, messageSync);
+  encoding.writeVarUint(encoder, MESSAGE_SYNC);
   syncProtocol.writeSyncStep1(encoder, doc);
   ws.send(encoding.toUint8Array(encoder));
 }
 
 function sendUpdate(ws: WebSocket, update: Uint8Array) {
   const encoder = encoding.createEncoder();
-  encoding.writeVarUint(encoder, messageSync);
+  encoding.writeVarUint(encoder, MESSAGE_SYNC);
   syncProtocol.writeUpdate(encoder, update);
   ws.send(encoding.toUint8Array(encoder));
 }
@@ -121,7 +125,10 @@ beforeEach(async () => {
 
 afterEach(async () => {
   for (const ws of openSockets) {
-    if (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING) {
+    if (
+      ws.readyState === WebSocket.OPEN ||
+      ws.readyState === WebSocket.CONNECTING
+    ) {
       ws.close();
     }
   }
@@ -159,7 +166,7 @@ describe("WebSocket handler", () => {
 
     const decoder = decoding.createDecoder(messages[0]);
     const msgType = decoding.readVarUint(decoder);
-    expect(msgType).toBe(messageSync);
+    expect(msgType).toBe(MESSAGE_SYNC);
   });
 
   it("syncs document between two clients", async () => {
@@ -194,7 +201,7 @@ describe("WebSocket handler", () => {
     const msg = clientB.messages[clientB.messages.length - 1];
     const decoder = decoding.createDecoder(msg);
     const msgType = decoding.readVarUint(decoder);
-    expect(msgType).toBe(messageSync);
+    expect(msgType).toBe(MESSAGE_SYNC);
 
     const encoder = encoding.createEncoder();
     syncProtocol.readSyncMessage(decoder, encoder, docB, null);
@@ -220,7 +227,7 @@ describe("WebSocket handler", () => {
       content: "# Test",
     });
     const encoder = encoding.createEncoder();
-    encoding.writeVarUint(encoder, messageFileOp);
+    encoding.writeVarUint(encoder, MESSAGE_FILE_OP);
     encoding.writeVarString(encoder, fileOp);
     clientA.ws.send(encoding.toUint8Array(encoder));
 
@@ -228,7 +235,7 @@ describe("WebSocket handler", () => {
     const msg = clientB.messages[clientB.messages.length - 1];
     const decoder = decoding.createDecoder(msg);
     const type = decoding.readVarUint(decoder);
-    expect(type).toBe(messageFileOp);
+    expect(type).toBe(MESSAGE_FILE_OP);
     const payload = decoding.readVarString(decoder);
     expect(JSON.parse(payload)).toEqual({
       type: "create",
@@ -247,7 +254,7 @@ describe("WebSocket handler", () => {
     const msgCountBefore = client.messages.length;
 
     const encoder = encoding.createEncoder();
-    encoding.writeVarUint(encoder, messageFileOp);
+    encoding.writeVarUint(encoder, MESSAGE_FILE_OP);
     encoding.writeVarString(encoder, '{"type":"delete","path":"x.md"}');
     client.ws.send(encoding.toUint8Array(encoder));
 
@@ -329,7 +336,8 @@ describe("WebSocket handler", () => {
       const messages: Uint8Array[] = [];
       ws.on("message", (data: Buffer | ArrayBuffer | Buffer[]) => {
         if (Buffer.isBuffer(data)) messages.push(new Uint8Array(data));
-        else if (data instanceof ArrayBuffer) messages.push(new Uint8Array(data));
+        else if (data instanceof ArrayBuffer)
+          messages.push(new Uint8Array(data));
         else messages.push(new Uint8Array(Buffer.concat(data as Buffer[])));
       });
       ws.on("open", () => {
@@ -366,7 +374,9 @@ describe("WebSocket handler", () => {
 
     // Connect to control channel as host and send set-permission
     const ctrlHost = await new Promise<WebSocket>((resolve, reject) => {
-      const ws = new WebSocket(`ws://localhost:${port}/control/${room.id}?token=${room.token}`);
+      const ws = new WebSocket(
+        `ws://localhost:${port}/control/${room.id}?token=${room.token}`,
+      );
       ws.on("open", () => {
         openSockets.push(ws);
         resolve(ws);
@@ -410,7 +420,7 @@ describe("WebSocket handler", () => {
     docA.destroy();
   });
 
-  it("blocks messageFileOp for read-only clients", async () => {
+  it("blocks file-op messages for read-only clients", async () => {
     const room = await createRoom("ro-fileop");
     const roUserId = "ro-fileop-user";
     setPermission(room.id, roUserId, "read-only");
@@ -427,7 +437,8 @@ describe("WebSocket handler", () => {
       const messages: Uint8Array[] = [];
       ws.on("message", (data: Buffer | ArrayBuffer | Buffer[]) => {
         if (Buffer.isBuffer(data)) messages.push(new Uint8Array(data));
-        else if (data instanceof ArrayBuffer) messages.push(new Uint8Array(data));
+        else if (data instanceof ArrayBuffer)
+          messages.push(new Uint8Array(data));
         else messages.push(new Uint8Array(Buffer.concat(data as Buffer[])));
       });
       ws.on("open", () => {
@@ -443,8 +454,11 @@ describe("WebSocket handler", () => {
 
     // Read-only client sends a fileOp — should be blocked
     const encoder = encoding.createEncoder();
-    encoding.writeVarUint(encoder, messageFileOp);
-    encoding.writeVarString(encoder, '{"type":"create","path":"hack.md","content":"nope"}');
+    encoding.writeVarUint(encoder, MESSAGE_FILE_OP);
+    encoding.writeVarString(
+      encoder,
+      '{"type":"create","path":"hack.md","content":"nope"}',
+    );
     roClient.ws.send(encoding.toUint8Array(encoder));
 
     await new Promise((r) => setTimeout(r, 500));

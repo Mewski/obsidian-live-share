@@ -37,6 +37,7 @@ export class AuthManager {
   async logout(): Promise<void> {
     this.plugin.settings.jwt = "";
     this.plugin.settings.githubUserId = "";
+    this.plugin.settings.displayName = "Anonymous";
     this.plugin.settings.avatarUrl = "";
     await this.plugin.saveSettings();
     new Notice("Live Share: logged out");

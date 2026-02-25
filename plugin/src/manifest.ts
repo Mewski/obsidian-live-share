@@ -66,6 +66,7 @@ export class ManifestManager {
       if (event.status === "disconnected") {
         this.provider?.off("status", onDisconnect);
         this.provider?.destroy();
+        this.provider = null;
       }
     };
     this.provider.on("status", onDisconnect);

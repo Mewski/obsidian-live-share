@@ -36,7 +36,9 @@ vi.stubGlobal("WebSocket", MockWebSocket);
 
 const { ControlChannel: CC } = await import("../control-ws");
 
-function createSettings(overrides?: Partial<LiveShareSettings>): LiveShareSettings {
+function createSettings(
+  overrides?: Partial<LiveShareSettings>,
+): LiveShareSettings {
   return {
     serverUrl: "http://localhost:4321",
     roomId: "test-room",
@@ -136,7 +138,9 @@ describe("ControlChannel", () => {
 
       const ws = connectAndGetWs(channel);
       ws.simulateMessage(JSON.stringify({ type: "file-op", path: "a.md" }));
-      ws.simulateMessage(JSON.stringify({ type: "presence-update", userId: "u1" }));
+      ws.simulateMessage(
+        JSON.stringify({ type: "presence-update", userId: "u1" }),
+      );
 
       expect(fileOpHandler).toHaveBeenCalledOnce();
       expect(presenceHandler).toHaveBeenCalledOnce();
@@ -338,7 +342,7 @@ describe("ControlChannel", () => {
       expect(dispatched.encrypted).toBeUndefined();
     });
 
-    it("does not encrypt file-chunk-start (not in encryptable list)", () => {
+    it("encrypts file-chunk-start path", async () => {
       const e2e = createMockE2E();
       channel = new CC(createSettings(), e2e as any);
       const ws = connectAndGetWs(channel);
@@ -349,10 +353,11 @@ describe("ControlChannel", () => {
         totalSize: 1000,
       });
 
-      expect(ws.sent).toHaveLength(1);
+      await vi.waitFor(() => expect(ws.sent).toHaveLength(1));
       const sent = JSON.parse(ws.sent[0]);
-      expect(sent.encrypted).toBeUndefined();
-      expect(e2e.encryptString).not.toHaveBeenCalled();
+      expect(sent.encrypted).toBe(true);
+      expect(sent.path).toBe("encrypted:big.bin");
+      expect(e2e.encryptString).toHaveBeenCalledWith("big.bin");
     });
 
     it("drops message when encryption fails instead of sending plaintext", async () => {
@@ -380,7 +385,9 @@ describe("ControlChannel", () => {
 
       connectAndGetWs(channel);
 
-      await vi.waitFor(() => expect(stateCallback).toHaveBeenCalledWith("connected"));
+      await vi.waitFor(() =>
+        expect(stateCallback).toHaveBeenCalledWith("connected"),
+      );
     });
 
     it("cleans up on destroy", () => {
@@ -424,14 +431,16 @@ describe("ControlChannel", () => {
       channel.onStateChange(stateCallback);
 
       const ws = connectAndGetWs(channel);
-      await vi.waitFor(() => expect(stateCallback).toHaveBeenCalledWith("connected"));
+      await vi.waitFor(() =>
+        expect(stateCallback).toHaveBeenCalledWith("connected"),
+      );
       stateCallback.mockClear();
 
       ws.readyState = MockWebSocket.CLOSED;
       ws.onclose?.();
 
       expect(stateCallback).toHaveBeenCalledWith("disconnected");
-      expect((channel as any).destroyed).toBe(true);
+      expect((channel as any).isDestroyed).toBe(true);
     });
 
     it("does not fire disconnected twice if already destroyed", async () => {
@@ -440,7 +449,9 @@ describe("ControlChannel", () => {
       channel.onStateChange(stateCallback);
 
       const ws = connectAndGetWs(channel);
-      await vi.waitFor(() => expect(stateCallback).toHaveBeenCalledWith("connected"));
+      await vi.waitFor(() =>
+        expect(stateCallback).toHaveBeenCalledWith("connected"),
+      );
       stateCallback.mockClear();
 
       ws.readyState = MockWebSocket.CLOSED;

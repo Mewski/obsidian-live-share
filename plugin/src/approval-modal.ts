@@ -9,7 +9,7 @@ export interface JoinRequest {
 export class ApprovalModal extends Modal {
   private request: JoinRequest;
   private onDecision: (approved: boolean, permission: "read-write" | "read-only") => void;
-  private decided = false;
+  private hasDecided = false;
 
   constructor(
     app: App,
@@ -48,7 +48,7 @@ export class ApprovalModal extends Modal {
       cls: "mod-cta",
     });
     approveRW.addEventListener("click", () => {
-      this.decided = true;
+      this.hasDecided = true;
       this.onDecision(true, "read-write");
       this.close();
     });
@@ -57,21 +57,21 @@ export class ApprovalModal extends Modal {
       text: "Approve (Read-Only)",
     });
     approveRO.addEventListener("click", () => {
-      this.decided = true;
+      this.hasDecided = true;
       this.onDecision(true, "read-only");
       this.close();
     });
 
     const deny = buttons.createEl("button", { text: "Deny" });
     deny.addEventListener("click", () => {
-      this.decided = true;
+      this.hasDecided = true;
       this.onDecision(false, "read-only");
       this.close();
     });
   }
 
   onClose() {
-    if (!this.decided) {
+    if (!this.hasDecided) {
       this.onDecision(false, "read-only");
     }
     this.contentEl.empty();

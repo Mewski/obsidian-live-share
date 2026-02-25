@@ -9,9 +9,9 @@ import * as Y from "yjs";
 import { getPermission } from "./permissions.js";
 import { type Persistence, getDefaultPersistence } from "./persistence.js";
 
-const messageSync = 0; // Yjs sync protocol
-const messageAwareness = 1; // Awareness state (cursors, presence)
-const messageFileOp = 2; // Non-Yjs file operations broadcast
+const MESSAGE_SYNC = 0; // Yjs sync protocol
+const MESSAGE_AWARENESS = 1; // Awareness state (cursors, presence)
+const MESSAGE_FILE_OP = 2; // Non-Yjs file operations broadcast
 
 interface RoomState {
   doc: Y.Doc;
@@ -31,8 +31,7 @@ function extractBaseRoomId(roomId: string): string {
 
 function toUint8Array(raw: Buffer | ArrayBuffer | Buffer[]): Uint8Array {
   if (raw instanceof ArrayBuffer) return new Uint8Array(raw);
-  if (Buffer.isBuffer(raw))
-    return new Uint8Array(raw.buffer, raw.byteOffset, raw.byteLength);
+  if (Buffer.isBuffer(raw)) return new Uint8Array(raw.buffer, raw.byteOffset, raw.byteLength);
   const buf = Buffer.concat(raw as Buffer[]);
   return new Uint8Array(buf.buffer, buf.byteOffset, buf.byteLength);
 }
@@ -46,30 +45,27 @@ function handleMessage(ws: WebSocket, state: RoomState, data: Uint8Array) {
   const msgType = decoding.readVarUint(decoder);
 
   switch (msgType) {
-    case messageSync: {
+    case MESSAGE_SYNC: {
       // Peek at the sync sub-type to enforce read-only permissions.
       // Step2 and Update carry document mutations; block them for read-only clients.
       const syncType = decoding.peekVarUint(decoder);
-      if (
-        state.readOnlyClients.has(ws) &&
-        (syncType === SYNC_STEP2 || syncType === SYNC_UPDATE)
-      ) {
+      if (state.readOnlyClients.has(ws) && (syncType === SYNC_STEP2 || syncType === SYNC_UPDATE)) {
         break;
       }
       const encoder = encoding.createEncoder();
-      encoding.writeVarUint(encoder, messageSync);
+      encoding.writeVarUint(encoder, MESSAGE_SYNC);
       syncProtocol.readSyncMessage(decoder, encoder, state.doc, ws);
       if (encoding.length(encoder) > 1) {
         ws.send(encoding.toUint8Array(encoder));
       }
       break;
     }
-    case messageAwareness: {
+    case MESSAGE_AWARENESS: {
       const update = decoding.readVarUint8Array(decoder);
       awarenessProtocol.applyAwarenessUpdate(state.awareness, update, ws);
       break;
     }
-    case messageFileOp: {
+    case MESSAGE_FILE_OP: {
       if (state.readOnlyClients.has(ws)) break;
       for (const client of state.clients) {
         if (client !== ws && client.readyState === WebSocket.OPEN) {
@@ -83,25 +79,19 @@ function handleMessage(ws: WebSocket, state: RoomState, data: Uint8Array) {
 
 function sendSyncStep1(ws: WebSocket, doc: Y.Doc) {
   const encoder = encoding.createEncoder();
-  encoding.writeVarUint(encoder, messageSync);
+  encoding.writeVarUint(encoder, MESSAGE_SYNC);
   syncProtocol.writeSyncStep1(encoder, doc);
   ws.send(encoding.toUint8Array(encoder));
 }
 
-function sendAwarenessState(
-  ws: WebSocket,
-  awareness: awarenessProtocol.Awareness,
-) {
+function sendAwarenessState(ws: WebSocket, awareness: awarenessProtocol.Awareness) {
   const clients = awareness.getStates();
   if (clients.size > 0) {
     const encoder = encoding.createEncoder();
-    encoding.writeVarUint(encoder, messageAwareness);
+    encoding.writeVarUint(encoder, MESSAGE_AWARENESS);
     encoding.writeVarUint8Array(
       encoder,
-      awarenessProtocol.encodeAwarenessUpdate(
-        awareness,
-        Array.from(clients.keys()),
-      ),
+      awarenessProtocol.encodeAwarenessUpdate(awareness, Array.from(clients.keys())),
     );
     ws.send(encoding.toUint8Array(encoder));
   }
@@ -135,7 +125,7 @@ export function createYjsWSS(persist?: Persistence) {
 
     doc.on("update", (update: Uint8Array, origin: unknown) => {
       const encoder = encoding.createEncoder();
-      encoding.writeVarUint(encoder, messageSync);
+      encoding.writeVarUint(encoder, MESSAGE_SYNC);
       syncProtocol.writeUpdate(encoder, update);
       const msg = encoding.toUint8Array(encoder);
 
@@ -179,7 +169,7 @@ export function createYjsWSS(persist?: Persistence) {
 
         const changedClients = added.concat(updated, removed);
         const encoder = encoding.createEncoder();
-        encoding.writeVarUint(encoder, messageAwareness);
+        encoding.writeVarUint(encoder, MESSAGE_AWARENESS);
         encoding.writeVarUint8Array(
           encoder,
           awarenessProtocol.encodeAwarenessUpdate(awareness, changedClients),
@@ -225,10 +215,7 @@ export function createYjsWSS(persist?: Persistence) {
     try {
       await persistence.persistDoc(roomId, state.doc);
     } catch (err) {
-      console.error(
-        `[yjs] failed to persist doc ${roomId} during cleanup:`,
-        err,
-      );
+      console.error(`[yjs] failed to persist doc ${roomId} during cleanup:`, err);
     }
     awarenessProtocol.removeAwarenessStates(
       state.awareness,
@@ -246,10 +233,7 @@ export function createYjsWSS(persist?: Persistence) {
       try {
         await persistence.persistDoc(roomId, state.doc);
       } catch (err) {
-        console.error(
-          `[yjs] failed to persist doc ${roomId} during shutdown:`,
-          err,
-        );
+        console.error(`[yjs] failed to persist doc ${roomId} during shutdown:`, err);
       }
       for (const ws of state.clients) {
         ws.close(1000, "server shutting down");
@@ -267,74 +251,67 @@ export function createYjsWSS(persist?: Persistence) {
     return { rooms: roomStates.size, connections };
   }
 
-  wss.on(
-    "connection",
-    async (ws: WebSocket, req: IncomingMessage, roomId: string) => {
-      let state: RoomState;
+  wss.on("connection", async (ws: WebSocket, req: IncomingMessage, roomId: string) => {
+    let state: RoomState;
+    try {
+      state = await getOrCreateRoom(roomId);
+    } catch (err) {
+      console.error(`[yjs] failed to get/create room ${roomId}:`, err);
+      ws.close(1011, "internal error");
+      return;
+    }
+    state.clients.add(ws);
+
+    const reqUrl = new URL(req.url || "", `http://${req.headers.host}`);
+    const userId = reqUrl.searchParams.get("userId");
+    const baseRoomId = extractBaseRoomId(roomId);
+    if (userId) {
+      state.clientUserIds.set(ws, userId);
+      const permission = getPermission(baseRoomId, userId);
+      if (permission === "read-only") {
+        state.readOnlyClients.add(ws);
+      }
+    }
+
+    sendSyncStep1(ws, state.doc);
+    sendAwarenessState(ws, state.awareness);
+
+    ws.on("error", (err) => {
+      console.error(`[yjs] ws error for room ${roomId}:`, err.message);
+      ws.close();
+    });
+
+    ws.on("message", (raw: Buffer | ArrayBuffer | Buffer[]) => {
+      const data = toUint8Array(raw);
       try {
-        state = await getOrCreateRoom(roomId);
+        handleMessage(ws, state, data);
       } catch (err) {
-        console.error(`[yjs] failed to get/create room ${roomId}:`, err);
-        ws.close(1011, "internal error");
-        return;
+        console.error("[yjs] failed to handle message:", err);
       }
-      state.clients.add(ws);
+    });
 
-      const reqUrl = new URL(req.url || "", `http://${req.headers.host}`);
-      const userId = reqUrl.searchParams.get("userId");
-      const baseRoomId = extractBaseRoomId(roomId);
-      if (userId) {
-        state.clientUserIds.set(ws, userId);
-        const permission = getPermission(baseRoomId, userId);
-        if (permission === "read-only") {
-          state.readOnlyClients.add(ws);
-        }
+    ws.on("close", () => {
+      state.clients.delete(ws);
+      state.readOnlyClients.delete(ws);
+      state.clientUserIds.delete(ws);
+
+      const clientIds = state.clientAwarenessIds.get(ws);
+      if (clientIds && clientIds.size > 0) {
+        awarenessProtocol.removeAwarenessStates(state.awareness, Array.from(clientIds), null);
       }
+      state.clientAwarenessIds.delete(ws);
 
-      sendSyncStep1(ws, state.doc);
-      sendAwarenessState(ws, state.awareness);
-
-      ws.on("error", (err) => {
-        console.error(`[yjs] ws error for room ${roomId}:`, err.message);
-        ws.close();
-      });
-
-      ws.on("message", (raw: Buffer | ArrayBuffer | Buffer[]) => {
-        const data = toUint8Array(raw);
-        try {
-          handleMessage(ws, state, data);
-        } catch (err) {
-          console.error("[yjs] failed to handle message:", err);
-        }
-      });
-
-      ws.on("close", () => {
-        state.clients.delete(ws);
-        state.readOnlyClients.delete(ws);
-        state.clientUserIds.delete(ws);
-
-        const clientIds = state.clientAwarenessIds.get(ws);
-        if (clientIds && clientIds.size > 0) {
-          awarenessProtocol.removeAwarenessStates(
-            state.awareness,
-            Array.from(clientIds),
-            null,
-          );
-        }
-        state.clientAwarenessIds.delete(ws);
-
-        if (state.clients.size === 0) {
-          state.cleanupTimer = setTimeout(() => {
-            if (state.clients.size === 0) {
-              cleanupRoom(roomId, state).catch((err) => {
-                console.error(`[yjs] failed to cleanup room ${roomId}:`, err);
-              });
-            }
-          }, 30_000);
-        }
-      });
-    },
-  );
+      if (state.clients.size === 0) {
+        state.cleanupTimer = setTimeout(() => {
+          if (state.clients.size === 0) {
+            cleanupRoom(roomId, state).catch((err) => {
+              console.error(`[yjs] failed to cleanup room ${roomId}:`, err);
+            });
+          }
+        }, 30_000);
+      }
+    });
+  });
 
   /** Update read-only status for a userId across all Yjs rooms matching a base room ID. */
   function updatePermission(

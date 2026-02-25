@@ -88,6 +88,6 @@ function uint8ToBase64(bytes: Uint8Array): string {
   );
 }
 
-function base64ToUint8(b64: string): Uint8Array {
-  return new Uint8Array(base64ToArrayBuffer(b64));
+function base64ToUint8(base64: string): Uint8Array {
+  return new Uint8Array(base64ToArrayBuffer(base64));
 }

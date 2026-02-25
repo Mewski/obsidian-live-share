@@ -29,8 +29,8 @@ export class FileOpsManager {
     this.vault = vault;
   }
 
-  setSender(fn: (op: FileOp) => void) {
-    this.sendOp = fn;
+  setSender(sender: (op: FileOp) => void) {
+    this.sendOp = sender;
   }
 
   suppressPath(path: string): void {

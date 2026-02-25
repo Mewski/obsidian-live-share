@@ -36,7 +36,7 @@ export class ControlChannel {
   private ws: WebSocket | null = null;
   private handlers = new Map<ControlMessageType, Handler[]>();
   private settings: LiveShareSettings;
-  private destroyed = false;
+  private isDestroyed = false;
   private e2e: E2ECrypto | null = null;
   private stateChangeCallback: ((state: "connected" | "disconnected") => void) | null = null;
 
@@ -58,7 +58,7 @@ export class ControlChannel {
   }
 
   connect(): void {
-    if (this.destroyed) return;
+    if (this.isDestroyed) return;
     const wsUrl = toWsUrl(this.settings.serverUrl);
     let url = `${wsUrl}/control/${this.settings.roomId}?token=${encodeURIComponent(this.settings.token)}`;
     if (this.settings.jwt) url += `&jwt=${encodeURIComponent(this.settings.jwt)}`;
@@ -98,8 +98,8 @@ export class ControlChannel {
 
     this.ws.onclose = () => {
       this.stopPing();
-      if (!this.destroyed) {
-        this.destroyed = true;
+      if (!this.isDestroyed) {
+        this.isDestroyed = true;
         this.stateChangeCallback?.("disconnected");
       }
     };
@@ -110,7 +110,10 @@ export class ControlChannel {
   send(msg: ControlMessage): void {
     if (this.ws?.readyState !== WebSocket.OPEN) return;
     const encryptable =
-      msg.type === "file-op" || msg.type === "file-chunk-data" || msg.type === "file-chunk-end";
+      msg.type === "file-op" ||
+      msg.type === "file-chunk-start" ||
+      msg.type === "file-chunk-data" ||
+      msg.type === "file-chunk-end";
     if (this.e2e?.enabled && encryptable) {
       this.encryptAndSend(msg);
     } else {
@@ -138,9 +141,24 @@ export class ControlChannel {
   private async encryptAndSend(msg: ControlMessage): Promise<void> {
     if (!this.e2e || !this.ws || this.ws.readyState !== WebSocket.OPEN) return;
     try {
-      if (msg.type === "file-chunk-data" && typeof msg.data === "string") {
-        const encrypted = await this.e2e.encryptString(msg.data);
-        this.ws.send(JSON.stringify({ ...msg, data: encrypted, encrypted: true }));
+      if (
+        (msg.type === "file-chunk-start" || msg.type === "file-chunk-end") &&
+        typeof msg.path === "string"
+      ) {
+        const encrypted = await this.e2e.encryptString(msg.path);
+        this.ws.send(JSON.stringify({ ...msg, path: encrypted, encrypted: true }));
+      } else if (msg.type === "file-chunk-data" && typeof msg.data === "string") {
+        const encryptedData = await this.e2e.encryptString(msg.data);
+        const encryptedPath =
+          typeof msg.path === "string" ? await this.e2e.encryptString(msg.path) : msg.path;
+        this.ws.send(
+          JSON.stringify({
+            ...msg,
+            data: encryptedData,
+            path: encryptedPath,
+            encrypted: true,
+          }),
+        );
       } else {
         const op = msg.op as Record<string, unknown>;
         if (op && typeof op.content === "string") {
@@ -165,9 +183,22 @@ export class ControlChannel {
     if (!this.e2e) return;
     try {
       let decryptedMsg: ControlMessage;
-      if (msg.type === "file-chunk-data" && typeof msg.data === "string") {
-        const decrypted = await this.e2e.decryptString(msg.data);
-        decryptedMsg = { ...msg, data: decrypted, encrypted: undefined };
+      if (
+        (msg.type === "file-chunk-start" || msg.type === "file-chunk-end") &&
+        typeof msg.path === "string"
+      ) {
+        const decryptedPath = await this.e2e.decryptString(msg.path);
+        decryptedMsg = { ...msg, path: decryptedPath, encrypted: undefined };
+      } else if (msg.type === "file-chunk-data" && typeof msg.data === "string") {
+        const decryptedData = await this.e2e.decryptString(msg.data);
+        const decryptedPath =
+          typeof msg.path === "string" ? await this.e2e.decryptString(msg.path) : msg.path;
+        decryptedMsg = {
+          ...msg,
+          data: decryptedData,
+          path: decryptedPath,
+          encrypted: undefined,
+        };
       } else {
         const op = msg.op as Record<string, unknown> | undefined;
         if (op && typeof op.content === "string") {
@@ -208,7 +239,7 @@ export class ControlChannel {
   }
 
   destroy(): void {
-    this.destroyed = true;
+    this.isDestroyed = true;
     this.stateChangeCallback?.("disconnected");
     this.stopPing();
     if (this.ws) {
