@@ -429,10 +429,11 @@ export default class LiveSharePlugin extends Plugin {
       this.refreshPresenceView();
       this.fileOpsManager.clearPendingChunks();
       this.manifestManager.destroy();
-      await this.sessionManager.endSession();
       this.connectionState.transition({ type: "disconnect" });
       new Notice("Live Share: session ended");
     } finally {
+      // Always clear session state, even if cleanup above throws
+      await this.sessionManager.endSession();
       this.endingSession = false;
     }
   }
