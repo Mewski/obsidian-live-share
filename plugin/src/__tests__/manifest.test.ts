@@ -4,8 +4,18 @@ import { ExclusionManager } from "../exclusion";
 import { ManifestManager } from "../manifest";
 import type { LiveShareSettings } from "../types";
 
+const { MockWebsocketProvider } = vi.hoisted(() => {
+  const MockWebsocketProvider = vi.fn(function (this: any) {
+    this.destroy = vi.fn();
+    this.synced = true;
+    this.on = vi.fn();
+    this.off = vi.fn();
+    this.once = vi.fn();
+  });
+  return { MockWebsocketProvider };
+});
 vi.mock("y-websocket", () => ({
-  WebsocketProvider: vi.fn(),
+  WebsocketProvider: MockWebsocketProvider,
 }));
 
 function createSettings(overrides: Partial<LiveShareSettings> = {}): LiveShareSettings {
@@ -557,6 +567,49 @@ describe("ManifestManager", () => {
 
       expect(synced).toBe(1);
       expect(requestBinary).toHaveBeenCalledWith("safe-binary.png");
+    });
+  });
+
+  // -----------------------------------------------------------------------
+  // syncFromManifest skipText option
+  // -----------------------------------------------------------------------
+  describe("syncFromManifest skipText", () => {
+    it("skips text files when skipText is true", async () => {
+      const manager = new ManifestManager(vault as any, createSettings());
+      const { manifest } = injectManifest(manager);
+
+      manifest.set("notes.md", { hash: "a", size: 10, mtime: 1000 });
+      manifest.set("image.png", {
+        hash: "b",
+        size: 20,
+        mtime: 1000,
+        binary: true,
+      });
+
+      const requestBinary = vi.fn();
+      const synced = await manager.syncFromManifest(undefined, undefined, requestBinary, {
+        skipText: true,
+      });
+
+      // Only the binary file should be synced; the .md is skipped
+      expect(synced).toBe(1);
+      expect(requestBinary).toHaveBeenCalledWith("image.png");
+      expect(vault.create).not.toHaveBeenCalled();
+    });
+
+    it("does not skip text files when skipText is not set", async () => {
+      const manager = new ManifestManager(vault as any, createSettings());
+      const { manifest } = injectManifest(manager);
+
+      manifest.set("notes.md", { hash: "a", size: 10, mtime: 1000 });
+
+      MockWebsocketProvider.mockClear();
+      await manager.syncFromManifest(undefined, undefined, undefined, {
+        skipText: false,
+      });
+
+      // Provider WAS constructed — text file not skipped
+      expect(MockWebsocketProvider).toHaveBeenCalled();
     });
   });
 

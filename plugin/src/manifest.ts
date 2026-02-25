@@ -124,6 +124,7 @@ export class ManifestManager {
     suppress?: (path: string) => void,
     unsuppress?: (path: string) => void,
     requestBinary?: (path: string) => void,
+    options?: { skipText?: boolean },
   ): Promise<number> {
     if (!this.manifest || !this.doc) return 0;
 
@@ -134,6 +135,10 @@ export class ManifestManager {
       if (!path || path.startsWith("/") || path.startsWith("\\")) continue;
       const segments = path.split(/[\\/]/);
       if (segments.some((s) => s === ".." || s === ".")) continue;
+
+      // When backgroundSync handles text files, skip them here to avoid
+      // redundant temporary WebSocket connections.
+      if (options?.skipText && !fileEntry.binary && isTextFile(path)) continue;
 
       const localFile = this.vault.getAbstractFileByPath(path) as TFile | null;
 

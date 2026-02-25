@@ -64,8 +64,13 @@ export default class LiveSharePlugin extends Plugin {
   private registerManifestChangeHandler() {
     this.manifestManager.onManifestChange(async (added, removed) => {
       if (added.length > 0) {
-        const n = await this.manifestManager.syncFromManifest(undefined, undefined, (path) =>
-          this.requestBinaryFile(path),
+        const suppress = (p: string) => this.fileOpsManager.suppressPath(p);
+        const unsuppress = (p: string) => this.fileOpsManager.unsuppressPath(p);
+        const n = await this.manifestManager.syncFromManifest(
+          suppress,
+          unsuppress,
+          (path) => this.requestBinaryFile(path),
+          { skipText: true },
         );
         if (n > 0) new Notice(`Live Share: synced ${n} file(s)`);
         for (const path of added) {
@@ -371,8 +376,13 @@ export default class LiveSharePlugin extends Plugin {
           await this.manifestManager.publishManifest();
           await this.backgroundSync.startAll("host");
         } else {
-          await this.manifestManager.syncFromManifest(undefined, undefined, (path) =>
-            this.requestBinaryFile(path),
+          const suppress = (p: string) => this.fileOpsManager.suppressPath(p);
+          const unsuppress = (p: string) => this.fileOpsManager.unsuppressPath(p);
+          await this.manifestManager.syncFromManifest(
+            suppress,
+            unsuppress,
+            (path) => this.requestBinaryFile(path),
+            { skipText: true },
           );
           await this.backgroundSync.startAll("guest");
           this.registerManifestChangeHandler();
@@ -446,8 +456,13 @@ export default class LiveSharePlugin extends Plugin {
     if (ok) {
       await this.connectSync();
       await this.manifestManager.connect();
-      const count = await this.manifestManager.syncFromManifest(undefined, undefined, (path) =>
-        this.requestBinaryFile(path),
+      const suppress = (p: string) => this.fileOpsManager.suppressPath(p);
+      const unsuppress = (p: string) => this.fileOpsManager.unsuppressPath(p);
+      const count = await this.manifestManager.syncFromManifest(
+        suppress,
+        unsuppress,
+        (path) => this.requestBinaryFile(path),
+        { skipText: true },
       );
       await this.backgroundSync.startAll("guest");
       this.registerManifestChangeHandler();
