@@ -34,7 +34,7 @@ export class SessionManager {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          hostUserId: settings.githubUserId || settings.displayName,
+          hostUserId: settings.githubUserId || settings.clientId,
           requireApproval: settings.requireApproval,
         }),
       });

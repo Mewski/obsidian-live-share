@@ -609,4 +609,158 @@ describe("Control WebSocket handler", () => {
     await new Promise((r) => setTimeout(r, 300));
     // The server should not have thrown; test passes if we reach here
   });
+
+  it("host can change guest permission via set-permission", async () => {
+    const room = await createRoom("ctrl-set-perm");
+
+    const host = await connectControl(room.id, room.token);
+    const guest = await connectControl(room.id, room.token);
+
+    await new Promise((r) => setTimeout(r, 100));
+
+    sendJSON(host.ws, {
+      type: "presence-update",
+      userId: "host-1",
+      displayName: "Host",
+      isHost: true,
+    });
+    sendJSON(guest.ws, {
+      type: "presence-update",
+      userId: "guest-1",
+      displayName: "Guest",
+    });
+
+    await new Promise((r) => setTimeout(r, 100));
+    guest.messages.length = 0;
+    host.messages.length = 0;
+
+    // Host changes guest to read-only
+    sendJSON(host.ws, {
+      type: "set-permission",
+      userId: "guest-1",
+      permission: "read-only",
+    });
+
+    await waitForMessages(guest.messages, 1);
+    const permMsg = JSON.parse(guest.messages[0]);
+    expect(permMsg.type).toBe("permission-update");
+    expect(permMsg.permission).toBe("read-only");
+
+    // Now guest's file-ops should be blocked
+    guest.messages.length = 0;
+    host.messages.length = 0;
+
+    sendJSON(guest.ws, {
+      type: "file-op",
+      op: "create",
+      path: "blocked.md",
+      content: "should not arrive",
+    });
+
+    await new Promise((r) => setTimeout(r, 300));
+    expect(host.messages.length).toBe(0);
+
+    // Host changes guest back to read-write
+    sendJSON(host.ws, {
+      type: "set-permission",
+      userId: "guest-1",
+      permission: "read-write",
+    });
+
+    await waitForMessages(guest.messages, 1);
+    const permMsg2 = JSON.parse(guest.messages[0]);
+    expect(permMsg2.type).toBe("permission-update");
+    expect(permMsg2.permission).toBe("read-write");
+
+    // Now file-ops should go through
+    guest.messages.length = 0;
+    host.messages.length = 0;
+
+    sendJSON(guest.ws, {
+      type: "file-op",
+      op: "create",
+      path: "allowed.md",
+      content: "should arrive",
+    });
+
+    await waitForMessages(host.messages, 1);
+    const fileOp = JSON.parse(host.messages[0]);
+    expect(fileOp.type).toBe("file-op");
+    expect(fileOp.path).toBe("allowed.md");
+  });
+
+  it("non-host cannot send set-permission", async () => {
+    const room = await createRoom("ctrl-set-perm-nonhost");
+
+    const host = await connectControl(room.id, room.token);
+    const guest = await connectControl(room.id, room.token);
+
+    await new Promise((r) => setTimeout(r, 100));
+
+    sendJSON(host.ws, {
+      type: "presence-update",
+      userId: "host-1",
+      displayName: "Host",
+      isHost: true,
+    });
+    sendJSON(guest.ws, {
+      type: "presence-update",
+      userId: "guest-1",
+      displayName: "Guest",
+    });
+
+    await new Promise((r) => setTimeout(r, 100));
+    host.messages.length = 0;
+    guest.messages.length = 0;
+
+    // Guest tries to change host's permission -- should be ignored
+    sendJSON(guest.ws, {
+      type: "set-permission",
+      userId: "host-1",
+      permission: "read-only",
+    });
+
+    await new Promise((r) => setTimeout(r, 300));
+    // Host should not receive a permission-update
+    const permMsg = host.messages.find((m) => {
+      const parsed = JSON.parse(m);
+      return parsed.type === "permission-update";
+    });
+    expect(permMsg).toBeUndefined();
+  });
+
+  it("set-permission with invalid permission value is ignored", async () => {
+    const room = await createRoom("ctrl-set-perm-invalid");
+
+    const host = await connectControl(room.id, room.token);
+    const guest = await connectControl(room.id, room.token);
+
+    await new Promise((r) => setTimeout(r, 100));
+
+    sendJSON(host.ws, {
+      type: "presence-update",
+      userId: "host-1",
+      displayName: "Host",
+      isHost: true,
+    });
+    sendJSON(guest.ws, {
+      type: "presence-update",
+      userId: "guest-1",
+      displayName: "Guest",
+    });
+
+    await new Promise((r) => setTimeout(r, 100));
+    guest.messages.length = 0;
+
+    // Host sends invalid permission value
+    sendJSON(host.ws, {
+      type: "set-permission",
+      userId: "guest-1",
+      permission: "admin",
+    });
+
+    await new Promise((r) => setTimeout(r, 300));
+    // Guest should not receive anything
+    expect(guest.messages.length).toBe(0);
+  });
 });

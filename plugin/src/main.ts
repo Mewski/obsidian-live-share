@@ -88,8 +88,17 @@ export default class LiveSharePlugin extends Plugin {
   private currentScrollListener: (() => void) | null = null;
   private currentScrollDOM: HTMLElement | null = null;
 
+  private get userId(): string {
+    return this.settings.githubUserId || this.settings.clientId;
+  }
+
   async onload() {
     await this.loadSettings();
+
+    if (!this.settings.clientId) {
+      this.settings.clientId = crypto.randomUUID();
+      await this.saveData(this.settings);
+    }
 
     this.syncManager = new SyncManager(this.settings);
     this.collabManager = new CollabManager();
@@ -170,7 +179,7 @@ export default class LiveSharePlugin extends Plugin {
         if (!filePath || !this.controlChannel) return;
         this.controlChannel.send({
           type: "focus-request",
-          fromUserId: this.settings.githubUserId || this.settings.displayName,
+          fromUserId: this.userId,
           fromDisplayName: this.settings.displayName,
           filePath,
           line: cursor.line,
@@ -193,7 +202,7 @@ export default class LiveSharePlugin extends Plugin {
         if (!filePath || !this.controlChannel) return;
         this.controlChannel.send({
           type: "summon",
-          fromUserId: this.settings.githubUserId || this.settings.displayName,
+          fromUserId: this.userId,
           fromDisplayName: this.settings.displayName,
           targetUserId: "__all__",
           filePath,
@@ -239,6 +248,7 @@ export default class LiveSharePlugin extends Plugin {
       view.setFollowHandler((userId) => this.followUser(userId));
       view.setKickHandler((userId) => this.kickUser(userId));
       view.setSummonHandler((userId) => this.summonUser(userId));
+      view.setPermissionHandler((userId) => this.setUserPermission(userId));
       view.setIsHost(this.settings.role === "host");
       return view;
     });
@@ -256,7 +266,7 @@ export default class LiveSharePlugin extends Plugin {
           if (activeView?.file) {
             this.controlChannel.send({
               type: "focus-request",
-              fromUserId: this.settings.githubUserId || this.settings.displayName,
+              fromUserId: this.userId,
               fromDisplayName: this.settings.displayName,
               filePath: activeView.file.path,
               line: activeView.editor?.getCursor()?.line ?? 0,
@@ -574,6 +584,10 @@ export default class LiveSharePlugin extends Plugin {
           approved,
           permission,
         });
+        if (approved) {
+          const existing = this.remoteUsers.get(msg.userId as string);
+          if (existing) existing.permission = permission;
+        }
       }).open();
     });
 
@@ -589,6 +603,24 @@ export default class LiveSharePlugin extends Plugin {
         this.settings.permission = perm;
         await this.saveSettings();
       }
+    });
+
+    this.controlChannel.on("permission-update", async (msg) => {
+      const perm = msg.permission as string | undefined;
+      if (perm !== "read-only" && perm !== "read-write") return;
+      this.settings.permission = perm;
+      await this.saveSettings();
+
+      // Reconnect Yjs providers so they use the updated permission param
+      this.syncManager.disconnect();
+      this.manifestManager.destroy();
+      this.syncManager.updateSettings(this.settings);
+      this.manifestManager.updateSettings(this.settings);
+      this.syncManager.connect();
+      await this.manifestManager.connect();
+      this.registerManifestChangeHandler();
+
+      new Notice(`Live Share: your permission was changed to ${perm}`);
     });
 
     this.controlChannel.on("focus-request", (msg) => {
@@ -622,7 +654,7 @@ export default class LiveSharePlugin extends Plugin {
     if (this.settings.role === "guest") {
       this.controlChannel.send({
         type: "join-request",
-        userId: this.settings.githubUserId || this.settings.displayName,
+        userId: this.userId,
         displayName: this.settings.displayName,
         avatarUrl: this.settings.avatarUrl,
       });
@@ -719,7 +751,7 @@ export default class LiveSharePlugin extends Plugin {
     }
     this.controlChannel.send({
       type: "presence-update",
-      userId: this.settings.githubUserId || this.settings.displayName,
+      userId: this.userId,
       displayName: this.settings.displayName,
       cursorColor: this.settings.cursorColor,
       currentFile,
@@ -763,6 +795,22 @@ export default class LiveSharePlugin extends Plugin {
     new Notice(`Live Share: kicked ${name}`);
   }
 
+  private setUserPermission(userId: string) {
+    if (this.settings.role !== "host" || !this.controlChannel) return;
+    const user = this.remoteUsers.get(userId);
+    if (!user) return;
+    const currentPerm = user.permission ?? "read-write";
+    const newPerm = currentPerm === "read-write" ? "read-only" : "read-write";
+    this.controlChannel.send({
+      type: "set-permission",
+      userId,
+      permission: newPerm,
+    });
+    user.permission = newPerm;
+    this.refreshPresenceView();
+    new Notice(`Live Share: set ${user.displayName} to ${newPerm}`);
+  }
+
   private async reloadFromHost() {
     if (!this.sessionManager.isActive) {
       new Notice("Live Share: no active session");
@@ -793,7 +841,7 @@ export default class LiveSharePlugin extends Plugin {
     }
     this.controlChannel.send({
       type: "summon",
-      fromUserId: this.settings.githubUserId || this.settings.displayName,
+      fromUserId: this.userId,
       fromDisplayName: this.settings.displayName,
       targetUserId: userId,
       filePath,

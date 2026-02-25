@@ -19,6 +19,7 @@ export interface PresenceUser {
   scrollTop?: number;
   isHost?: boolean;
   line?: number;
+  permission?: "read-write" | "read-only";
 }
 
 export class PresenceView extends ItemView {
@@ -26,6 +27,7 @@ export class PresenceView extends ItemView {
   private onFollowRequest: ((userId: string) => void) | null = null;
   private onKickRequest: ((userId: string) => void) | null = null;
   private onSummonRequest: ((userId: string) => void) | null = null;
+  private onSetPermissionRequest: ((userId: string) => void) | null = null;
   private isHost = false;
   private followedUserId: string | null = null;
 
@@ -51,6 +53,10 @@ export class PresenceView extends ItemView {
 
   setSummonHandler(handler: (userId: string) => void): void {
     this.onSummonRequest = handler;
+  }
+
+  setPermissionHandler(handler: (userId: string) => void): void {
+    this.onSetPermissionRequest = handler;
   }
 
   setIsHost(isHost: boolean) {
@@ -132,6 +138,14 @@ export class PresenceView extends ItemView {
       });
 
       if (this.isHost) {
+        const permBtn = actions.createEl("button", {
+          text: user.permission === "read-only" ? "Make R/W" : "Make R/O",
+          cls: "live-share-presence-perm",
+        });
+        permBtn.addEventListener("click", () => {
+          this.onSetPermissionRequest?.(userId);
+        });
+
         const summonBtn = actions.createEl("button", {
           text: "Summon",
           cls: "live-share-presence-summon",

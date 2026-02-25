@@ -25,6 +25,8 @@ export type ControlMessageType =
   | "kicked"
   | "sync-request"
   | "sync-response"
+  | "set-permission"
+  | "permission-update"
   | "ping"
   | "pong";
 

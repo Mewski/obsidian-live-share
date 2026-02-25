@@ -23,6 +23,7 @@ export interface LiveShareSettings {
   encryptionPassphrase: string;
   permission: Permission;
   requireApproval: boolean;
+  clientId: string;
 }
 
 export const DEFAULT_SETTINGS: LiveShareSettings = {
@@ -39,6 +40,7 @@ export const DEFAULT_SETTINGS: LiveShareSettings = {
   encryptionPassphrase: "",
   permission: "read-write",
   requireApproval: false,
+  clientId: "",
 };
 
 export interface FileCreateOp {

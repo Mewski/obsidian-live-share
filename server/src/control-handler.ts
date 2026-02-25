@@ -26,6 +26,8 @@ const ALLOWED_TYPES = new Set([
   "kick",
   "sync-request",
   "sync-response",
+  "set-permission",
+  "permission-update",
   "ping",
   "pong",
 ]);
@@ -213,6 +215,20 @@ export function createControlWSS() {
           if (targetClient.userId === targetUserId) {
             sendTo(clientWs, { type: "kicked" });
             clientWs.close();
+          }
+        }
+        return;
+      }
+
+      if (msg.type === "set-permission" && client.isHost) {
+        const targetUserId = msg.userId;
+        if (typeof targetUserId !== "string" || !targetUserId) return;
+        const perm = msg.permission;
+        if (perm !== "read-write" && perm !== "read-only") return;
+        for (const [clientWs, targetClient] of room.clients) {
+          if (targetClient.userId === targetUserId) {
+            targetClient.permission = perm;
+            sendTo(clientWs, { type: "permission-update", permission: perm });
           }
         }
         return;

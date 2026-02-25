@@ -25,6 +25,7 @@ function createSettings(
     encryptionPassphrase: "",
     permission: "read-write",
     requireApproval: false,
+    clientId: "test-client-id",
     ...overrides,
   };
 }
