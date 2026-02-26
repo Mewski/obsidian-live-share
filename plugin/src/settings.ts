@@ -101,53 +101,55 @@ export class LiveShareSettingTab extends PluginSettingTab {
 
     const session = new SettingGroup(containerEl).setHeading("Session");
 
-    if (active) {
-      const connectionState = this.plugin.connectionState.getState();
-      const role = settings.role === "host" ? "Hosting" : "Joined";
-      const stateLabel =
-        connectionState === "connected"
-          ? "Connected"
-          : connectionState === "connecting"
-            ? "Connecting..."
-            : connectionState === "error"
-              ? "Error"
-              : connectionState === "auth-required"
-                ? "Auth required"
-                : connectionState;
-      session
-        .addSetting((s) => {
-          s.setName(`${role} · ${stateLabel}`).setDesc(`Room: ${settings.roomId}`);
-        })
-        .addSetting((s) => {
+    session.addSetting((s) => {
+      if (active) {
+        const connectionState = this.plugin.connectionState.getState();
+        const role = settings.role === "host" ? "Hosting" : "Joined";
+        const stateLabel =
+          connectionState === "connected"
+            ? "Connected"
+            : connectionState === "connecting"
+              ? "Connecting..."
+              : connectionState === "error"
+                ? "Error"
+                : connectionState === "auth-required"
+                  ? "Auth required"
+                  : connectionState;
+        s.setName(`${role} · ${stateLabel}`).setDesc(`Room: ${settings.roomId}`);
+        s.addButton((btn) =>
+          btn.setButtonText("Copy invite link").onClick(() => {
+            sessionManager.copyInvite();
+          }),
+        );
+        if (settings.role === "host") {
           s.addButton((btn) =>
-            btn.setButtonText("Copy invite link").onClick(() => {
-              sessionManager.copyInvite();
-            }),
+            btn
+              .setButtonText("End session")
+              .setWarning()
+              .onClick(async () => {
+                await this.plugin.endSession();
+                this.display();
+              }),
           );
-          if (settings.role === "host") {
-            s.addButton((btn) =>
-              btn
-                .setButtonText("End session")
-                .setWarning()
-                .onClick(async () => {
-                  await this.plugin.endSession();
-                  this.display();
-                }),
-            );
-          } else {
-            s.addButton((btn) =>
-              btn
-                .setButtonText("Leave session")
-                .setWarning()
-                .onClick(async () => {
-                  await this.plugin.endSession();
-                  this.display();
-                }),
-            );
-          }
-        });
-    } else {
-      session.addSetting((s) => {
+        } else {
+          s.addButton((btn) =>
+            btn
+              .setButtonText("Leave session")
+              .setWarning()
+              .onClick(async () => {
+                await this.plugin.endSession();
+                this.display();
+              }),
+          );
+        }
+      } else {
+        s.setName("No active session");
+        s.addButton((btn) =>
+          btn.setButtonText("Join session").onClick(async () => {
+            await this.plugin.joinSession();
+            this.display();
+          }),
+        );
         s.addButton((btn) =>
           btn
             .setButtonText("Start session")
@@ -157,14 +159,8 @@ export class LiveShareSettingTab extends PluginSettingTab {
               this.display();
             }),
         );
-        s.addButton((btn) =>
-          btn.setButtonText("Join session").onClick(async () => {
-            await this.plugin.joinSession();
-            this.display();
-          }),
-        );
-      });
-    }
+      }
+    });
 
     session
       .addSetting((s) => {

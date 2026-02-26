@@ -11,6 +11,29 @@
   flex-shrink: 0;
 }
 
+.live-share-approval-verified {
+  color: var(--text-success);
+  font-size: var(--font-ui-small);
+  margin: 4px 0 0;
+}
+
+.live-share-verified-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.live-share-verified-badge::before {
+  content: "✓";
+  font-weight: 700;
+}
+
+.live-share-approval-unverified {
+  color: var(--text-muted);
+  font-size: var(--font-ui-small);
+  margin: 4px 0 0;
+}
+
 .live-share-approval-buttons {
   display: flex;
   gap: 8px;

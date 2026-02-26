@@ -202,6 +202,7 @@ export function createControlWSS(options?: ControlWSSOptions) {
               userId: client.userId,
               displayName: client.displayName,
               avatarUrl: msg.avatarUrl || "",
+              verified: !!client.verifiedUserId,
             });
           }
         } else {

@@ -33,9 +33,21 @@ export class ApprovalModal extends Modal {
         }
       } catch {}
     }
-    info.createEl("p", {
-      text: `${this.request.displayName} wants to join your session.`,
-    });
+    const nameEl = info.createEl("p");
+    nameEl.appendText(`${this.request.displayName} wants to join your session.`);
+
+    if (this.request.verified) {
+      const badge = info.createEl("p", { cls: "live-share-approval-verified" });
+      badge.createEl("span", {
+        text: "GitHub verified",
+        cls: "live-share-verified-badge",
+      });
+    } else {
+      info.createEl("p", {
+        text: "Identity not verified",
+        cls: "live-share-approval-unverified",
+      });
+    }
 
     const buttons = contentEl.createDiv({ cls: "live-share-approval-buttons" });
 

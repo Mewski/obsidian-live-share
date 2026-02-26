@@ -151,6 +151,7 @@ export interface JoinRequestMessage {
   userId: string;
   displayName: string;
   avatarUrl: string;
+  verified?: boolean;
 }
 
 export interface JoinResponseMessage {
