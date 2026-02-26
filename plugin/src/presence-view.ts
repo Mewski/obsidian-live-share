@@ -108,7 +108,7 @@ export class PresenceView extends ItemView {
         text: this.getInitial(user.displayName),
       });
       if (HEX_COLOR_RE.test(user.cursorColor)) {
-        avatar.style.backgroundColor = user.cursorColor;
+        avatar.setCssProps({ "--user-color": user.cursorColor });
       }
 
       const info = row.createEl("div", { cls: "live-share-user-info" });

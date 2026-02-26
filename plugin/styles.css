@@ -152,7 +152,7 @@
   width: 28px;
   height: 28px;
   border-radius: 50%;
-  background: var(--interactive-accent);
+  background: var(--user-color, var(--interactive-accent));
   color: #fff;
   display: flex;
   align-items: center;
