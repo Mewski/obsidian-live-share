@@ -95,9 +95,7 @@ export class CollabManager {
     const collabExt = yCollab(docHandle.text, docHandle.awareness, {
       undoManager: false,
     });
-    const extensions: Extension[] = Array.isArray(collabExt)
-      ? [...collabExt]
-      : [collabExt];
+    const extensions: Extension[] = Array.isArray(collabExt) ? [...collabExt] : [collabExt];
     if (permission === "read-only") {
       extensions.push(EditorState.readOnly.of(true));
     }
@@ -106,14 +104,8 @@ export class CollabManager {
     });
 
     const sel = view.state.selection.main;
-    const anchor = Y.createRelativePositionFromTypeIndex(
-      docHandle.text,
-      sel.anchor,
-    );
-    const head = Y.createRelativePositionFromTypeIndex(
-      docHandle.text,
-      sel.head,
-    );
+    const anchor = Y.createRelativePositionFromTypeIndex(docHandle.text, sel.anchor);
+    const head = Y.createRelativePositionFromTypeIndex(docHandle.text, sel.head);
     docHandle.awareness.setLocalStateField("cursor", { anchor, head });
   }
 
