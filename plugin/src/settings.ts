@@ -115,9 +115,7 @@ export class LiveShareSettingTab extends PluginSettingTab {
                 : connectionState === "auth-required"
                   ? "Auth required"
                   : connectionState;
-        s.setName(`${role} · ${stateLabel}`).setDesc(
-          `Room: ${settings.roomId}`,
-        );
+        s.setName(`${role} · ${stateLabel}`).setDesc(`Room: ${settings.roomId}`);
         s.addButton((btn) =>
           btn.setButtonText("Copy invite link").onClick(() => {
             sessionManager.copyInvite();
@@ -173,9 +171,7 @@ export class LiveShareSettingTab extends PluginSettingTab {
               .setPlaceholder("Entire vault")
               .setValue(settings.sharedFolder)
               .onChange(async (value) => {
-                settings.sharedFolder = value
-                  .replace(/^[./\\]+/, "")
-                  .replace(/\.\./g, "");
+                settings.sharedFolder = value.replace(/^[./\\]+/, "").replace(/\.\./g, "");
                 await this.plugin.saveSettings();
               });
             if (active) text.setDisabled(true);
@@ -185,12 +181,10 @@ export class LiveShareSettingTab extends PluginSettingTab {
         s.setName("Require approval")
           .setDesc("Guests must be approved by the host before joining")
           .addToggle((toggle) => {
-            toggle
-              .setValue(settings.requireApproval)
-              .onChange(async (value) => {
-                settings.requireApproval = value;
-                await this.plugin.saveSettings();
-              });
+            toggle.setValue(settings.requireApproval).onChange(async (value) => {
+              settings.requireApproval = value;
+              await this.plugin.saveSettings();
+            });
             if (active) toggle.setDisabled(true);
           });
       });
@@ -207,23 +201,17 @@ export class LiveShareSettingTab extends PluginSettingTab {
       .setHeading("Preferences")
       .addSetting((s) => {
         s.setName("Notifications")
-          .setDesc(
-            "Show status notices for non-critical events like file syncs and follows",
-          )
+          .setDesc("Show status notices for non-critical events like file syncs and follows")
           .addToggle((toggle) =>
-            toggle
-              .setValue(settings.notificationsEnabled)
-              .onChange(async (value) => {
-                settings.notificationsEnabled = value;
-                await this.plugin.saveSettings();
-              }),
+            toggle.setValue(settings.notificationsEnabled).onChange(async (value) => {
+              settings.notificationsEnabled = value;
+              await this.plugin.saveSettings();
+            }),
           );
       })
       .addSetting((s) => {
         s.setName("Auto-reconnect")
-          .setDesc(
-            "Automatically rejoin the previous session when Obsidian starts",
-          )
+          .setDesc("Automatically rejoin the previous session when Obsidian starts")
           .addToggle((toggle) =>
             toggle.setValue(settings.autoReconnect).onChange(async (value) => {
               settings.autoReconnect = value;
@@ -261,17 +249,13 @@ export class LiveShareSettingTab extends PluginSettingTab {
     const advanced = new SettingGroup(containerEl).setHeading("Advanced");
 
     advanced.addSetting((s) => {
-      s.setName("Excluded patterns").setDesc(
-        "Glob patterns for files to exclude from sharing.",
-      );
+      s.setName("Excluded patterns").setDesc("Glob patterns for files to exclude from sharing.");
       s.addButton((btn) =>
         btn
           .setButtonText("Add exclusion")
           .setCta()
           .onClick(async () => {
-            const value = await this.plugin.promptText(
-              "Glob pattern, e.g. *.tmp or drafts/**",
-            );
+            const value = await this.plugin.promptText("Glob pattern, e.g. *.tmp or drafts/**");
             if (value) {
               const trimmed = value.trim();
               if (trimmed && !settings.excludePatterns.includes(trimmed)) {
@@ -292,9 +276,7 @@ export class LiveShareSettingTab extends PluginSettingTab {
             .setIcon("cross")
             .setTooltip("Remove this pattern")
             .onClick(async () => {
-              settings.excludePatterns = settings.excludePatterns.filter(
-                (p) => p !== pattern,
-              );
+              settings.excludePatterns = settings.excludePatterns.filter((p) => p !== pattern);
               await this.plugin.saveSettings();
               this.display();
             }),
