@@ -68,6 +68,12 @@ Host-only operations enforced server-side:
 | Confirmation dialogs | Destructive actions (end session, kick) require user confirmation |
 | Display name sanitization | Empty/whitespace-only display names default to "Anonymous" |
 | Chunk validation | Chunked file assembly verifies all chunks arrived before writing to disk |
+| Shared folder sanitization | Leading `./\` and `..` sequences are stripped from the shared folder path to prevent directory traversal |
+| Display name trimming | Display names from JWT auth are trimmed; whitespace-only names fall back to "Anonymous" |
+| WebSocket send protection | All `ws.send()` calls are wrapped in try-catch to prevent a single failing socket from crashing the server |
+| Log flood protection | Console warnings for unknown message types are rate-limited (max 10) to prevent log flooding |
+| Server password | Optional `SERVER_PASSWORD` env var restricts all REST and WebSocket access (timing-safe comparison) |
+| PORT validation | Server validates the PORT env var is a valid port number (1-65535) at startup |
 
 ## Threat Model
 

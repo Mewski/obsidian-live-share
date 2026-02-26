@@ -34,7 +34,8 @@ npm run format       # Auto-fix formatting
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `PORT` | `4321` | Server port |
+| `PORT` | `4321` | Server port (validated: 1-65535) |
+| `SERVER_PASSWORD` | - | Require this password for all REST and WebSocket connections |
 | `TLS_CERT` | - | Path to TLS certificate (enables HTTPS/WSS) |
 | `TLS_KEY` | - | Path to TLS private key |
 | `REQUIRE_GITHUB_AUTH` | `false` | Require GitHub OAuth for all connections |
@@ -104,7 +105,8 @@ The server handles `SIGTERM` and `SIGINT`: closes all WebSocket connections, the
 
 For production, ensure:
 
-1. Set `JWT_SECRET` to a strong random value
-2. Enable TLS via `TLS_CERT`/`TLS_KEY` or run behind a reverse proxy (nginx, Caddy)
-3. Use a process manager (systemd, pm2) to keep the server running
-4. Back up the `./data/` directory for persistence
+1. Set `JWT_SECRET` to a strong random value (the server warns at startup if unset, and exits if `REQUIRE_GITHUB_AUTH` is enabled without it)
+2. Set `SERVER_PASSWORD` to restrict access to authorized clients
+3. Enable TLS via `TLS_CERT`/`TLS_KEY` or run behind a reverse proxy (nginx, Caddy)
+4. Use a process manager (systemd, pm2) to keep the server running
+5. Back up the `./data/` directory for persistence

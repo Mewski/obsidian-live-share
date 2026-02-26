@@ -21,6 +21,12 @@ Real-time collaborative editing for [Obsidian](https://obsidian.md). Share your 
 - **Reload from host**: Guests can re-download all files from the host
 - **File exclusion**: Configure `.liveshare.json` to exclude files from sharing
 - **Latency monitoring**: Ping/pong latency shown in the status bar
+- **Notification control**: Toggle non-critical status notices on or off in settings
+- **Debug logging**: Optional timestamped debug log written to a file in your vault
+- **Auto-reconnect**: Optionally rejoin the previous session automatically when Obsidian starts
+- **Join via link**: Open `obsidian://live-share?invite=...` links to join sessions directly
+- **Ribbon context menu**: Right-click the collaborators icon for quick access to session actions
+- **Session actions in settings**: Start, join, end, or leave sessions directly from the settings tab
 - **Fail-fast connections**: Connection drops immediately end the session and clean up all resources
 
 ## Quick Start
@@ -28,7 +34,7 @@ Real-time collaborative editing for [Obsidian](https://obsidian.md). Share your 
 ### Prerequisites
 
 - Node.js 18+ and npm
-- Obsidian 1.5.0+
+- Obsidian 1.11.0+
 
 ### 1. Start the Server
 
@@ -57,7 +63,7 @@ cp plugin/main.js plugin/manifest.json plugin/styles.css \
    /path/to/vault/.obsidian/plugins/obsidian-live-share/
 ```
 
-Open Obsidian, go to **Settings > Community Plugins**, and enable **Obsidian Live Share**.
+Open Obsidian, go to **Settings > Community Plugins**, and enable **Live Share**.
 
 ### 3. Configure
 
@@ -68,6 +74,9 @@ Open **Settings > Live Share** and set:
 - **Cursor color**: Pick your cursor color using the color picker
 - **Shared folder**: Subfolder to share (leave empty for the whole vault)
 - **Require approval**: Require host approval for guests to join (off by default)
+- **Notifications**: Toggle non-critical status notices (on by default)
+- **Auto-reconnect**: Automatically rejoin the previous session on startup (on by default)
+- **Debug logging**: Write timestamped debug logs to a file in your vault (off by default)
 
 ### 4. Start Collaborating
 
@@ -123,7 +132,8 @@ The host's local vault is the single source of truth. Text files sync character-
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `PORT` | `4321` | Server port |
+| `PORT` | `4321` | Server port (1-65535) |
+| `SERVER_PASSWORD` | - | Require this password for all REST and WebSocket connections |
 | `TLS_CERT` | - | Path to TLS certificate (enables HTTPS/WSS) |
 | `TLS_KEY` | - | Path to TLS private key |
 | `REQUIRE_GITHUB_AUTH` | `false` | Require GitHub OAuth for all connections |
@@ -140,13 +150,13 @@ See [Server Setup](docs/server.md) for TLS, OAuth, persistence, and deployment d
 # Server
 cd server
 npm run dev          # Dev server with auto-reload
-npm test             # 63 tests
+npm test             # 79 tests
 npm run lint         # Biome linter
 
 # Plugin
 cd plugin
 npm run dev          # Watch mode (esbuild)
-npm test             # 226 tests
+npm test             # 268 tests
 npm run lint         # Biome linter
 ```
 

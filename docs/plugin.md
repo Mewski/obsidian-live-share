@@ -17,7 +17,7 @@ mkdir -p /path/to/vault/.obsidian/plugins/obsidian-live-share
 cp main.js manifest.json styles.css /path/to/vault/.obsidian/plugins/obsidian-live-share/
 ```
 
-Open Obsidian, go to **Settings > Community Plugins**, and enable **Obsidian Live Share**.
+Open Obsidian, go to **Settings > Community Plugins**, and enable **Live Share**.
 
 ## Configuration
 
@@ -30,8 +30,12 @@ Open **Settings > Live Share**:
 | **Cursor color** | Pick your cursor color using the color picker |
 | **Shared folder** | Subfolder to share (leave empty for the whole vault) |
 | **Require approval** | When enabled, guests must be approved by the host before joining. The host can grant read-write or read-only access, or deny the request. |
+| **Notifications** | Show status notices for non-critical events like file syncs and follows (on by default) |
+| **Auto-reconnect** | Automatically rejoin the previous session when Obsidian starts (on by default) |
+| **Debug logging** | Write timestamped debug logs to a file in your vault (off by default) |
+| **Debug log file** | Path within your vault for the debug log (default: `live-share-debug.md`) |
 
-When a session is active, the settings page also shows the connection state, room ID, token, and encryption status.
+When a session is active, the settings page also shows the connection state, room ID, and encryption status. You can copy the invite link or end/leave the session directly from the settings tab.
 
 ## Commands
 
@@ -75,6 +79,24 @@ The collaborators panel (right sidebar) shows each connected user with:
 - **Permission toggle** (host only): Toggle a guest between read-write and read-only. Takes effect immediately.
 - **Summon button** (host only): Navigate that specific user to your cursor
 - **Kick button** (host only): Remove the user from the session (asks for confirmation)
+
+## Ribbon Icon
+
+Click the collaborators icon in the left ribbon to open the presence panel. **Right-click** the icon for a context menu with quick actions:
+
+- **No active session**: Start session, Join session
+- **In session**: Copy invite link, Show collaborators, End/Leave session
+- **Always**: Settings
+
+## Join via Link
+
+You can join a session by opening a protocol link in the format:
+
+```
+obsidian://live-share?invite=obsliveshare%3A...
+```
+
+This is useful for sharing invite links that open directly in Obsidian when clicked.
 
 ## Status Bar
 

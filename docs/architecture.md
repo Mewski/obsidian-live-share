@@ -39,7 +39,7 @@ Each session uses two WebSocket channels:
 
 | Component | File | Responsibility |
 |-----------|------|----------------|
-| Main plugin | `main.ts` | Commands, vault event handlers, session lifecycle, presentation mode |
+| Main plugin | `main.ts` | Commands, vault event handlers, session lifecycle, presentation mode, ribbon menu, protocol handlers |
 | Background sync | `background-sync.ts` | Yjs observer-based sync for non-active text files, disk writes |
 | Control channel | `control-ws.ts` | WebSocket client with ping/pong latency, E2E encryption |
 | File operations | `file-ops.ts` | Remote op application, per-path suppression, chunked transfer |
@@ -52,8 +52,9 @@ Each session uses two WebSocket channels:
 | Connection state | `connection-state.ts` | State machine for connection lifecycle |
 | Crypto | `crypto.ts` | AES-256-GCM encryption with PBKDF2 key derivation |
 | Session | `session.ts` | Room creation/join, invite link encoding/parsing |
-| Settings | `settings.ts` | Plugin settings UI |
-| Auth | `auth.ts` | GitHub OAuth token handling |
+| Debug logger | `debug-logger.ts` | Optional timestamped debug log written to a vault file |
+| Settings | `settings.ts` | Plugin settings UI with session actions |
+| Auth | `auth.ts` | GitHub OAuth token handling with protocol handler support |
 | Exclusion | `exclusion.ts` | File exclusion patterns from `.liveshare.json` |
 | Types | `types.ts` | Shared type definitions and default settings |
 | Utils | `utils.ts` | Path normalization, line ending normalization, file type detection |
