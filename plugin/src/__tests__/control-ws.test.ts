@@ -57,6 +57,7 @@ function createSettings(overrides?: Partial<LiveShareSettings>): LiveShareSettin
     debugLogging: false,
     debugLogPath: "live-share-debug.md",
     autoReconnect: true,
+    excludePatterns: [],
     ...overrides,
   };
 }

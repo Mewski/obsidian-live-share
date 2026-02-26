@@ -1,4 +1,4 @@
-import { type App, PluginSettingTab, SettingGroup } from "obsidian";
+import { type App, PluginSettingTab, Setting, SettingGroup } from "obsidian";
 import type LiveSharePlugin from "./main";
 
 export class LiveShareSettingTab extends PluginSettingTab {
@@ -246,10 +246,48 @@ export class LiveShareSettingTab extends PluginSettingTab {
           );
       });
 
-    new SettingGroup(containerEl).setHeading("Advanced").addSetting((s) => {
-      s.setName("File exclusion").setDesc(
-        'To exclude files from sharing, create a .liveshare.json file in your vault root with an "exclude" array of glob patterns. For example: { "exclude": ["*.tmp", "drafts/**", "private/**"] }. The .obsidian and .trash folders are always excluded.',
+    const advanced = new SettingGroup(containerEl).setHeading("Advanced");
+
+    advanced.addSetting((s) => {
+      s.setName("Excluded patterns").setDesc(
+        "Glob patterns for files to exclude from sharing. .obsidian and .trash are always excluded.",
+      );
+      let inputValue = "";
+      s.addText((text) => {
+        text.setPlaceholder("e.g. *.tmp, drafts/**").onChange((value) => {
+          inputValue = value;
+        });
+        text.inputEl.addEventListener("keydown", (e) => {
+          if (e.key === "Enter") {
+            e.preventDefault();
+            const trimmed = inputValue.trim();
+            if (trimmed && !settings.excludePatterns.includes(trimmed)) {
+              settings.excludePatterns.push(trimmed);
+              this.plugin.saveSettings().then(() => this.display());
+            }
+          }
+        });
+      });
+      s.addButton((btn) =>
+        btn.setButtonText("Add").onClick(async () => {
+          const trimmed = inputValue.trim();
+          if (trimmed && !settings.excludePatterns.includes(trimmed)) {
+            settings.excludePatterns.push(trimmed);
+            await this.plugin.saveSettings();
+            this.display();
+          }
+        }),
       );
     });
+
+    for (const pattern of settings.excludePatterns) {
+      new Setting(containerEl).setName(pattern).addExtraButton((btn) =>
+        btn.setIcon("x").onClick(async () => {
+          settings.excludePatterns = settings.excludePatterns.filter((p) => p !== pattern);
+          await this.plugin.saveSettings();
+          this.display();
+        }),
+      );
+    }
   }
 }

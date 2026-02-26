@@ -1,28 +1,12 @@
 import { minimatch } from "minimatch";
-import { Notice, type TFile, type Vault } from "obsidian";
 
-export interface LiveShareConfig {
-  exclude: string[];
-}
-
-const DEFAULT_EXCLUDES = [".obsidian/**", ".liveshare.json", ".trash/**"];
+const DEFAULT_EXCLUDES = [".obsidian/**", ".trash/**"];
 
 export class ExclusionManager {
   private patterns: string[] = [...DEFAULT_EXCLUDES];
 
-  async loadConfig(vault: Vault): Promise<void> {
-    try {
-      const file = vault.getAbstractFileByPath(".liveshare.json");
-      if (file && "stat" in file) {
-        const content = await vault.read(file as TFile);
-        const config = JSON.parse(content) as LiveShareConfig;
-        if (Array.isArray(config.exclude)) {
-          this.patterns = [...DEFAULT_EXCLUDES, ...config.exclude];
-        }
-      }
-    } catch {
-      new Notice("Live Share: .liveshare.json has invalid syntax");
-    }
+  setPatterns(custom: string[]): void {
+    this.patterns = [...DEFAULT_EXCLUDES, ...custom];
   }
 
   isExcluded(path: string): boolean {

@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 import { ExclusionManager } from "../exclusion";
 
 describe("ExclusionManager", () => {
@@ -17,10 +17,6 @@ describe("ExclusionManager", () => {
       expect(manager.isExcluded(".obsidian/plugins/foo/main.js")).toBe(true);
     });
 
-    it("excludes .liveshare.json (exact match)", () => {
-      expect(manager.isExcluded(".liveshare.json")).toBe(true);
-    });
-
     it("excludes .trash/deleted.md", () => {
       expect(manager.isExcluded(".trash/deleted.md")).toBe(true);
     });
@@ -36,44 +32,41 @@ describe("ExclusionManager", () => {
     it("does not exclude a deeply nested normal file", () => {
       expect(manager.isExcluded("folder/subfolder/note.md")).toBe(false);
     });
+
+    it("does not exclude .liveshare.json by default", () => {
+      expect(manager.isExcluded(".liveshare.json")).toBe(false);
+    });
   });
 
-  describe("loadConfig with custom patterns", () => {
-    it("merges custom exclude patterns with defaults", async () => {
-      const mockVault = {
-        getAbstractFileByPath: (path: string) => {
-          if (path === ".liveshare.json") return { stat: {} };
-          return null;
-        },
-        read: vi.fn(async () => JSON.stringify({ exclude: ["*.tmp", "drafts/**"] })),
-      };
-
-      await manager.loadConfig(mockVault as any);
+  describe("setPatterns", () => {
+    it("merges custom patterns with defaults", () => {
+      manager.setPatterns(["*.tmp", "drafts/**"]);
 
       expect(manager.isExcluded("test.tmp")).toBe(true);
       expect(manager.isExcluded("drafts/wip.md")).toBe(true);
 
       expect(manager.isExcluded(".obsidian/config")).toBe(true);
-      expect(manager.isExcluded(".liveshare.json")).toBe(true);
       expect(manager.isExcluded(".trash/deleted.md")).toBe(true);
 
       expect(manager.isExcluded("notes/hello.md")).toBe(false);
     });
-  });
 
-  describe("loadConfig with missing config file", () => {
-    it("uses default patterns when .liveshare.json does not exist", async () => {
-      const mockVault = {
-        getAbstractFileByPath: () => null,
-        read: vi.fn(),
-      };
-
-      await manager.loadConfig(mockVault as any);
-
-      expect(mockVault.read).not.toHaveBeenCalled();
+    it("works with an empty array (defaults only)", () => {
+      manager.setPatterns([]);
 
       expect(manager.isExcluded(".obsidian/config")).toBe(true);
+      expect(manager.isExcluded(".trash/deleted.md")).toBe(true);
       expect(manager.isExcluded("notes/hello.md")).toBe(false);
+    });
+
+    it("can be called multiple times to replace custom patterns", () => {
+      manager.setPatterns(["*.tmp"]);
+      expect(manager.isExcluded("test.tmp")).toBe(true);
+      expect(manager.isExcluded("private/secret.md")).toBe(false);
+
+      manager.setPatterns(["private/**"]);
+      expect(manager.isExcluded("test.tmp")).toBe(false);
+      expect(manager.isExcluded("private/secret.md")).toBe(true);
     });
   });
 });

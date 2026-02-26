@@ -170,6 +170,22 @@ export default class LiveSharePlugin extends Plugin {
       await this.saveData(this.settings);
     }
 
+    if (this.settings.excludePatterns.length === 0) {
+      try {
+        const configFile = this.app.vault.getAbstractFileByPath(".liveshare.json");
+        if (configFile && configFile instanceof TFile) {
+          const content = await this.app.vault.read(configFile);
+          const config = JSON.parse(content);
+          if (Array.isArray(config.exclude) && config.exclude.length > 0) {
+            this.settings.excludePatterns = config.exclude;
+            await this.saveData(this.settings);
+          }
+        }
+      } catch {
+        // ignore malformed .liveshare.json during migration
+      }
+    }
+
     this.syncManager = new SyncManager(this.settings);
     this.collabManager = new CollabManager();
     this.fileOpsManager = new FileOpsManager(this.app.vault);
@@ -177,7 +193,7 @@ export default class LiveSharePlugin extends Plugin {
     this.manifestManager = new ManifestManager(this.app.vault, this.settings);
     this.authManager = new AuthManager(this);
     this.exclusionManager = new ExclusionManager();
-    await this.exclusionManager.loadConfig(this.app.vault);
+    this.exclusionManager.setPatterns(this.settings.excludePatterns);
     this.manifestManager.setExclusionManager(this.exclusionManager);
     this.backgroundSync = new BackgroundSync(
       this.app.vault,
@@ -422,13 +438,6 @@ export default class LiveSharePlugin extends Plugin {
 
     this.registerEvent(
       this.app.vault.on("modify", async (file: TAbstractFile) => {
-        if (file.path === ".liveshare.json") {
-          await this.exclusionManager.loadConfig(this.app.vault);
-          if (this.settings.role === "host") {
-            await this.manifestManager.publishManifest({ purge: true });
-          }
-          return;
-        }
         if (!(file instanceof TFile) || !this.manifestManager.isSharedPath(file.path)) return;
         if (this.fileOpsManager.isPathMuted(file.path)) return;
 
@@ -553,6 +562,7 @@ export default class LiveSharePlugin extends Plugin {
     this.syncManager.updateSettings(this.settings);
     this.manifestManager.updateSettings(this.settings);
     this.logger.updateSettings(this.settings.debugLogging, this.settings.debugLogPath);
+    this.exclusionManager.setPatterns(this.settings.excludePatterns);
   }
 
   notify(msg: string): void {

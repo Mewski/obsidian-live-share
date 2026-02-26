@@ -22,6 +22,7 @@ export interface LiveShareSettings {
   debugLogging: boolean;
   debugLogPath: string;
   autoReconnect: boolean;
+  excludePatterns: string[];
 }
 
 export const DEFAULT_SETTINGS: LiveShareSettings = {
@@ -44,6 +45,7 @@ export const DEFAULT_SETTINGS: LiveShareSettings = {
   debugLogging: false,
   debugLogPath: "live-share-debug.md",
   autoReconnect: true,
+  excludePatterns: [],
 };
 
 export interface FileCreateOp {
