@@ -87,6 +87,16 @@
   opacity: 0.3;
 }
 
+.cm-ySelectionInfo {
+  opacity: 1 !important;
+  transition-delay: 0s !important;
+  font-family: var(--font-interface) !important;
+  font-size: 0.7em !important;
+  padding: 1px 4px !important;
+  border-radius: 3px 3px 3px 0 !important;
+  pointer-events: none;
+}
+
 /* Presence panel */
 .live-share-presence-panel {
   padding: var(--size-4-1) var(--size-4-3) var(--size-4-6);

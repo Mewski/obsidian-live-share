@@ -9,6 +9,7 @@ describe("types", () => {
     expect(DEFAULT_SETTINGS.token).toBe("");
     expect(DEFAULT_SETTINGS.displayName).toBe("Anonymous");
     expect(DEFAULT_SETTINGS.cursorColor).toMatch(/^#/);
+    expect(DEFAULT_SETTINGS.serverPassword).toBe("");
   });
 
   it("FileOp union types are assignable", () => {

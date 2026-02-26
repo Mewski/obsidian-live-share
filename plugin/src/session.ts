@@ -21,11 +21,16 @@ export class SessionManager {
     const { settings } = this.plugin;
     const baseUrl = settings.serverUrl.replace(/\/+$/, "");
 
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+    };
+    if (settings.serverPassword) headers["X-Server-Password"] = settings.serverPassword;
+
     let createResponse: Response;
     try {
       createResponse = await fetch(`${baseUrl}/rooms`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers,
         body: JSON.stringify({
           hostUserId: settings.githubUserId || settings.clientId,
           requireApproval: settings.requireApproval,
@@ -68,11 +73,16 @@ export class SessionManager {
     const { settings } = this.plugin;
     const baseUrl = parsedInvite.s.replace(/\/+$/, "");
 
+    const joinHeaders: Record<string, string> = {
+      "Content-Type": "application/json",
+    };
+    if (settings.serverPassword) joinHeaders["X-Server-Password"] = settings.serverPassword;
+
     let joinResponse: Response;
     try {
       joinResponse = await fetch(`${baseUrl}/rooms/${parsedInvite.r}/join`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: joinHeaders,
         body: JSON.stringify({ token: parsedInvite.t }),
       });
     } catch {
@@ -101,10 +111,14 @@ export class SessionManager {
 
     if (settings.role === "host" && settings.roomId && settings.token) {
       const baseUrl = settings.serverUrl.replace(/\/+$/, "");
+      const deleteHeaders: Record<string, string> = {
+        Authorization: `Bearer ${settings.token}`,
+      };
+      if (settings.serverPassword) deleteHeaders["X-Server-Password"] = settings.serverPassword;
       try {
         await fetch(`${baseUrl}/rooms/${settings.roomId}`, {
           method: "DELETE",
-          headers: { Authorization: `Bearer ${settings.token}` },
+          headers: deleteHeaders,
         });
       } catch {}
     }

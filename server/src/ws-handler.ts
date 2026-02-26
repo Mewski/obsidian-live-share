@@ -242,8 +242,8 @@ export function createYjsWSS() {
     });
   });
 
-  function closeAllRooms() {
-    for (const [roomId, state] of roomStates) {
+  function closeAll() {
+    for (const state of roomStates.values()) {
       if (state.cleanupTimer) clearTimeout(state.cleanupTimer);
       for (const client of state.clients) {
         client.ws.close(1000, "server shutting down");
@@ -284,7 +284,7 @@ export function createYjsWSS() {
     }
   }
 
-  return { muxWss, closeAllRooms, getStats, updatePermission };
+  return { muxWss, closeAll, getStats, updatePermission };
 }
 
 function extractDocId(roomId: string): string {

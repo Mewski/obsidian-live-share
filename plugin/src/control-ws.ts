@@ -79,6 +79,8 @@ export class ControlChannel {
     const wsUrl = toWsUrl(this.settings.serverUrl);
     let url = `${wsUrl}/control/${this.settings.roomId}?token=${encodeURIComponent(this.settings.token)}`;
     if (this.settings.jwt) url += `&jwt=${encodeURIComponent(this.settings.jwt)}`;
+    if (this.settings.serverPassword)
+      url += `&password=${encodeURIComponent(this.settings.serverPassword)}`;
 
     this.ws = new WebSocket(url);
 

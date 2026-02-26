@@ -198,6 +198,7 @@ export class SyncManager {
     const wsUrl = toWsUrl(this.settings.serverUrl);
     const params = new URLSearchParams({ token: this.settings.token });
     if (this.settings.jwt) params.set("jwt", this.settings.jwt);
+    if (this.settings.serverPassword) params.set("password", this.settings.serverPassword);
     const userId = this.settings.githubUserId || this.settings.clientId;
     if (userId) params.set("userId", userId);
 

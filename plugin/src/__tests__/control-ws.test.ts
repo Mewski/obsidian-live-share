@@ -51,6 +51,7 @@ function createSettings(overrides?: Partial<LiveShareSettings>): LiveShareSettin
     encryptionPassphrase: "",
     permission: "read-write",
     requireApproval: false,
+    serverPassword: "",
     clientId: "test-client-id",
     ...overrides,
   };

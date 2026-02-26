@@ -14,6 +14,7 @@ import { safeTokenCompare } from "./util.js";
 import { createYjsWSS } from "./ws-handler.js";
 
 const REQUIRE_GITHUB_AUTH = process.env.REQUIRE_GITHUB_AUTH === "true";
+const SERVER_PASSWORD = process.env.SERVER_PASSWORD || "";
 
 export function createApp(
   persistence?: Persistence,
@@ -38,6 +39,16 @@ export function createApp(
     max: 10,
     standardHeaders: true,
   });
+  if (SERVER_PASSWORD) {
+    app.use("/rooms", (req, res, next) => {
+      const provided = req.headers["x-server-password"];
+      if (typeof provided !== "string" || !safeTokenCompare(provided, SERVER_PASSWORD)) {
+        res.status(401).json({ error: "invalid server password" });
+        return;
+      }
+      next();
+    });
+  }
   app.use("/rooms", limiter, roomRouter);
   app.use("/auth", authLimiter, createAuthRouter());
 
@@ -63,6 +74,14 @@ export function createApp(
 
   server.on("upgrade", (req, socket, head) => {
     const url = new URL(req.url || "", `http://${req.headers.host}`);
+
+    if (SERVER_PASSWORD) {
+      const provided = url.searchParams.get("password");
+      if (!provided || !safeTokenCompare(provided, SERVER_PASSWORD)) {
+        socket.destroy();
+        return;
+      }
+    }
 
     const muxMatch = url.pathname.match(/^\/ws-mux\/(.+)$/);
     if (muxMatch) {
@@ -126,7 +145,7 @@ export function createApp(
     console.info("[server] shutting down gracefully...");
     clearInterval(reaperInterval);
     control.closeAll();
-    yjs.closeAllRooms();
+    yjs.closeAll();
     if (persistence) await persistence.close();
     server.close();
   }

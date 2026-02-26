@@ -332,9 +332,9 @@ export function createControlWSS(options?: ControlWSSOptions) {
   });
 
   function closeAll() {
-    for (const [, room] of rooms) {
+    for (const room of rooms.values()) {
       if (room.cleanupTimer) clearTimeout(room.cleanupTimer);
-      for (const [ws] of room.clients) {
+      for (const ws of room.clients.keys()) {
         ws.close(1000, "server shutting down");
       }
     }
