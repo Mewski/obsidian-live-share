@@ -155,9 +155,8 @@ roomRouter.delete("/:id", async (req, res) => {
     return;
   }
 
-  rooms.delete(req.params.id);
   clearRoomPermissions(req.params.id);
-  await persistence.deleteRoom(req.params.id);
+  await removeRoom(req.params.id);
 
   res.json({ ok: true });
 });

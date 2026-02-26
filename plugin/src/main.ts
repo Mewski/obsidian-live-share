@@ -783,6 +783,14 @@ export default class LiveSharePlugin extends Plugin {
       this.logger.log("connection", `control channel ${controlState}`);
       if (controlState === "connected") {
         this.connectionState.transition({ type: "connected" });
+        if (this.settings.role === "guest") {
+          this.controlChannel?.send({
+            type: "join-request",
+            userId: this.userId,
+            displayName: this.settings.displayName,
+            avatarUrl: this.settings.avatarUrl,
+          });
+        }
         this.broadcastPresence();
         if (this.backgroundSync.isRunning()) {
           this.onActiveFileChange();
@@ -850,7 +858,9 @@ export default class LiveSharePlugin extends Plugin {
             this.manifestManager.renameFile(renameOp.oldPath, renameOp.newPath, this.syncManager);
           }
         })
-        .catch(() => {});
+        .catch((err) => {
+          this.logger.error("file-op", "failed to apply remote file-op", err);
+        });
     });
     for (const chunkType of ["file-chunk-start", "file-chunk-data", "file-chunk-end"] as const) {
       this.controlChannel.on(chunkType, (msg) => {
@@ -860,7 +870,9 @@ export default class LiveSharePlugin extends Plugin {
             ...msg,
             type: CONTROL_TO_CHUNK[chunkType],
           } as FileOp)
-          .catch(() => {});
+          .catch((err) => {
+            this.logger.error("file-op", `failed to apply remote ${chunkType}`, err);
+          });
       });
     }
     this.controlChannel.on("presence-update", (msg) => {
@@ -992,15 +1004,6 @@ export default class LiveSharePlugin extends Plugin {
       new Notice("Live Share: the host ended the session");
       this.endSession();
     });
-
-    if (this.settings.role === "guest") {
-      this.controlChannel.send({
-        type: "join-request",
-        userId: this.userId,
-        displayName: this.settings.displayName,
-        avatarUrl: this.settings.avatarUrl,
-      });
-    }
 
     this.broadcastPresence();
     if (this.presenceInterval) clearInterval(this.presenceInterval);

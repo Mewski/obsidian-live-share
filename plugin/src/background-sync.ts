@@ -1,4 +1,4 @@
-import type { Vault } from "obsidian";
+import { Notice, type Vault } from "obsidian";
 import type * as Y from "yjs";
 
 import type { FileOpsManager } from "./file-ops";
@@ -47,7 +47,9 @@ export class BackgroundSync {
       if (!isTextFile(path) || entry.binary) continue;
       try {
         await this.subscribe(path);
-      } catch {}
+      } catch {
+        new Notice(`Live Share: failed to sync ${path}`);
+      }
     }
   }
 
@@ -298,6 +300,7 @@ export class BackgroundSync {
       await this.vault.adapter.write(path, content);
       this.lastWrittenContent.set(path, content);
     } catch {
+      new Notice(`Live Share: failed to write ${path}`);
     } finally {
       setTimeout(() => {
         this.recentDiskWrites.delete(path);

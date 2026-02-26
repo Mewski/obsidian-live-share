@@ -218,15 +218,17 @@ export function createControlWSS(options?: ControlWSSOptions) {
       }
 
       if (msg.type === "join-response" && client.isHost) {
-        const targetUserId = msg.userId as string;
+        const targetUserId = msg.userId;
+        if (typeof targetUserId !== "string" || !targetUserId) return;
+        if (typeof msg.approved !== "boolean") return;
         const targetWs = room.pendingApprovals.get(targetUserId);
         if (targetWs) {
           room.pendingApprovals.delete(targetUserId);
           const targetClient = room.clients.get(targetWs);
           if (targetClient) {
-            targetClient.isApproved = msg.approved as boolean;
-            if (msg.permission) {
-              targetClient.permission = msg.permission as Permission;
+            targetClient.isApproved = msg.approved;
+            if (msg.permission === "read-write" || msg.permission === "read-only") {
+              targetClient.permission = msg.permission;
             }
             if (targetClient.isApproved && targetClient.userId) {
               setPermission(roomId, targetClient.userId, targetClient.permission);

@@ -20,6 +20,7 @@ import { normalizePath, toWsUrl } from "./utils";
 const SYNC_STEP2 = 1;
 const RECONNECT_BASE_MS = 100;
 const RECONNECT_MAX_MS = 30_000;
+const MAX_RECONNECT_ATTEMPTS = 15;
 
 export interface DocHandle {
   doc: Y.Doc;
@@ -237,6 +238,10 @@ export class SyncManager {
 
   private scheduleReconnect(): void {
     if (this.reconnectTimer) return;
+    if (this.reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
+      this.shouldConnect = false;
+      return;
+    }
     const delay = Math.min(RECONNECT_BASE_MS * 2 ** this.reconnectAttempts, RECONNECT_MAX_MS);
     this.reconnectAttempts++;
     this.reconnectTimer = setTimeout(() => {
