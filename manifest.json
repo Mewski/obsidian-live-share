@@ -1,1 +1,10 @@
-plugin/manifest.json
+{
+  "id": "live-share",
+  "name": "Live Share",
+  "version": "0.3.3",
+  "minAppVersion": "1.11.0",
+  "description": "Real-time collaborative editing.",
+  "author": "Mewski",
+  "authorUrl": "https://github.com/Mewski",
+  "isDesktopOnly": true
+}
