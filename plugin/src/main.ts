@@ -461,7 +461,8 @@ export default class LiveSharePlugin extends Plugin {
         const payload = parseJwtPayload(token);
         this.settings.jwt = token;
         this.settings.githubUserId = payload.sub;
-        this.settings.displayName = payload.displayName || payload.username;
+        this.settings.displayName =
+          (payload.displayName || payload.username || "").trim() || "Anonymous";
         this.settings.avatarUrl = payload.avatar || "";
         await this.saveSettings();
         new Notice(`Live Share: authenticated as ${this.settings.displayName}`);

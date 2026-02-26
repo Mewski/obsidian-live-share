@@ -141,31 +141,32 @@ export function createAuthRouter(): Router {
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="color-scheme" content="dark light">
-<title>Live Share Auth</title>
+<title>Live Share - Authenticated</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
-body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;min-height:100vh;display:flex;align-items:center;justify-content:center;background:#1e1e2e;color:#cdd6f4}
-@media(prefers-color-scheme:light){body{background:#eff1f5;color:#4c4f69}.card{background:#fff;border-color:#ccd0da}.token-input{background:#e6e9ef;border-color:#ccd0da;color:#4c4f69}.fallback{color:#6c6f85}.copy-btn{background:#313244;color:#cdd6f4}.copy-btn:hover{background:#45475a}}
-.card{max-width:420px;width:100%;margin:24px;padding:40px 32px;background:#313244;border:1px solid #45475a;border-radius:16px;text-align:center}
-.avatar{width:80px;height:80px;border-radius:50%;margin:0 auto 20px;border:3px solid #7c3aed}
-h1{font-size:20px;font-weight:600;margin-bottom:4px}
-.username{font-size:14px;color:#a6adc8;margin-bottom:28px}
-.open-btn{display:inline-block;padding:12px 32px;background:#7c3aed;color:#fff;border-radius:8px;text-decoration:none;font-weight:600;font-size:15px;transition:background .15s}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",sans-serif;min-height:100vh;display:flex;align-items:center;justify-content:center;background:#1e1e1e;color:#dcddde}
+@media(prefers-color-scheme:light){body{background:#f6f6f6;color:#2e3338}.card{background:#fff;border-color:#e0e0e0}.token-input{background:#f0f0f0;border-color:#ddd;color:#2e3338}.fallback{color:#888}.copy-btn{background:#e8e8e8;color:#2e3338}.copy-btn:hover{background:#ddd}.close-msg{color:#888}}
+.card{max-width:400px;width:100%;margin:24px;padding:36px 28px;background:#262626;border:1px solid #3a3a3a;border-radius:12px;text-align:center}
+.avatar{width:72px;height:72px;border-radius:50%;margin:0 auto 16px;border:2px solid #7c3aed}
+h1{font-size:18px;font-weight:600;margin-bottom:2px}
+.subtitle{font-size:13px;color:#999;margin-bottom:24px}
+.open-btn{display:inline-block;padding:10px 28px;background:#7c3aed;color:#fff;border-radius:4px;text-decoration:none;font-weight:600;font-size:14px;transition:background .15s}
 .open-btn:hover{background:#6d28d9}
-.fallback{font-size:12px;color:#6c7086;margin-top:28px;margin-bottom:10px}
-.token-row{display:flex;gap:8px}
-.token-input{flex:1;padding:8px 12px;font-size:13px;font-family:monospace;background:#1e1e2e;border:1px solid #45475a;border-radius:6px;color:#cdd6f4;outline:none;min-width:0}
-.copy-btn{padding:8px 14px;background:#45475a;color:#cdd6f4;border:none;border-radius:6px;cursor:pointer;font-size:13px;white-space:nowrap;transition:background .15s}
-.copy-btn:hover{background:#585b70}
-.check{color:#a6e3a1}
+.fallback{font-size:11px;color:#666;margin-top:24px;margin-bottom:8px}
+.token-row{display:flex;gap:6px}
+.token-input{flex:1;padding:6px 10px;font-size:12px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;background:#1e1e1e;border:1px solid #3a3a3a;border-radius:4px;color:#dcddde;outline:none;min-width:0}
+.copy-btn{padding:6px 12px;background:#3a3a3a;color:#dcddde;border:none;border-radius:4px;cursor:pointer;font-size:12px;white-space:nowrap;transition:background .15s}
+.copy-btn:hover{background:#4a4a4a}
+.check{color:#50c878}
+.close-msg{margin-top:16px;font-size:13px;color:#999}
 </style>
 </head>
 <body>
 <div class="card">
   <img class="avatar" src="${safeAvatar}" alt="">
   <h1>${safeName}</h1>
-  <p class="username">Signed in with GitHub</p>
-  <a class="open-btn" href="${obsidianUri}">Open in Obsidian</a>
+  <p class="subtitle">Authenticated with GitHub</p>
+  <a class="open-btn" id="open" href="${obsidianUri}">Open in Obsidian</a>
   <p class="fallback">If the button doesn't work, copy the token and paste it in Obsidian:</p>
   <div class="token-row">
     <input class="token-input" id="token" readonly value=${JSON.stringify(jwtToken)} onclick="this.select()">
@@ -176,9 +177,10 @@ h1{font-size:20px;font-weight:600;margin-bottom:4px}
 setTimeout(()=>{
   location.href=${JSON.stringify(obsidianUri)};
   setTimeout(()=>{
-    document.querySelector('.open-btn').textContent='Redirected!';
+    document.getElementById('open').textContent='Redirected';
+    document.getElementById('open').style.background='#50c878';
     document.querySelector('.card').insertAdjacentHTML('beforeend',
-      '<p style="margin-top:20px;font-size:14px;color:#a6adc8">You can close this tab.</p>');
+      '<p class="close-msg">You can close this tab.</p>');
     try{window.close()}catch{}
   },500);
 },300);
