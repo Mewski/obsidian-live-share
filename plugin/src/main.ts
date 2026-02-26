@@ -492,6 +492,7 @@ export default class LiveSharePlugin extends Plugin {
     this.registerObsidianProtocolHandler("live-share-auth", async (params) => {
       const token = params.token;
       if (!token) return;
+      if (this.authManager.completeAuth(token)) return;
       try {
         const payload = parseJwtPayload(token);
         this.settings.jwt = token;

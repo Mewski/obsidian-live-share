@@ -5,7 +5,11 @@ export class PromptModal extends Modal {
   private placeholder: string;
   private resolve: (value: string | null) => void;
 
-  constructor(app: App, placeholder: string, resolve: (value: string | null) => void) {
+  constructor(
+    app: App,
+    placeholder: string,
+    resolve: (value: string | null) => void,
+  ) {
     super(app);
     this.setTitle("Live Share");
     this.placeholder = placeholder;
@@ -33,6 +37,11 @@ export class PromptModal extends Modal {
       this.close();
     });
     input.focus();
+  }
+
+  closeWithValue(value: string | null) {
+    this.result = value;
+    this.close();
   }
 
   onClose() {

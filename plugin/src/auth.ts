@@ -1,29 +1,55 @@
 import { Notice } from "obsidian";
 import type LiveSharePlugin from "./main";
+import { PromptModal } from "./modals";
 import { parseJwtPayload } from "./utils";
 
 export class AuthManager {
+  private pendingModal: PromptModal | null = null;
+
   constructor(private plugin: LiveSharePlugin) {}
 
   get isAuthenticated(): boolean {
     return !!this.plugin.settings.jwt;
   }
 
+  completeAuth(jwt: string): boolean {
+    if (this.pendingModal) {
+      this.pendingModal.closeWithValue(jwt);
+      this.pendingModal = null;
+      return true;
+    }
+    return false;
+  }
+
   async authenticate(): Promise<boolean> {
     const serverUrl = this.plugin.settings.serverUrl.replace(/\/+$/, "");
     window.open(`${serverUrl}/auth/github?state=${Date.now()}`);
 
-    const jwt = await this.plugin.promptText("Paste your auth token");
+    const jwt = await new Promise<string | null>((resolve) => {
+      const modal = new PromptModal(
+        this.plugin.app,
+        "Paste your auth token",
+        (value) => {
+          this.pendingModal = null;
+          resolve(value);
+        },
+      );
+      this.pendingModal = modal;
+      modal.open();
+    });
     if (!jwt) return false;
 
     try {
       const payload = parseJwtPayload(jwt);
       this.plugin.settings.jwt = jwt;
       this.plugin.settings.githubUserId = payload.sub;
-      this.plugin.settings.displayName = payload.displayName || payload.username;
+      this.plugin.settings.displayName =
+        payload.displayName || payload.username;
       this.plugin.settings.avatarUrl = payload.avatar || "";
       await this.plugin.saveSettings();
-      new Notice(`Live Share: authenticated as ${this.plugin.settings.displayName}`);
+      new Notice(
+        `Live Share: authenticated as ${this.plugin.settings.displayName}`,
+      );
       return true;
     } catch {
       new Notice("Live Share: invalid auth token");

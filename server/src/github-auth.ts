@@ -67,18 +67,21 @@ export function createAuthRouter(): Router {
 
       let tokenResponse: Response;
       try {
-        tokenResponse = await fetch("https://github.com/login/oauth/access_token", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Accept: "application/json",
+        tokenResponse = await fetch(
+          "https://github.com/login/oauth/access_token",
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Accept: "application/json",
+            },
+            body: JSON.stringify({
+              client_id: GITHUB_CLIENT_ID,
+              client_secret: GITHUB_CLIENT_SECRET,
+              code,
+            }),
           },
-          body: JSON.stringify({
-            client_id: GITHUB_CLIENT_ID,
-            client_secret: GITHUB_CLIENT_SECRET,
-            code,
-          }),
-        });
+        );
       } catch {
         res.status(502).send("Failed to contact GitHub");
         return;
@@ -135,14 +138,46 @@ export function createAuthRouter(): Router {
         .replace(/"/g, "&quot;");
 
       const obsidianUri = `obsidian://live-share-auth?token=${encodeURIComponent(jwtToken)}`;
+      const safeAvatar = githubUser.avatar_url
+        .replace(/&/g, "&amp;")
+        .replace(/"/g, "&quot;");
       res.send(`<!DOCTYPE html>
-<html><head><title>Live Share Auth</title></head>
-<body style="font-family:system-ui;max-width:500px;margin:60px auto;text-align:center">
-  <h2>Authenticated as ${safeName}</h2>
-  <p><a href="${obsidianUri}" style="display:inline-block;padding:10px 24px;background:#7c3aed;color:#fff;border-radius:6px;text-decoration:none;font-weight:600">Open in Obsidian</a></p>
-  <p style="color:#666;font-size:13px;margin-top:24px">If the button doesn't work, copy the token below and paste it in Obsidian:</p>
-  <input id="token" readonly value=${JSON.stringify(jwtToken)} style="width:100%;padding:8px;font-size:14px;margin:12px 0" onclick="this.select()">
-  <button onclick="navigator.clipboard.writeText(document.getElementById('token').value)" style="padding:8px 16px;cursor:pointer">Copy</button>
+<html><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="dark light">
+<title>Live Share Auth</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;min-height:100vh;display:flex;align-items:center;justify-content:center;background:#1e1e2e;color:#cdd6f4}
+@media(prefers-color-scheme:light){body{background:#eff1f5;color:#4c4f69}.card{background:#fff;border-color:#ccd0da}.token-input{background:#e6e9ef;border-color:#ccd0da;color:#4c4f69}.fallback{color:#6c6f85}.copy-btn{background:#313244;color:#cdd6f4}.copy-btn:hover{background:#45475a}}
+.card{max-width:420px;width:100%;margin:24px;padding:40px 32px;background:#313244;border:1px solid #45475a;border-radius:16px;text-align:center}
+.avatar{width:80px;height:80px;border-radius:50%;margin:0 auto 20px;border:3px solid #7c3aed}
+h1{font-size:20px;font-weight:600;margin-bottom:4px}
+.username{font-size:14px;color:#a6adc8;margin-bottom:28px}
+.open-btn{display:inline-block;padding:12px 32px;background:#7c3aed;color:#fff;border-radius:8px;text-decoration:none;font-weight:600;font-size:15px;transition:background .15s}
+.open-btn:hover{background:#6d28d9}
+.fallback{font-size:12px;color:#6c7086;margin-top:28px;margin-bottom:10px}
+.token-row{display:flex;gap:8px}
+.token-input{flex:1;padding:8px 12px;font-size:13px;font-family:monospace;background:#1e1e2e;border:1px solid #45475a;border-radius:6px;color:#cdd6f4;outline:none;min-width:0}
+.copy-btn{padding:8px 14px;background:#45475a;color:#cdd6f4;border:none;border-radius:6px;cursor:pointer;font-size:13px;white-space:nowrap;transition:background .15s}
+.copy-btn:hover{background:#585b70}
+.check{color:#a6e3a1}
+</style>
+</head>
+<body>
+<div class="card">
+  <img class="avatar" src="${safeAvatar}" alt="">
+  <h1>${safeName}</h1>
+  <p class="username">Signed in with GitHub</p>
+  <a class="open-btn" href="${obsidianUri}">Open in Obsidian</a>
+  <p class="fallback">If the button doesn't work, copy the token and paste it in Obsidian:</p>
+  <div class="token-row">
+    <input class="token-input" id="token" readonly value=${JSON.stringify(jwtToken)} onclick="this.select()">
+    <button class="copy-btn" id="copy" onclick="navigator.clipboard.writeText(document.getElementById('token').value).then(()=>{document.getElementById('copy').innerHTML='<span class=check>Copied!</span>'})">Copy</button>
+  </div>
+</div>
+<script>setTimeout(()=>location.href=${JSON.stringify(obsidianUri)},300)</script>
 </body></html>`);
     } catch (err) {
       console.error("[auth] failed to handle OAuth callback:", err);
