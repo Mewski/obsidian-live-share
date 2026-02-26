@@ -1,4 +1,4 @@
-import { type App, PluginSettingTab, Setting, SettingGroup } from "obsidian";
+import { type App, PluginSettingTab, SettingGroup } from "obsidian";
 import type LiveSharePlugin from "./main";
 
 export class LiveShareSettingTab extends PluginSettingTab {
@@ -115,7 +115,9 @@ export class LiveShareSettingTab extends PluginSettingTab {
                 : connectionState === "auth-required"
                   ? "Auth required"
                   : connectionState;
-        s.setName(`${role} · ${stateLabel}`).setDesc(`Room: ${settings.roomId}`);
+        s.setName(`${role} · ${stateLabel}`).setDesc(
+          `Room: ${settings.roomId}`,
+        );
         s.addButton((btn) =>
           btn.setButtonText("Copy invite link").onClick(() => {
             sessionManager.copyInvite();
@@ -171,7 +173,9 @@ export class LiveShareSettingTab extends PluginSettingTab {
               .setPlaceholder("Entire vault")
               .setValue(settings.sharedFolder)
               .onChange(async (value) => {
-                settings.sharedFolder = value.replace(/^[./\\]+/, "").replace(/\.\./g, "");
+                settings.sharedFolder = value
+                  .replace(/^[./\\]+/, "")
+                  .replace(/\.\./g, "");
                 await this.plugin.saveSettings();
               });
             if (active) text.setDisabled(true);
@@ -181,10 +185,12 @@ export class LiveShareSettingTab extends PluginSettingTab {
         s.setName("Require approval")
           .setDesc("Guests must be approved by the host before joining")
           .addToggle((toggle) => {
-            toggle.setValue(settings.requireApproval).onChange(async (value) => {
-              settings.requireApproval = value;
-              await this.plugin.saveSettings();
-            });
+            toggle
+              .setValue(settings.requireApproval)
+              .onChange(async (value) => {
+                settings.requireApproval = value;
+                await this.plugin.saveSettings();
+              });
             if (active) toggle.setDisabled(true);
           });
       });
@@ -201,17 +207,23 @@ export class LiveShareSettingTab extends PluginSettingTab {
       .setHeading("Preferences")
       .addSetting((s) => {
         s.setName("Notifications")
-          .setDesc("Show status notices for non-critical events like file syncs and follows")
+          .setDesc(
+            "Show status notices for non-critical events like file syncs and follows",
+          )
           .addToggle((toggle) =>
-            toggle.setValue(settings.notificationsEnabled).onChange(async (value) => {
-              settings.notificationsEnabled = value;
-              await this.plugin.saveSettings();
-            }),
+            toggle
+              .setValue(settings.notificationsEnabled)
+              .onChange(async (value) => {
+                settings.notificationsEnabled = value;
+                await this.plugin.saveSettings();
+              }),
           );
       })
       .addSetting((s) => {
         s.setName("Auto-reconnect")
-          .setDesc("Automatically rejoin the previous session when Obsidian starts")
+          .setDesc(
+            "Automatically rejoin the previous session when Obsidian starts",
+          )
           .addToggle((toggle) =>
             toggle.setValue(settings.autoReconnect).onChange(async (value) => {
               settings.autoReconnect = value;
@@ -250,44 +262,44 @@ export class LiveShareSettingTab extends PluginSettingTab {
 
     advanced.addSetting((s) => {
       s.setName("Excluded patterns").setDesc(
-        "Glob patterns for files to exclude from sharing. .obsidian and .trash are always excluded.",
+        "Glob patterns for files to exclude from sharing.",
       );
-      let inputValue = "";
-      s.addText((text) => {
-        text.setPlaceholder("e.g. *.tmp, drafts/**").onChange((value) => {
-          inputValue = value;
-        });
-        text.inputEl.addEventListener("keydown", (e) => {
-          if (e.key === "Enter") {
-            e.preventDefault();
-            const trimmed = inputValue.trim();
-            if (trimmed && !settings.excludePatterns.includes(trimmed)) {
-              settings.excludePatterns.push(trimmed);
-              this.plugin.saveSettings().then(() => this.display());
-            }
-          }
-        });
-      });
       s.addButton((btn) =>
-        btn.setButtonText("Add").onClick(async () => {
-          const trimmed = inputValue.trim();
-          if (trimmed && !settings.excludePatterns.includes(trimmed)) {
-            settings.excludePatterns.push(trimmed);
-            await this.plugin.saveSettings();
-            this.display();
-          }
-        }),
+        btn
+          .setButtonText("Add exclusion")
+          .setCta()
+          .onClick(async () => {
+            const value = await this.plugin.promptText(
+              "Glob pattern, e.g. *.tmp or drafts/**",
+            );
+            if (value) {
+              const trimmed = value.trim();
+              if (trimmed && !settings.excludePatterns.includes(trimmed)) {
+                settings.excludePatterns.push(trimmed);
+                await this.plugin.saveSettings();
+                this.display();
+              }
+            }
+          }),
       );
     });
 
     for (const pattern of settings.excludePatterns) {
-      new Setting(containerEl).setName(pattern).addExtraButton((btn) =>
-        btn.setIcon("x").onClick(async () => {
-          settings.excludePatterns = settings.excludePatterns.filter((p) => p !== pattern);
-          await this.plugin.saveSettings();
-          this.display();
-        }),
-      );
+      advanced.addSetting((s) => {
+        s.setName(pattern);
+        s.addExtraButton((btn) =>
+          btn
+            .setIcon("cross")
+            .setTooltip("Remove this pattern")
+            .onClick(async () => {
+              settings.excludePatterns = settings.excludePatterns.filter(
+                (p) => p !== pattern,
+              );
+              await this.plugin.saveSettings();
+              this.display();
+            }),
+        );
+      });
     }
   }
 }
