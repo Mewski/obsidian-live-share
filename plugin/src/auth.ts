@@ -26,10 +26,14 @@ export class AuthManager {
     window.open(`${serverUrl}/auth/github?state=${Date.now()}`);
 
     const jwt = await new Promise<string | null>((resolve) => {
-      const modal = new PromptModal(this.plugin.app, "Paste your auth token", (value) => {
-        this.pendingModal = null;
-        resolve(value);
-      });
+      const modal = new PromptModal(
+        this.plugin.app,
+        "Waiting for redirect... or paste token here",
+        (value) => {
+          this.pendingModal = null;
+          resolve(value);
+        },
+      );
       this.pendingModal = modal;
       modal.open();
     });

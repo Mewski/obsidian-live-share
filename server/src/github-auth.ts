@@ -172,7 +172,17 @@ h1{font-size:20px;font-weight:600;margin-bottom:4px}
     <button class="copy-btn" id="copy" onclick="navigator.clipboard.writeText(document.getElementById('token').value).then(()=>{document.getElementById('copy').innerHTML='<span class=check>Copied!</span>'})">Copy</button>
   </div>
 </div>
-<script>setTimeout(()=>location.href=${JSON.stringify(obsidianUri)},300)</script>
+<script>
+setTimeout(()=>{
+  location.href=${JSON.stringify(obsidianUri)};
+  setTimeout(()=>{
+    document.querySelector('.open-btn').textContent='Redirected!';
+    document.querySelector('.card').insertAdjacentHTML('beforeend',
+      '<p style="margin-top:20px;font-size:14px;color:#a6adc8">You can close this tab.</p>');
+    try{window.close()}catch{}
+  },500);
+},300);
+</script>
 </body></html>`);
     } catch (err) {
       console.error("[auth] failed to handle OAuth callback:", err);
