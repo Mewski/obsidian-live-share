@@ -847,6 +847,12 @@ export default class LiveSharePlugin extends Plugin {
                 await this.backgroundSync.onFileAdded(file.path);
               }
             }
+          } else if (op.type === "modify" && "path" in op && !isTextFile(op.path)) {
+            const file = this.app.vault.getAbstractFileByPath(op.path);
+            if (file instanceof TFile) {
+              const content = await this.app.vault.readBinary(file);
+              await this.manifestManager.updateFile(file, content);
+            }
           } else if (op.type === "delete" && "path" in op) {
             this.manifestManager.removeFile(op.path);
             this.backgroundSync.onFileRemoved(op.path);
