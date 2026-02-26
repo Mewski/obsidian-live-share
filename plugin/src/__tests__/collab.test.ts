@@ -10,9 +10,7 @@ vi.mock("yjs", () => ({
 }));
 
 vi.mock("y-codemirror.next", () => ({
-  yCollab: vi.fn((_text: any, _awareness: any, _opts: any) => [
-    "yCollab-extension",
-  ]),
+  yCollab: vi.fn((_text: any, _awareness: any, _opts: any) => ["yCollab-extension"]),
 }));
 
 const reconfigureCalls: unknown[] = [];
@@ -137,12 +135,7 @@ describe("CollabManager", () => {
       const view = createMockView();
       const syncManager = createMockSyncManager({ textLength: 0 });
 
-      await collab.activateForFile(
-        view as any,
-        "test.md",
-        syncManager as any,
-        "host",
-      );
+      await collab.activateForFile(view as any, "test.md", syncManager as any, "host");
 
       expect(syncManager._doc.transact).toHaveBeenCalled();
       expect(syncManager._text.insert).toHaveBeenCalledWith(0, "local content");
@@ -152,12 +145,7 @@ describe("CollabManager", () => {
       const view = createMockView();
       const syncManager = createMockSyncManager({ textLength: 0 });
 
-      await collab.activateForFile(
-        view as any,
-        "test.md",
-        syncManager as any,
-        "guest",
-      );
+      await collab.activateForFile(view as any, "test.md", syncManager as any, "guest");
 
       expect(syncManager._text.insert).not.toHaveBeenCalled();
     });
@@ -175,12 +163,7 @@ describe("CollabManager", () => {
       const view = createMockView();
       const syncManager = createMockSyncManager({ textLength: 42 });
 
-      await collab.activateForFile(
-        view as any,
-        "test.md",
-        syncManager as any,
-        "host",
-      );
+      await collab.activateForFile(view as any, "test.md", syncManager as any, "host");
 
       expect(syncManager._text.delete).toHaveBeenCalledWith(0, 6);
       expect(syncManager._text.insert).toHaveBeenCalledWith(0, "local content");
@@ -190,12 +173,7 @@ describe("CollabManager", () => {
       const view = createMockView();
       const syncManager = createMockSyncManager({ textLength: 5 });
 
-      await collab.activateForFile(
-        view as any,
-        "test.md",
-        syncManager as any,
-        "host",
-      );
+      await collab.activateForFile(view as any, "test.md", syncManager as any, "host");
 
       expect(view.dispatch).toHaveBeenCalled();
       expect(reconfigureCalls).toContainEqual(["yCollab-extension"]);
@@ -214,9 +192,7 @@ describe("CollabManager", () => {
       );
 
       expect(view.dispatch).toHaveBeenCalled();
-      const lastReconfigure = reconfigureCalls[
-        reconfigureCalls.length - 1
-      ] as unknown[];
+      const lastReconfigure = reconfigureCalls[reconfigureCalls.length - 1] as unknown[];
       expect(lastReconfigure).toHaveLength(2);
       expect(lastReconfigure[0]).toBe("yCollab-extension");
       expect(lastReconfigure[1]).toEqual({ readOnly: true });
@@ -249,12 +225,7 @@ describe("CollabManager", () => {
           }),
       );
 
-      const promise = collab.activateForFile(
-        view as any,
-        "first.md",
-        syncManager as any,
-        "host",
-      );
+      const promise = collab.activateForFile(view as any, "first.md", syncManager as any, "host");
 
       collab.deactivateAll(view as any);
 

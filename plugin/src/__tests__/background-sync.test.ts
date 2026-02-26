@@ -10,6 +10,10 @@ function createVault() {
     create: vi.fn(async () => ({})),
     getFiles: vi.fn(() => []),
     createFolder: vi.fn(async () => ({})),
+    adapter: {
+      write: vi.fn(async () => {}),
+      writeBinary: vi.fn(async () => {}),
+    },
   } as any;
 }
 
@@ -135,7 +139,7 @@ describe("BackgroundSync", () => {
     await bg.startAll("guest");
     vi.advanceTimersByTime(200);
 
-    expect(vault.modify).toHaveBeenCalledWith(fakeFile, "remote content");
+    expect(vault.adapter.write).toHaveBeenCalledWith("test.md", "remote content");
   });
 
   it("flushes old active file to disk on switch", async () => {
@@ -158,10 +162,11 @@ describe("BackgroundSync", () => {
 
     bg.setActiveFile("a.md");
 
-    vault.modify.mockClear();
+    vault.adapter.write.mockClear();
     bg.setActiveFile("b.md");
+    await vi.advanceTimersByTimeAsync(0);
 
-    expect(vault.modify).toHaveBeenCalledWith({ path: "a.md" }, "content of A");
+    expect(vault.adapter.write).toHaveBeenCalledWith("a.md", "content of A");
   });
 
   it("does not write to disk for the active file", async () => {
@@ -210,7 +215,7 @@ describe("BackgroundSync", () => {
     vi.advanceTimersByTime(1100);
     await vi.advanceTimersByTimeAsync(0);
 
-    expect(vault.modify).toHaveBeenCalledWith({ path: "bg.md" }, "background edit");
+    expect(vault.adapter.write).toHaveBeenCalledWith("bg.md", "background edit");
   });
 
   it("host pushes local text changes into Y.Doc", async () => {

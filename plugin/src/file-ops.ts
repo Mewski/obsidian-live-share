@@ -218,17 +218,9 @@ export class FileOpsManager {
           }
           if (assembly.binary) {
             const buf = base64ToArrayBuffer(joined);
-            if (exists) {
-              await this.vault.modifyBinary(exists as TFile, buf);
-            } else {
-              await this.vault.createBinary(op.path, buf);
-            }
+            await this.vault.adapter.writeBinary(op.path, buf);
           } else {
-            if (exists) {
-              await this.vault.modify(exists as TFile, joined);
-            } else {
-              await this.vault.create(op.path, joined);
-            }
+            await this.vault.adapter.write(op.path, joined);
           }
           break;
         }
@@ -238,9 +230,6 @@ export class FileOpsManager {
         }
       }
     } catch {
-      const detail =
-        "path" in op ? op.path : "oldPath" in op ? (op as { oldPath: string }).oldPath : "";
-      new Notice(`Live Share: failed to apply remote ${op.type} for ${detail}`);
     } finally {
       setTimeout(() => {
         for (const path of paths) this.unmutePathEvents(path);

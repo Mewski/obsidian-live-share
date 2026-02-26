@@ -22,6 +22,8 @@ export class BackgroundSync {
   private writeTimers = new Map<string, ReturnType<typeof setTimeout>>();
   private activeFile: string | null = null;
   private recentDiskWrites = new Set<string>();
+  private lastWrittenContent = new Map<string, string>();
+  private writeQueue: Promise<void> = Promise.resolve();
   private role: SessionRole = "host";
   private destroyed = false;
   private running = false;
@@ -73,6 +75,7 @@ export class BackgroundSync {
         if (file) {
           const content = normalizeLineEndings(await this.vault.read(file));
           applyMinimalYTextUpdate(docHandle.doc, docHandle.text, content);
+          this.lastWrittenContent.set(path, content);
         }
       } else if (this.role === "guest" && docHandle.text.length > 0) {
         const file = this.vault.getAbstractFileByPath(path) as TFile | null;
@@ -80,6 +83,8 @@ export class BackgroundSync {
         const localContent = file ? normalizeLineEndings(await this.vault.read(file)) : "";
         if (remoteContent !== localContent) {
           await this.writeToDisk(path, remoteContent);
+        } else {
+          this.lastWrittenContent.set(path, localContent);
         }
       }
 
@@ -245,6 +250,7 @@ export class BackgroundSync {
     this.observers.clear();
     this.activeFile = null;
     this.recentDiskWrites.clear();
+    this.lastWrittenContent.clear();
   }
 
   private flushWrite(path: string): void {
@@ -270,20 +276,30 @@ export class BackgroundSync {
     );
   }
 
-  private async writeToDisk(path: string, content: string): Promise<void> {
+  private writeToDisk(path: string, content: string): Promise<void> {
+    if (this.lastWrittenContent.get(path) === content) return Promise.resolve();
+    this.writeQueue = this.writeQueue.then(() => this.doWriteToDisk(path, content));
+    return this.writeQueue;
+  }
+
+  private async doWriteToDisk(path: string, content: string): Promise<void> {
+    if (this.lastWrittenContent.get(path) === content) return;
     this.recentDiskWrites.add(path);
     this.fileOpsManager.mutePathEvents(path);
     try {
       const file = this.vault.getAbstractFileByPath(path) as TFile | null;
       if (file) {
-        await this.vault.modify(file, content);
-      } else {
-        const dir = path.substring(0, path.lastIndexOf("/"));
-        if (dir) await ensureFolder(this.vault, dir);
-        await this.vault.create(path, content);
+        const existing = normalizeLineEndings(await this.vault.read(file));
+        if (existing === content) {
+          this.lastWrittenContent.set(path, content);
+          return;
+        }
       }
+      const dir = path.substring(0, path.lastIndexOf("/"));
+      if (dir) await ensureFolder(this.vault, dir);
+      await this.vault.adapter.write(path, content);
+      this.lastWrittenContent.set(path, content);
     } catch {
-      if (!this.destroyed) new Notice(`Live Share: failed to write ${path} to disk`);
     } finally {
       setTimeout(() => {
         this.recentDiskWrites.delete(path);

@@ -36,6 +36,10 @@ function createMockVault() {
     read: vi.fn(async () => "file content"),
     readBinary: vi.fn(async () => new ArrayBuffer(8)),
     createFolder: vi.fn(async () => ({})),
+    adapter: {
+      write: vi.fn(async () => {}),
+      writeBinary: vi.fn(async () => {}),
+    },
   };
 }
 
@@ -300,7 +304,7 @@ describe("FileOpsManager", () => {
         type: "chunk-end",
         path: "big.md",
       });
-      expect(vault.create).toHaveBeenCalledWith("big.md", "HelloWorld");
+      expect(vault.adapter.write).toHaveBeenCalledWith("big.md", "HelloWorld");
     });
 
     it("assembles text chunks and modifies existing file", async () => {
@@ -328,7 +332,7 @@ describe("FileOpsManager", () => {
         path: "big.md",
       });
 
-      expect(vault.modify).toHaveBeenCalled();
+      expect(vault.adapter.write).toHaveBeenCalled();
     });
 
     it("assembles binary chunks and creates binary file", async () => {
@@ -354,7 +358,7 @@ describe("FileOpsManager", () => {
         type: "chunk-end",
         path: "big.png",
       });
-      expect(vault.createBinary).toHaveBeenCalled();
+      expect(vault.adapter.writeBinary).toHaveBeenCalled();
     });
 
     it("ignores chunk-end without a matching chunk-start", async () => {
