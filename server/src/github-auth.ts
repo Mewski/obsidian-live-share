@@ -134,18 +134,15 @@ export function createAuthRouter(): Router {
         .replace(/>/g, "&gt;")
         .replace(/"/g, "&quot;");
 
+      const obsidianUri = `obsidian://live-share-auth?token=${encodeURIComponent(jwtToken)}`;
       res.send(`<!DOCTYPE html>
-<html><head><title>Obsidian Live Share Auth</title></head>
+<html><head><title>Live Share Auth</title></head>
 <body style="font-family:system-ui;max-width:500px;margin:60px auto;text-align:center">
   <h2>Authenticated as ${safeName}</h2>
-  <p>Copy this token and paste it into Obsidian:</p>
-  <input id="token" readonly style="width:100%;padding:8px;font-size:14px;margin:12px 0" onclick="this.select()">
-  <button onclick="navigator.clipboard.writeText(document.getElementById('token').value)" style="padding:8px 16px;cursor:pointer">Copy Token</button>
-  <p style="color:#666;font-size:13px;margin-top:24px">You can close this window after copying.</p>
-  <script>
-    document.getElementById('token').value = ${JSON.stringify(jwtToken)};
-    window.location = 'obsidian://live-share-auth?token=' + encodeURIComponent(${JSON.stringify(jwtToken)});
-  </script>
+  <p><a href="${obsidianUri}" style="display:inline-block;padding:10px 24px;background:#7c3aed;color:#fff;border-radius:6px;text-decoration:none;font-weight:600">Open in Obsidian</a></p>
+  <p style="color:#666;font-size:13px;margin-top:24px">If the button doesn't work, copy the token below and paste it in Obsidian:</p>
+  <input id="token" readonly value=${JSON.stringify(jwtToken)} style="width:100%;padding:8px;font-size:14px;margin:12px 0" onclick="this.select()">
+  <button onclick="navigator.clipboard.writeText(document.getElementById('token').value)" style="padding:8px 16px;cursor:pointer">Copy</button>
 </body></html>`);
     } catch (err) {
       console.error("[auth] failed to handle OAuth callback:", err);
