@@ -38,7 +38,7 @@
   cursor: pointer;
 }
 
-/* Read-only banner (shown at top of editor for read-only guests) */
+/* Read-only banner */
 .live-share-readonly-banner {
   background: var(--background-secondary);
   color: var(--text-muted);
@@ -48,81 +48,12 @@
   border-bottom: 1px solid var(--background-modifier-border);
 }
 
-/* Presence panel */
-.live-share-presence-empty {
-  color: var(--text-muted);
-  padding: 12px;
-}
-
-.live-share-presence-list {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  padding: 8px;
-}
-
-.live-share-presence-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 6px 8px;
-  border-radius: 4px;
-}
-
-.live-share-presence-item:hover {
-  background: var(--background-secondary);
-}
-
-.live-share-presence-dot {
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  flex-shrink: 0;
-  background-color: var(--cursor-color, var(--text-muted));
-}
-
-.live-share-presence-info {
-  display: flex;
-  flex-direction: column;
-  flex: 1;
-  min-width: 0;
-  gap: 2px;
-}
-
-.live-share-presence-name {
-  font-weight: 500;
-}
-
-.live-share-presence-file {
-  font-size: 0.8em;
-  color: var(--text-muted);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.live-share-presence-actions {
-  display: flex;
-  gap: 4px;
-  flex-shrink: 0;
-}
-
-.live-share-presence-follow,
-.live-share-presence-kick {
-  font-size: 0.75em;
-  padding: 2px 8px;
-}
-
-.live-share-presence-kick {
-  color: var(--text-error);
-}
-
 /* Status bar */
 .live-share-status-bar {
   cursor: pointer;
 }
 
-/* Prompt input (used in start/join session dialogs) */
+/* Prompt input */
 .live-share-prompt-input {
   width: 100%;
   margin-bottom: 1em;
@@ -156,51 +87,133 @@
   opacity: 0.3;
 }
 
-.live-share-presence-summon {
-  background: transparent;
-  border: 1px solid var(--interactive-accent);
-  color: var(--interactive-accent);
-  border-radius: 4px;
-  padding: 2px 8px;
-  cursor: pointer;
-  font-size: 11px;
-  margin-left: 4px;
+/* Presence panel */
+.live-share-presence-panel {
+  padding: var(--size-4-1) var(--size-4-3) var(--size-4-6);
 }
 
-.live-share-presence-summon:hover {
-  background: var(--interactive-accent);
-  color: var(--text-on-accent);
+.live-share-presence-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 32px 16px;
+  color: var(--text-faint);
 }
 
-.live-share-presence-badge {
-  font-size: 10px;
+.live-share-presence-empty-icon {
+  opacity: 0.4;
+}
+
+.live-share-presence-empty-icon svg {
+  width: 28px;
+  height: 28px;
+}
+
+.live-share-presence-empty-text {
+  font-size: var(--font-ui-small);
+}
+
+.live-share-presence-list {
+  display: flex;
+  flex-direction: column;
+}
+
+/* User row */
+.live-share-user {
+  display: flex;
+  align-items: center;
+  gap: var(--size-4-2);
+  padding: var(--size-2-3) var(--size-4-2);
+  margin-bottom: var(--nav-item-margin-bottom);
+  border-radius: var(--nav-item-radius);
+}
+
+.live-share-user:hover {
+  background: var(--nav-item-background-hover);
+}
+
+.live-share-user.is-followed {
+  background: var(--nav-item-background-selected);
+}
+
+/* Avatar */
+.live-share-user-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
   background: var(--interactive-accent);
-  color: var(--text-on-accent);
-  border-radius: 3px;
-  padding: 1px 5px;
-  margin-left: 6px;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
   font-weight: 600;
+  flex-shrink: 0;
+  user-select: none;
 }
 
-.live-share-presence-activity {
-  font-size: 10px;
-  color: var(--text-muted);
-  margin-left: auto;
-  padding-left: 8px;
+/* Info column */
+.live-share-user-info {
+  flex: 1;
+  min-width: 0;
 }
 
-.live-share-presence-item.is-followed {
-  background: var(--background-modifier-hover);
-  border-left: 3px solid var(--interactive-accent);
-  padding-left: 5px;
+.live-share-user-name-row {
+  display: flex;
+  align-items: center;
+  gap: 5px;
 }
 
-.live-share-presence-follow.is-active {
+.live-share-user-name {
+  font-size: var(--font-ui-small);
+  font-weight: var(--font-medium);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.live-share-badge {
+  font-size: 9px;
+  font-weight: 600;
+  padding: 1px 4px;
+  border-radius: 3px;
+  line-height: 14px;
+  flex-shrink: 0;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.live-share-badge.mod-host {
   background: var(--interactive-accent);
   color: var(--text-on-accent);
 }
 
-.live-share-presence-kick:hover {
-  background: var(--text-error);
-  color: var(--text-on-accent);
+.live-share-badge.mod-readonly {
+  background: var(--background-modifier-border);
+  color: var(--text-muted);
+}
+
+.live-share-user-file {
+  font-size: var(--font-ui-smaller);
+  color: var(--text-faint);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-top: 1px;
+}
+
+/* Actions */
+.live-share-user-actions {
+  display: flex;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.live-share-user-actions .clickable-icon.is-active {
+  color: var(--interactive-accent);
+}
+
+.live-share-user-actions .clickable-icon.mod-warning:hover {
+  color: var(--text-error);
 }

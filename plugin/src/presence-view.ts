@@ -1,4 +1,4 @@
-import { ItemView } from "obsidian";
+import { ExtraButtonComponent, ItemView, setIcon } from "obsidian";
 
 import type { Permission } from "./types";
 import { HEX_COLOR_RE } from "./utils";
@@ -73,88 +73,109 @@ export class PresenceView extends ItemView {
     this.contentEl.empty();
   }
 
+  private getInitial(name: string): string {
+    return name.trim().charAt(0).toUpperCase() || "?";
+  }
+
   private render() {
     const { contentEl } = this;
     contentEl.empty();
+    contentEl.addClass("live-share-presence-panel");
 
     if (this.users.size === 0) {
-      contentEl.createEl("p", {
-        text: "No collaborators connected",
+      const empty = contentEl.createEl("div", {
         cls: "live-share-presence-empty",
+      });
+      const iconEl = empty.createEl("div", {
+        cls: "live-share-presence-empty-icon",
+      });
+      setIcon(iconEl, "users");
+      empty.createEl("div", {
+        text: "No collaborators connected",
+        cls: "live-share-presence-empty-text",
       });
       return;
     }
 
-    const list = contentEl.createEl("div", { cls: "live-share-presence-list" });
+    const list = contentEl.createEl("div", {
+      cls: "live-share-presence-list",
+    });
 
     for (const [userId, user] of this.users) {
       const isFollowed = this.followedUserId === userId;
-      const itemCls = isFollowed
-        ? "live-share-presence-item is-followed"
-        : "live-share-presence-item";
-      const userItem = list.createEl("div", { cls: itemCls });
 
-      const cursorDot = userItem.createEl("span", {
-        cls: "live-share-presence-dot",
+      const row = list.createEl("div", {
+        cls: `live-share-user${isFollowed ? " is-followed" : ""}`,
+      });
+
+      const avatar = row.createEl("div", {
+        cls: "live-share-user-avatar",
+        text: this.getInitial(user.displayName),
       });
       if (HEX_COLOR_RE.test(user.cursorColor)) {
-        cursorDot.style.setProperty("--cursor-color", user.cursorColor);
+        avatar.style.backgroundColor = user.cursorColor;
       }
 
-      const info = userItem.createEl("div", {
-        cls: "live-share-presence-info",
-      });
-      const nameEl = info.createEl("span", {
+      const info = row.createEl("div", { cls: "live-share-user-info" });
+
+      const nameRow = info.createEl("div", { cls: "live-share-user-name-row" });
+      nameRow.createEl("span", {
         text: user.displayName,
-        cls: "live-share-presence-name",
+        cls: "live-share-user-name",
       });
       if (user.isHost) {
-        nameEl.createEl("span", {
+        nameRow.createEl("span", {
           text: "Host",
-          cls: "live-share-presence-badge",
+          cls: "live-share-badge mod-host",
         });
       }
+      if (user.permission === "read-only") {
+        nameRow.createEl("span", {
+          text: "R/O",
+          cls: "live-share-badge mod-readonly",
+        });
+      }
+
       if (user.currentFile) {
-        info.createEl("span", {
+        info.createEl("div", {
           text: user.currentFile,
-          cls: "live-share-presence-file",
+          cls: "live-share-user-file",
         });
       }
 
-      const actions = userItem.createEl("div", {
-        cls: "live-share-presence-actions",
+      const actions = row.createEl("div", {
+        cls: "live-share-user-actions",
       });
 
-      const followBtn = actions.createEl("button", {
-        text: "Follow",
-        cls: isFollowed ? "live-share-presence-follow is-active" : "live-share-presence-follow",
-      });
-      followBtn.addEventListener("click", () => {
+      const followBtn = new ExtraButtonComponent(actions)
+        .setIcon(isFollowed ? "eye-off" : "eye")
+        .setTooltip(isFollowed ? "Unfollow" : "Follow");
+      if (isFollowed) followBtn.extraSettingsEl.addClass("is-active");
+      followBtn.extraSettingsEl.addEventListener("click", () => {
         this.onFollowRequest?.(userId);
       });
 
       if (this.isHost) {
-        const permBtn = actions.createEl("button", {
-          text: user.permission === "read-only" ? "Make R/W" : "Make R/O",
-          cls: "live-share-presence-perm",
-        });
-        permBtn.addEventListener("click", () => {
-          this.onSetPermissionRequest?.(userId);
-        });
+        const isReadOnly = user.permission === "read-only";
+        new ExtraButtonComponent(actions)
+          .setIcon(isReadOnly ? "unlock" : "lock")
+          .setTooltip(isReadOnly ? "Make read-write" : "Make read-only")
+          .extraSettingsEl.addEventListener("click", () => {
+            this.onSetPermissionRequest?.(userId);
+          });
 
-        const summonBtn = actions.createEl("button", {
-          text: "Summon",
-          cls: "live-share-presence-summon",
-        });
-        summonBtn.addEventListener("click", () => {
-          this.onSummonRequest?.(userId);
-        });
+        new ExtraButtonComponent(actions)
+          .setIcon("compass")
+          .setTooltip("Summon here")
+          .extraSettingsEl.addEventListener("click", () => {
+            this.onSummonRequest?.(userId);
+          });
 
-        const kickBtn = actions.createEl("button", {
-          text: "Kick",
-          cls: "live-share-presence-kick",
-        });
-        kickBtn.addEventListener("click", () => {
+        const kickBtn = new ExtraButtonComponent(actions)
+          .setIcon("x")
+          .setTooltip("Kick from session");
+        kickBtn.extraSettingsEl.addClass("mod-warning");
+        kickBtn.extraSettingsEl.addEventListener("click", () => {
           this.onKickRequest?.(userId);
         });
       }
