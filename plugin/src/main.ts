@@ -443,7 +443,7 @@ export default class LiveSharePlugin extends Plugin {
         await this.connectSync();
         await this.manifestManager.connect(this.syncManager);
         if (this.settings.role === "host") {
-          await this.manifestManager.publishManifest();
+          await this.manifestManager.publishManifest({ purge: true });
           await this.backgroundSync.startAll("host");
           this.registerManifestChangeHandler();
         } else {

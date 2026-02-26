@@ -77,15 +77,16 @@ export class LiveShareSettingTab extends PluginSettingTab {
       .addSetting((s) => {
         s.setName("Display name")
           .setDesc("Shown to other collaborators")
-          .addText((text) =>
+          .addText((text) => {
             text
               .setPlaceholder("Anonymous")
               .setValue(settings.displayName)
               .onChange(async (value) => {
                 settings.displayName = value.trim() || "Anonymous";
                 await this.plugin.saveSettings();
-              }),
-          );
+              });
+            if (authManager.isAuthenticated) text.setDisabled(true);
+          });
       })
       .addSetting((s) => {
         s.setName("Cursor color")
