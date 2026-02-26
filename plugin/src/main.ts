@@ -420,25 +420,20 @@ export default class LiveSharePlugin extends Plugin {
 
     this.registerObsidianProtocolHandler("live-share-auth", async (params) => {
       const token = params.token;
-      console.log("Live Share auth: params", params);
-      console.log("Live Share auth: token length", token?.length);
-      console.log("Live Share auth: token preview", token?.substring(0, 50));
       if (!token) return;
       try {
         const parts = token.split(".");
-        if (parts.length !== 3) throw new Error(`Invalid JWT: ${parts.length} parts`);
+        if (parts.length !== 3) throw new Error("Invalid JWT");
         const b64 = parts[1].replace(/-/g, "+").replace(/_/g, "/");
         const payload = JSON.parse(atob(b64));
-        console.log("Live Share auth: payload", payload);
-        if (!payload.sub || !payload.username) throw new Error("Missing sub or username");
+        if (!payload.sub || !payload.username) throw new Error("Invalid JWT payload");
         this.settings.jwt = token;
         this.settings.githubUserId = payload.sub;
         this.settings.displayName = payload.displayName || payload.username;
         this.settings.avatarUrl = payload.avatar || "";
         await this.saveSettings();
         new Notice(`Live Share: authenticated as ${this.settings.displayName}`);
-      } catch (e) {
-        console.error("Live Share auth: error", e);
+      } catch {
         new Notice("Live Share: invalid auth token");
       }
     });

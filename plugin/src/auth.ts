@@ -16,15 +16,11 @@ export class AuthManager {
     if (!jwt) return false;
 
     try {
-      console.log("Live Share auth: jwt length", jwt.length);
-      console.log("Live Share auth: jwt preview", jwt.substring(0, 50));
       const parts = jwt.split(".");
-      console.log("Live Share auth: parts count", parts.length);
-      if (parts.length !== 3) throw new Error(`Invalid JWT: ${parts.length} parts`);
+      if (parts.length !== 3) throw new Error("Invalid JWT");
       const b64 = parts[1].replace(/-/g, "+").replace(/_/g, "/");
       const payload = JSON.parse(atob(b64));
-      console.log("Live Share auth: payload", payload);
-      if (!payload.sub || !payload.username) throw new Error("Missing sub or username");
+      if (!payload.sub || !payload.username) throw new Error("Invalid JWT payload");
 
       this.plugin.settings.jwt = jwt;
       this.plugin.settings.githubUserId = payload.sub;
