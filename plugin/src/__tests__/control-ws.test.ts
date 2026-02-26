@@ -53,6 +53,10 @@ function createSettings(overrides?: Partial<LiveShareSettings>): LiveShareSettin
     requireApproval: false,
     serverPassword: "",
     clientId: "test-client-id",
+    notificationsEnabled: true,
+    debugLogging: false,
+    debugLogPath: "live-share-debug.md",
+    autoReconnect: true,
     ...overrides,
   };
 }

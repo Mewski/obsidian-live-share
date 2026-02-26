@@ -26,14 +26,10 @@ export class AuthManager {
     window.open(`${serverUrl}/auth/github?state=${Date.now()}`);
 
     const jwt = await new Promise<string | null>((resolve) => {
-      const modal = new PromptModal(
-        this.plugin.app,
-        "Paste your auth token",
-        (value) => {
-          this.pendingModal = null;
-          resolve(value);
-        },
-      );
+      const modal = new PromptModal(this.plugin.app, "Paste your auth token", (value) => {
+        this.pendingModal = null;
+        resolve(value);
+      });
       this.pendingModal = modal;
       modal.open();
     });
@@ -44,12 +40,10 @@ export class AuthManager {
       this.plugin.settings.jwt = jwt;
       this.plugin.settings.githubUserId = payload.sub;
       this.plugin.settings.displayName =
-        payload.displayName || payload.username;
+        (payload.displayName || payload.username || "").trim() || "Anonymous";
       this.plugin.settings.avatarUrl = payload.avatar || "";
       await this.plugin.saveSettings();
-      new Notice(
-        `Live Share: authenticated as ${this.plugin.settings.displayName}`,
-      );
+      new Notice(`Live Share: authenticated as ${this.plugin.settings.displayName}`);
       return true;
     } catch {
       new Notice("Live Share: invalid auth token");

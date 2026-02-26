@@ -5,11 +5,7 @@ export class PromptModal extends Modal {
   private placeholder: string;
   private resolve: (value: string | null) => void;
 
-  constructor(
-    app: App,
-    placeholder: string,
-    resolve: (value: string | null) => void,
-  ) {
+  constructor(app: App, placeholder: string, resolve: (value: string | null) => void) {
     super(app);
     this.setTitle("Live Share");
     this.placeholder = placeholder;

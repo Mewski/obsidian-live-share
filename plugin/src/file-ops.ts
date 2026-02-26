@@ -231,7 +231,10 @@ export class FileOpsManager {
           break;
         }
       }
-    } catch {
+    } catch (err) {
+      const opPath = "path" in op ? op.path : "unknown";
+      new Notice(`Live Share: failed to apply ${op.type} for ${opPath}`);
+      console.error(`[Live Share] applyOp ${op.type} failed:`, err);
     } finally {
       setTimeout(() => {
         for (const path of paths) this.unmutePathEvents(path);

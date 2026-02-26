@@ -21,6 +21,10 @@ function createSettings(overrides: Partial<LiveShareSettings> = {}): LiveShareSe
     requireApproval: false,
     serverPassword: "",
     clientId: "test-client-id",
+    notificationsEnabled: true,
+    debugLogging: false,
+    debugLogPath: "live-share-debug.md",
+    autoReconnect: true,
     ...overrides,
   };
 }

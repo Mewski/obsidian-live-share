@@ -18,6 +18,10 @@ export interface LiveShareSettings {
   requireApproval: boolean;
   serverPassword: string;
   clientId: string;
+  notificationsEnabled: boolean;
+  debugLogging: boolean;
+  debugLogPath: string;
+  autoReconnect: boolean;
 }
 
 export const DEFAULT_SETTINGS: LiveShareSettings = {
@@ -36,6 +40,10 @@ export const DEFAULT_SETTINGS: LiveShareSettings = {
   requireApproval: false,
   serverPassword: "",
   clientId: "",
+  notificationsEnabled: true,
+  debugLogging: false,
+  debugLogPath: "live-share-debug.md",
+  autoReconnect: true,
 };
 
 export interface FileCreateOp {
@@ -206,10 +214,6 @@ export interface SyncRequestMessage {
   path?: string;
 }
 
-export interface SyncResponseMessage {
-  type: "sync-response";
-}
-
 export interface SessionEndMessage {
   type: "session-end";
 }
@@ -242,7 +246,6 @@ export type ControlMessage =
   | PresentStartMessage
   | PresentStopMessage
   | SyncRequestMessage
-  | SyncResponseMessage
   | SessionEndMessage
   | PingMessage
   | PongMessage;
@@ -267,7 +270,6 @@ export interface ControlMessageMap {
   "present-start": PresentStartMessage;
   "present-stop": PresentStopMessage;
   "sync-request": SyncRequestMessage;
-  "sync-response": SyncResponseMessage;
   "session-end": SessionEndMessage;
   ping: PingMessage;
   pong: PongMessage;

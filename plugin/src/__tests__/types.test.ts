@@ -10,6 +10,10 @@ describe("types", () => {
     expect(DEFAULT_SETTINGS.displayName).toBe("Anonymous");
     expect(DEFAULT_SETTINGS.cursorColor).toMatch(/^#/);
     expect(DEFAULT_SETTINGS.serverPassword).toBe("");
+    expect(DEFAULT_SETTINGS.notificationsEnabled).toBe(true);
+    expect(DEFAULT_SETTINGS.debugLogging).toBe(false);
+    expect(DEFAULT_SETTINGS.debugLogPath).toBe("live-share-debug.md");
+    expect(DEFAULT_SETTINGS.autoReconnect).toBe(true);
   });
 
   it("FileOp union types are assignable", () => {

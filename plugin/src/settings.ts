@@ -114,8 +114,55 @@ export class LiveShareSettingTab extends PluginSettingTab {
               : connectionState === "auth-required"
                 ? "Auth required"
                 : connectionState;
+      session
+        .addSetting((s) => {
+          s.setName(`${role} · ${stateLabel}`).setDesc(`Room: ${settings.roomId}`);
+        })
+        .addSetting((s) => {
+          s.addButton((btn) =>
+            btn.setButtonText("Copy invite link").onClick(() => {
+              sessionManager.copyInvite();
+            }),
+          );
+          if (settings.role === "host") {
+            s.addButton((btn) =>
+              btn
+                .setButtonText("End session")
+                .setWarning()
+                .onClick(async () => {
+                  await this.plugin.endSession();
+                  this.display();
+                }),
+            );
+          } else {
+            s.addButton((btn) =>
+              btn
+                .setButtonText("Leave session")
+                .setWarning()
+                .onClick(async () => {
+                  await this.plugin.endSession();
+                  this.display();
+                }),
+            );
+          }
+        });
+    } else {
       session.addSetting((s) => {
-        s.setName(`${role} · ${stateLabel}`).setDesc(`Room: ${settings.roomId}`);
+        s.addButton((btn) =>
+          btn
+            .setButtonText("Start session")
+            .setCta()
+            .onClick(async () => {
+              await this.plugin.startSession();
+              this.display();
+            }),
+        );
+        s.addButton((btn) =>
+          btn.setButtonText("Join session").onClick(async () => {
+            await this.plugin.joinSession();
+            this.display();
+          }),
+        );
       });
     }
 
@@ -128,7 +175,7 @@ export class LiveShareSettingTab extends PluginSettingTab {
               .setPlaceholder("Entire vault")
               .setValue(settings.sharedFolder)
               .onChange(async (value) => {
-                settings.sharedFolder = value;
+                settings.sharedFolder = value.replace(/^[./\\]+/, "").replace(/\.\./g, "");
                 await this.plugin.saveSettings();
               });
             if (active) text.setDisabled(true);
@@ -153,6 +200,55 @@ export class LiveShareSettingTab extends PluginSettingTab {
         );
       });
     }
+
+    new SettingGroup(containerEl)
+      .setHeading("Preferences")
+      .addSetting((s) => {
+        s.setName("Notifications")
+          .setDesc("Show status notices for non-critical events like file syncs and follows")
+          .addToggle((toggle) =>
+            toggle.setValue(settings.notificationsEnabled).onChange(async (value) => {
+              settings.notificationsEnabled = value;
+              await this.plugin.saveSettings();
+            }),
+          );
+      })
+      .addSetting((s) => {
+        s.setName("Auto-reconnect")
+          .setDesc("Automatically rejoin the previous session when Obsidian starts")
+          .addToggle((toggle) =>
+            toggle.setValue(settings.autoReconnect).onChange(async (value) => {
+              settings.autoReconnect = value;
+              await this.plugin.saveSettings();
+            }),
+          );
+      });
+
+    new SettingGroup(containerEl)
+      .setHeading("Debug")
+      .addSetting((s) => {
+        s.setName("Debug logging")
+          .setDesc("Write timestamped debug logs to a file in your vault")
+          .addToggle((toggle) =>
+            toggle.setValue(settings.debugLogging).onChange(async (value) => {
+              settings.debugLogging = value;
+              await this.plugin.saveSettings();
+            }),
+          );
+      })
+      .addSetting((s) => {
+        s.setName("Debug log file")
+          .setDesc("Path within your vault for the debug log")
+          .addText((text) =>
+            text
+              .setPlaceholder("live-share-debug.md")
+              .setValue(settings.debugLogPath)
+              .onChange(async (value) => {
+                settings.debugLogPath = value.trim() || "live-share-debug.md";
+                await this.plugin.saveSettings();
+              }),
+          );
+      });
 
     new SettingGroup(containerEl).setHeading("Advanced").addSetting((s) => {
       s.setName("File exclusion").setDesc(

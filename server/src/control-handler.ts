@@ -19,7 +19,6 @@ const ALLOWED_TYPES = new Set([
   "summon",
   "kick",
   "sync-request",
-  "sync-response",
   "set-permission",
   "permission-update",
   "present-start",
@@ -30,6 +29,8 @@ const ALLOWED_TYPES = new Set([
 
 const MSG_RATE_WINDOW = 10_000;
 const MSG_RATE_LIMIT = 100;
+const UNKNOWN_TYPE_WARN_LIMIT = 10;
+let unknownTypeWarnCount = 0;
 
 interface ControlClient {
   ws: WebSocket;
@@ -72,19 +73,21 @@ export function createControlWSS(options?: ControlWSSOptions) {
     return room;
   }
 
+  function safeSend(ws: WebSocket, data: string) {
+    try {
+      if (ws.readyState === WebSocket.OPEN) ws.send(data);
+    } catch {}
+  }
+
   function broadcast(room: ControlRoom, data: Buffer | string, exclude?: WebSocket) {
     const str = typeof data === "string" ? data : data.toString("utf-8");
     for (const [ws, client] of room.clients) {
-      if (ws !== exclude && client.isApproved && ws.readyState === WebSocket.OPEN) {
-        ws.send(str);
-      }
+      if (ws !== exclude && client.isApproved) safeSend(ws, str);
     }
   }
 
   function sendTo(ws: WebSocket, msg: Record<string, unknown>) {
-    if (ws.readyState === WebSocket.OPEN) {
-      ws.send(JSON.stringify(msg));
-    }
+    safeSend(ws, JSON.stringify(msg));
   }
 
   function getHostClient(room: ControlRoom): ControlClient | undefined {
@@ -165,7 +168,10 @@ export function createControlWSS(options?: ControlWSSOptions) {
       }
 
       if (typeof msg.type !== "string" || !ALLOWED_TYPES.has(msg.type)) {
-        console.warn(`[control] dropped unknown type from ${client.userId}:`, msg.type);
+        if (unknownTypeWarnCount < UNKNOWN_TYPE_WARN_LIMIT) {
+          unknownTypeWarnCount++;
+          console.warn(`[control] dropped unknown type from ${client.userId}:`, msg.type);
+        }
         return;
       }
 
@@ -285,8 +291,8 @@ export function createControlWSS(options?: ControlWSSOptions) {
         const targetUserId = msg.targetUserId;
         const strData = data.toString("utf-8");
         for (const [clientWs, targetClient] of room.clients) {
-          if (targetClient.userId === targetUserId && clientWs.readyState === WebSocket.OPEN) {
-            clientWs.send(strData);
+          if (targetClient.userId === targetUserId) {
+            safeSend(clientWs, strData);
           }
         }
         return;

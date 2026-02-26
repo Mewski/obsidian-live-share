@@ -47,6 +47,12 @@ export function createYjsWSS() {
     maxPayload: 10 * 1024 * 1024,
   });
 
+  function safeSend(ws: WebSocket, data: Uint8Array | string) {
+    try {
+      if (ws.readyState === WebSocket.OPEN) ws.send(data);
+    } catch {}
+  }
+
   function getOrCreateRoom(roomId: string): RoomState {
     const existing = roomStates.get(roomId);
     if (existing) {
@@ -94,16 +100,12 @@ export function createYjsWSS() {
     const peerCountEncoder = encoding.createEncoder();
     encoding.writeVarUint(peerCountEncoder, peerCount);
     const msg = encodeMuxMessage(docId, MUX_SUBSCRIBED, encoding.toUint8Array(peerCountEncoder));
-    if (client.ws.readyState === WebSocket.OPEN) {
-      client.ws.send(msg);
-    }
+    safeSend(client.ws, msg);
 
     if (peerCount > 0) {
       const syncRequestMsg = encodeMuxMessage(docId, MUX_SYNC_REQUEST);
       for (const peer of state.clients) {
-        if (peer !== client && peer.ws.readyState === WebSocket.OPEN) {
-          peer.ws.send(syncRequestMsg);
-        }
+        if (peer !== client) safeSend(peer.ws, syncRequestMsg);
       }
     }
   }
@@ -128,9 +130,7 @@ export function createYjsWSS() {
 
     const msg = encodeMuxMessage(docId, MUX_SYNC, payload);
     for (const peer of state.clients) {
-      if (peer !== client && peer.ws.readyState === WebSocket.OPEN) {
-        peer.ws.send(msg);
-      }
+      if (peer !== client) safeSend(peer.ws, msg);
     }
   }
 
@@ -157,9 +157,7 @@ export function createYjsWSS() {
 
     const msg = encodeMuxMessage(docId, MUX_AWARENESS, payload);
     for (const peer of state.clients) {
-      if (peer !== client && peer.ws.readyState === WebSocket.OPEN) {
-        peer.ws.send(msg);
-      }
+      if (peer !== client) safeSend(peer.ws, msg);
     }
   }
 
@@ -184,9 +182,7 @@ export function createYjsWSS() {
       const docId = extractDocId(roomId);
       const msg = encodeMuxMessage(docId, MUX_AWARENESS, removalPayload);
       for (const peer of state.clients) {
-        if (peer.ws.readyState === WebSocket.OPEN) {
-          peer.ws.send(msg);
-        }
+        safeSend(peer.ws, msg);
       }
     }
     state.clientAwarenessIds.delete(client);

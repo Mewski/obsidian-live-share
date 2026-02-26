@@ -26,6 +26,7 @@ export class ControlChannel {
   private stateChangeCallback:
     | ((state: "connected" | "reconnecting" | "disconnected") => void)
     | null = null;
+  private errorCallback: ((context: string, err: unknown) => void) | null = null;
 
   private latencyMs = 0;
   private pingTimer: ReturnType<typeof setInterval> | null = null;
@@ -42,6 +43,10 @@ export class ControlChannel {
 
   onStateChange(callback: (state: "connected" | "reconnecting" | "disconnected") => void) {
     this.stateChangeCallback = callback;
+  }
+
+  onError(callback: (context: string, err: unknown) => void) {
+    this.errorCallback = callback;
   }
 
   getLatency(): number {
@@ -92,7 +97,9 @@ export class ControlChannel {
         if (handlers) {
           for (const handler of handlers) handler(msg as never);
         }
-      } catch {}
+      } catch (err) {
+        this.errorCallback?.("message", err);
+      }
     };
 
     this.ws.onclose = () => {
@@ -243,7 +250,9 @@ export class ControlChannel {
           this.ws.send(JSON.stringify(msg));
         }
       }
-    } catch {}
+    } catch (err) {
+      this.errorCallback?.("encrypt", err);
+    }
   }
 
   private async decryptAndDispatch(raw: ControlMessage & { encrypted?: boolean }): Promise<void> {
@@ -303,6 +312,8 @@ export class ControlChannel {
       if (handlers) {
         for (const handler of handlers) handler(decryptedMsg as never);
       }
-    } catch {}
+    } catch (err) {
+      this.errorCallback?.("decrypt", err);
+    }
   }
 }

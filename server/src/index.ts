@@ -170,6 +170,10 @@ if (isMain) {
       }
 
       const port = Number.parseInt(process.env.PORT || "4321");
+      if (!Number.isFinite(port) || port < 1 || port > 65535) {
+        console.error(`[server] invalid PORT: ${process.env.PORT}`);
+        process.exit(1);
+      }
       server.listen(port, () => {
         console.info(`[server] listening on :${port}`);
       });
