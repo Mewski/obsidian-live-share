@@ -1,21 +1,15 @@
 import { type App, Modal } from "obsidian";
 
-import type { Permission } from "./types";
-
-export interface JoinRequest {
-  userId: string;
-  displayName: string;
-  avatarUrl: string;
-}
+import type { JoinRequestMessage, Permission } from "./types";
 
 export class ApprovalModal extends Modal {
-  private request: JoinRequest;
+  private request: JoinRequestMessage;
   private onDecision: (approved: boolean, permission: Permission) => void;
   private hasDecided = false;
 
   constructor(
     app: App,
-    request: JoinRequest,
+    request: JoinRequestMessage,
     onDecision: (approved: boolean, permission: Permission) => void,
   ) {
     super(app);

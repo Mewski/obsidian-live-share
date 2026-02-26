@@ -83,24 +83,24 @@ export function createApp(
       }
     }
 
+    function authenticateUpgrade(url: URL, roomId: string): boolean {
+      const room = getRoom(roomId);
+      const token = url.searchParams.get("token");
+      if (!room || !token || !safeTokenCompare(token, room.token)) return false;
+      if (REQUIRE_GITHUB_AUTH) {
+        const jwtToken = url.searchParams.get("jwt");
+        if (!jwtToken || !verifyJWT(jwtToken)) return false;
+      }
+      return true;
+    }
+
     const muxMatch = url.pathname.match(/^\/ws-mux\/(.+)$/);
     if (muxMatch) {
       const baseRoomId = muxMatch[1];
-      const room = getRoom(baseRoomId);
-      const token = url.searchParams.get("token");
-      if (!room || !token || !safeTokenCompare(token, room.token)) {
+      if (!authenticateUpgrade(url, baseRoomId)) {
         socket.destroy();
         return;
       }
-
-      if (REQUIRE_GITHUB_AUTH) {
-        const jwtToken = url.searchParams.get("jwt");
-        if (!jwtToken || !verifyJWT(jwtToken)) {
-          socket.destroy();
-          return;
-        }
-      }
-
       yjs.muxWss.handleUpgrade(req, socket, head, (ws) => {
         yjs.muxWss.emit("connection", ws, req, baseRoomId);
       });
@@ -110,21 +110,10 @@ export function createApp(
     const ctrlMatch = url.pathname.match(/^\/control\/(.+)$/);
     if (ctrlMatch) {
       const roomId = ctrlMatch[1];
-      const room = getRoom(roomId);
-      const token = url.searchParams.get("token");
-      if (!room || !token || !safeTokenCompare(token, room.token)) {
+      if (!authenticateUpgrade(url, roomId)) {
         socket.destroy();
         return;
       }
-
-      if (REQUIRE_GITHUB_AUTH) {
-        const jwtToken = url.searchParams.get("jwt");
-        if (!jwtToken || !verifyJWT(jwtToken)) {
-          socket.destroy();
-          return;
-        }
-      }
-
       control.wss.handleUpgrade(req, socket, head, (ws) => {
         control.wss.emit("connection", ws, req, roomId);
       });

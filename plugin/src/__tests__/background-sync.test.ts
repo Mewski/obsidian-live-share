@@ -1,6 +1,14 @@
+import { TFile } from "obsidian";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import * as Y from "yjs";
 import { BackgroundSync } from "../background-sync";
+
+function mockFile(path: string) {
+  const f = Object.create(TFile.prototype);
+  f.path = path;
+  f.stat = { size: 0, mtime: 0, ctime: 0 };
+  return f;
+}
 
 function createVault() {
   return {
@@ -100,7 +108,7 @@ describe("BackgroundSync", () => {
   it("host seeds empty Y.Text from vault content", async () => {
     const entries = new Map([["test.md", { hash: "abc", size: 5, mtime: 1 }]]);
     manifestManager = createManifestManager(entries);
-    vault.getAbstractFileByPath.mockReturnValue({ path: "test.md" });
+    vault.getAbstractFileByPath.mockReturnValue(mockFile("test.md"));
     vault.read.mockResolvedValue("hello world");
     bg = new BackgroundSync(vault, syncManager, manifestManager, fileOpsManager);
 
@@ -113,7 +121,7 @@ describe("BackgroundSync", () => {
   it("host overwrites non-empty Y.Text with local content", async () => {
     const entries = new Map([["test.md", { hash: "abc", size: 5, mtime: 1 }]]);
     manifestManager = createManifestManager(entries);
-    vault.getAbstractFileByPath.mockReturnValue({ path: "test.md" });
+    vault.getAbstractFileByPath.mockReturnValue(mockFile("test.md"));
     vault.read.mockResolvedValue("local content");
     bg = new BackgroundSync(vault, syncManager, manifestManager, fileOpsManager);
 
@@ -128,7 +136,7 @@ describe("BackgroundSync", () => {
   it("guest writes remote Y.Text to vault if different from local", async () => {
     const entries = new Map([["test.md", { hash: "abc", size: 5, mtime: 1 }]]);
     manifestManager = createManifestManager(entries);
-    const fakeFile = { path: "test.md" };
+    const fakeFile = mockFile("test.md");
     vault.getAbstractFileByPath.mockReturnValue(fakeFile);
     vault.read.mockResolvedValue("old content");
     bg = new BackgroundSync(vault, syncManager, manifestManager, fileOpsManager);
@@ -148,9 +156,7 @@ describe("BackgroundSync", () => {
       ["b.md", { hash: "def", size: 5, mtime: 1 }],
     ]);
     manifestManager = createManifestManager(entries);
-    vault.getAbstractFileByPath.mockImplementation((p: string) => ({
-      path: p,
-    }));
+    vault.getAbstractFileByPath.mockImplementation((p: string) => mockFile(p));
     vault.read.mockResolvedValue("");
     bg = new BackgroundSync(vault, syncManager, manifestManager, fileOpsManager);
 
@@ -172,7 +178,7 @@ describe("BackgroundSync", () => {
   it("does not write to disk for the active file", async () => {
     const entries = new Map([["test.md", { hash: "abc", size: 5, mtime: 1 }]]);
     manifestManager = createManifestManager(entries);
-    vault.getAbstractFileByPath.mockReturnValue({ path: "test.md" });
+    vault.getAbstractFileByPath.mockReturnValue(mockFile("test.md"));
     vault.read.mockResolvedValue("");
     bg = new BackgroundSync(vault, syncManager, manifestManager, fileOpsManager);
 
@@ -195,7 +201,7 @@ describe("BackgroundSync", () => {
   it("writes remote changes to disk after debounce", async () => {
     const entries = new Map([["bg.md", { hash: "abc", size: 5, mtime: 1 }]]);
     manifestManager = createManifestManager(entries);
-    vault.getAbstractFileByPath.mockReturnValue({ path: "bg.md" });
+    vault.getAbstractFileByPath.mockReturnValue(mockFile("bg.md"));
     vault.read.mockResolvedValue("");
     bg = new BackgroundSync(vault, syncManager, manifestManager, fileOpsManager);
 
@@ -221,7 +227,7 @@ describe("BackgroundSync", () => {
   it("host pushes local text changes into Y.Doc", async () => {
     const entries = new Map([["note.md", { hash: "abc", size: 5, mtime: 1 }]]);
     manifestManager = createManifestManager(entries);
-    const fakeFile = { path: "note.md", stat: { size: 20, mtime: 1 } };
+    const fakeFile = mockFile("note.md");
     vault.getAbstractFileByPath.mockReturnValue(fakeFile);
     vault.read.mockResolvedValue("initial");
     bg = new BackgroundSync(vault, syncManager, manifestManager, fileOpsManager);
@@ -239,7 +245,7 @@ describe("BackgroundSync", () => {
   it("handleLocalTextModify skips the active file", async () => {
     const entries = new Map([["note.md", { hash: "abc", size: 5, mtime: 1 }]]);
     manifestManager = createManifestManager(entries);
-    vault.getAbstractFileByPath.mockReturnValue({ path: "note.md" });
+    vault.getAbstractFileByPath.mockReturnValue(mockFile("note.md"));
     vault.read.mockResolvedValue("initial");
     bg = new BackgroundSync(vault, syncManager, manifestManager, fileOpsManager);
 
@@ -256,7 +262,7 @@ describe("BackgroundSync", () => {
   it("handleLocalTextModify skips when writtenByUs", async () => {
     const entries = new Map([["note.md", { hash: "abc", size: 5, mtime: 1 }]]);
     manifestManager = createManifestManager(entries);
-    vault.getAbstractFileByPath.mockReturnValue({ path: "note.md" });
+    vault.getAbstractFileByPath.mockReturnValue(mockFile("note.md"));
     vault.read.mockResolvedValue("");
     bg = new BackgroundSync(vault, syncManager, manifestManager, fileOpsManager);
 
@@ -321,7 +327,7 @@ describe("BackgroundSync", () => {
   it("destroy cancels pending writes and cleans up", async () => {
     const entries = new Map([["flush.md", { hash: "abc", size: 5, mtime: 1 }]]);
     manifestManager = createManifestManager(entries);
-    vault.getAbstractFileByPath.mockReturnValue({ path: "flush.md" });
+    vault.getAbstractFileByPath.mockReturnValue(mockFile("flush.md"));
     vault.read.mockResolvedValue("");
     bg = new BackgroundSync(vault, syncManager, manifestManager, fileOpsManager);
 

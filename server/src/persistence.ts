@@ -32,10 +32,14 @@ export function createLevelPersistence(dbPath = "./data/yjs-docs"): Persistence 
           if (key.startsWith("room:")) {
             try {
               rooms.push(JSON.parse(value.toString("utf-8")));
-            } catch {}
+            } catch (err) {
+              console.warn("[persistence] corrupt room entry, skipping:", key, err);
+            }
           }
         }
-      } catch {}
+      } catch (err) {
+        console.warn("[persistence] failed to load rooms:", err);
+      }
       return rooms;
     },
 

@@ -1,5 +1,6 @@
 import { Notice } from "obsidian";
 import type LiveSharePlugin from "./main";
+import { parseJwtPayload } from "./utils";
 
 export class AuthManager {
   constructor(private plugin: LiveSharePlugin) {}
@@ -16,12 +17,7 @@ export class AuthManager {
     if (!jwt) return false;
 
     try {
-      const parts = jwt.split(".");
-      if (parts.length !== 3) throw new Error("Invalid JWT");
-      const b64 = parts[1].replace(/-/g, "+").replace(/_/g, "/");
-      const payload = JSON.parse(atob(b64));
-      if (!payload.sub || !payload.username) throw new Error("Invalid JWT payload");
-
+      const payload = parseJwtPayload(jwt);
       this.plugin.settings.jwt = jwt;
       this.plugin.settings.githubUserId = payload.sub;
       this.plugin.settings.displayName = payload.displayName || payload.username;

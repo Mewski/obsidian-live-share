@@ -64,17 +64,7 @@ export async function reapStaleRooms() {
   for (const [id, room] of rooms) {
     const age = now - (room.lastActivityAt || room.createdAt);
     if (age > ROOM_MAX_AGE_MS) {
-      rooms.delete(id);
-      const timer = touchTimers.get(id);
-      if (timer) {
-        clearTimeout(timer);
-        touchTimers.delete(id);
-      }
-      try {
-        await persistence.deleteRoom(id);
-      } catch (err) {
-        console.error(`[rooms] failed to reap stale room ${id}:`, err);
-      }
+      await removeRoom(id);
     }
   }
 }

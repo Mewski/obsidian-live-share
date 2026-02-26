@@ -1,4 +1,4 @@
-import { TFolder, type Vault } from "obsidian";
+import { TFile, TFolder, type Vault } from "obsidian";
 
 export const VAULT_EVENT_SETTLE_MS = 100;
 
@@ -152,6 +152,27 @@ export function base64ToArrayBuffer(base64: string): ArrayBuffer {
     bytes[i] = binary.charCodeAt(i);
   }
   return bytes.buffer as ArrayBuffer;
+}
+
+export interface JwtPayload {
+  sub: string;
+  username: string;
+  displayName?: string;
+  avatar?: string;
+}
+
+export function parseJwtPayload(token: string): JwtPayload {
+  const parts = token.split(".");
+  if (parts.length !== 3) throw new Error("Invalid JWT");
+  const b64 = parts[1].replace(/-/g, "+").replace(/_/g, "/");
+  const payload = JSON.parse(atob(b64));
+  if (!payload.sub || !payload.username) throw new Error("Invalid JWT payload");
+  return payload as JwtPayload;
+}
+
+export function getFileByPath(vault: Vault, path: string): TFile | null {
+  const file = vault.getAbstractFileByPath(path);
+  return file instanceof TFile ? file : null;
 }
 
 export async function ensureFolder(vault: Vault, path: string): Promise<void> {

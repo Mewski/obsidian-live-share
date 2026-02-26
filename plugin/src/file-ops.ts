@@ -13,6 +13,7 @@ import {
 
 const CHUNK_SIZE = 512 * 1024;
 const MAX_FILE_SIZE = 50 * 1024 * 1024;
+const RENAME_RETRY_DELAY_MS = 300;
 
 interface ChunkAssembly {
   chunks: string[];
@@ -86,7 +87,8 @@ export class FileOpsManager {
     return paths;
   }
 
-  private async applyRemoteOpInner(op: FileOp) {
+  private async applyRemoteOpInner(rawOp: FileOp) {
+    const op = { ...rawOp } as FileOp;
     if ("path" in op) op.path = normalizePath(op.path);
     if ("oldPath" in op) op.oldPath = normalizePath(op.oldPath);
     if ("newPath" in op) op.newPath = normalizePath(op.newPath);
@@ -152,7 +154,7 @@ export class FileOpsManager {
         case "rename": {
           let file = this.vault.getAbstractFileByPath(op.oldPath);
           if (!file) {
-            await new Promise((resolve) => setTimeout(resolve, 300));
+            await new Promise((resolve) => setTimeout(resolve, RENAME_RETRY_DELAY_MS));
             file = this.vault.getAbstractFileByPath(op.oldPath);
           }
           const alreadyExists = this.vault.getAbstractFileByPath(op.newPath);

@@ -151,7 +151,9 @@ export function createYjsWSS() {
         const clientId = decoding.readVarUint(decoder);
         ids.add(clientId);
       }
-    } catch {}
+    } catch (err) {
+      console.debug("[yjs-mux] malformed awareness data, skipping:", err);
+    }
 
     const msg = encodeMuxMessage(docId, MUX_AWARENESS, payload);
     for (const peer of state.clients) {
@@ -256,7 +258,7 @@ export function createYjsWSS() {
     const uniqueClients = new Set<WebSocket>();
     const sessions = new Set<string>();
     for (const [roomId, state] of roomStates) {
-      const baseRoomId = roomId.substring(0, roomId.indexOf(":"));
+      const baseRoomId = extractBaseRoomId(roomId);
       if (baseRoomId) sessions.add(baseRoomId);
       for (const client of state.clients) {
         uniqueClients.add(client.ws);
@@ -285,6 +287,11 @@ export function createYjsWSS() {
   }
 
   return { muxWss, closeAll, getStats, updatePermission };
+}
+
+function extractBaseRoomId(roomId: string): string {
+  const colonIndex = roomId.indexOf(":");
+  return colonIndex >= 0 ? roomId.substring(0, colonIndex) : roomId;
 }
 
 function extractDocId(roomId: string): string {

@@ -1,4 +1,4 @@
-import { Notice, type TFile, type Vault } from "obsidian";
+import type { Vault } from "obsidian";
 import type * as Y from "yjs";
 
 import type { FileOpsManager } from "./file-ops";
@@ -9,6 +9,7 @@ import {
   VAULT_EVENT_SETTLE_MS,
   applyMinimalYTextUpdate,
   ensureFolder,
+  getFileByPath,
   isTextFile,
   normalizeLineEndings,
   normalizePath,
@@ -25,7 +26,6 @@ export class BackgroundSync {
   private lastWrittenContent = new Map<string, string>();
   private writeQueue: Promise<void> = Promise.resolve();
   private role: SessionRole = "host";
-  private destroyed = false;
   private running = false;
 
   constructor(
@@ -40,7 +40,6 @@ export class BackgroundSync {
   }
 
   async startAll(role: SessionRole): Promise<void> {
-    this.destroyed = false;
     this.running = true;
     this.role = role;
     const entries = this.manifestManager.getEntries();
@@ -71,14 +70,14 @@ export class BackgroundSync {
       if (docHandle.doc.isDestroyed) return;
 
       if (this.role === "host" && path !== this.activeFile) {
-        const file = this.vault.getAbstractFileByPath(path) as TFile | null;
+        const file = getFileByPath(this.vault, path);
         if (file) {
           const content = normalizeLineEndings(await this.vault.read(file));
           applyMinimalYTextUpdate(docHandle.doc, docHandle.text, content);
           this.lastWrittenContent.set(path, content);
         }
       } else if (this.role === "guest" && docHandle.text.length > 0) {
-        const file = this.vault.getAbstractFileByPath(path) as TFile | null;
+        const file = getFileByPath(this.vault, path);
         const remoteContent = docHandle.text.toString();
         const localContent = file ? normalizeLineEndings(await this.vault.read(file)) : "";
         if (remoteContent !== localContent) {
@@ -121,7 +120,7 @@ export class BackgroundSync {
         const content = docHandle.text.toString();
         this.writeToDisk(oldActive, content);
         if (this.role === "host") {
-          const file = this.vault.getAbstractFileByPath(oldActive) as TFile | null;
+          const file = getFileByPath(this.vault, oldActive);
           if (file) this.manifestManager.updateFile(file, content);
         }
       }
@@ -186,13 +185,13 @@ export class BackgroundSync {
       if (docHandle.doc.isDestroyed) return;
 
       if (this.role === "host") {
-        const file = this.vault.getAbstractFileByPath(normNew) as TFile | null;
+        const file = getFileByPath(this.vault, normNew);
         if (file) {
           const content = normalizeLineEndings(await this.vault.read(file));
           applyMinimalYTextUpdate(docHandle.doc, docHandle.text, content);
         }
       } else if (docHandle.text.length > 0) {
-        const file = this.vault.getAbstractFileByPath(normNew) as TFile | null;
+        const file = getFileByPath(this.vault, normNew);
         const remoteContent = docHandle.text.toString();
         const localContent = file ? normalizeLineEndings(await this.vault.read(file)) : "";
         if (remoteContent !== localContent) {
@@ -220,7 +219,7 @@ export class BackgroundSync {
     const docHandle = this.syncManager.getDoc(path);
     if (!docHandle) return;
 
-    const file = this.vault.getAbstractFileByPath(path) as TFile | null;
+    const file = getFileByPath(this.vault, path);
     if (!file) return;
 
     const localContent = normalizeLineEndings(await this.vault.read(file));
@@ -238,7 +237,6 @@ export class BackgroundSync {
   }
 
   destroy(): void {
-    this.destroyed = true;
     this.running = false;
     for (const timer of this.writeTimers.values()) {
       clearTimeout(timer);
@@ -287,7 +285,7 @@ export class BackgroundSync {
     this.recentDiskWrites.add(path);
     this.fileOpsManager.mutePathEvents(path);
     try {
-      const file = this.vault.getAbstractFileByPath(path) as TFile | null;
+      const file = getFileByPath(this.vault, path);
       if (file) {
         const existing = normalizeLineEndings(await this.vault.read(file));
         if (existing === content) {

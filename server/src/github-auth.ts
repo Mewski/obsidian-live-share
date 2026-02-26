@@ -48,7 +48,7 @@ export function createAuthRouter(): Router {
   const router = Router();
 
   router.get("/github", (req, res) => {
-    const state = (req.query.state as string) || "";
+    const state = typeof req.query.state === "string" ? req.query.state : "";
     const params = new URLSearchParams({
       client_id: GITHUB_CLIENT_ID,
       scope: "read:user",
@@ -59,7 +59,7 @@ export function createAuthRouter(): Router {
 
   router.get("/github/callback", async (req, res) => {
     try {
-      const code = req.query.code as string;
+      const code = typeof req.query.code === "string" ? req.query.code : "";
       if (!code) {
         res.status(400).send("Missing code");
         return;

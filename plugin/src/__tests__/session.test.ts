@@ -1,40 +1,11 @@
 import { describe, expect, it } from "vitest";
-
-interface InvitePayload {
-  s: string;
-  r: string;
-  t: string;
-  e?: string;
-}
-
-function parseInvite(invite: string): InvitePayload | null {
-  const prefix = "obsliveshare:";
-  if (!invite.startsWith(prefix)) return null;
-  try {
-    const json = atob(invite.slice(prefix.length));
-    const parsed = JSON.parse(json);
-    if (
-      typeof parsed.s === "string" &&
-      typeof parsed.r === "string" &&
-      typeof parsed.t === "string"
-    ) {
-      const url = new URL(parsed.s);
-      if (url.protocol !== "http:" && url.protocol !== "https:") {
-        return null;
-      }
-      return parsed as InvitePayload;
-    }
-    return null;
-  } catch {
-    return null;
-  }
-}
+import { parseInvite } from "../session";
 
 function makeInvite(payload: Record<string, unknown>): string {
   return `obsliveshare:${btoa(JSON.stringify(payload))}`;
 }
 
-describe("Invite format parsing (mirrors SessionManager.parseInvite)", () => {
+describe("parseInvite", () => {
   it("parses a valid invite with an http URL", () => {
     const result = parseInvite(
       makeInvite({

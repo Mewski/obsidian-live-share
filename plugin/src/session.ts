@@ -64,7 +64,7 @@ export class SessionManager {
   }
 
   async joinSession(inviteString: string): Promise<boolean> {
-    const parsedInvite = this.parseInvite(inviteString);
+    const parsedInvite = parseInvite(inviteString);
     if (!parsedInvite) {
       new Notice("Live Share: invalid invite string");
       return false;
@@ -152,28 +152,28 @@ export class SessionManager {
     await navigator.clipboard.writeText(invite);
     new Notice("Live Share: invite link copied to clipboard");
   }
+}
 
-  private parseInvite(raw: string): InvitePayload | null {
-    const invite = raw.trim();
-    const prefix = "obsliveshare:";
-    if (!invite.startsWith(prefix)) return null;
-    try {
-      const json = atob(invite.slice(prefix.length));
-      const parsed = JSON.parse(json);
-      if (
-        typeof parsed.s === "string" &&
-        typeof parsed.r === "string" &&
-        typeof parsed.t === "string"
-      ) {
-        const url = new URL(parsed.s);
-        if (url.protocol !== "http:" && url.protocol !== "https:") {
-          return null;
-        }
-        return parsed as InvitePayload;
+export function parseInvite(raw: string): InvitePayload | null {
+  const invite = raw.trim();
+  const prefix = "obsliveshare:";
+  if (!invite.startsWith(prefix)) return null;
+  try {
+    const json = atob(invite.slice(prefix.length));
+    const parsed = JSON.parse(json);
+    if (
+      typeof parsed.s === "string" &&
+      typeof parsed.r === "string" &&
+      typeof parsed.t === "string"
+    ) {
+      const url = new URL(parsed.s);
+      if (url.protocol !== "http:" && url.protocol !== "https:") {
+        return null;
       }
-      return null;
-    } catch {
-      return null;
+      return parsed as InvitePayload;
     }
+    return null;
+  } catch {
+    return null;
   }
 }

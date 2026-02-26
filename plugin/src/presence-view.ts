@@ -53,11 +53,6 @@ export class PresenceView extends ItemView {
     this.onSetPermissionRequest = handler;
   }
 
-  setIsHost(isHost: boolean) {
-    this.isHost = isHost;
-    this.render();
-  }
-
   updateState(users: Map<string, PresenceUser>, isHost: boolean, followedUserId: string | null) {
     this.users = users;
     this.isHost = isHost;

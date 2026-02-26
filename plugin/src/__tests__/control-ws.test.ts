@@ -161,7 +161,15 @@ describe("ControlChannel", () => {
       channel.on("file-op", handler);
 
       const ws = connectAndGetWs(channel);
-      ws.simulateMessage(JSON.stringify({ type: "presence-update" }));
+      ws.simulateMessage(
+        JSON.stringify({
+          type: "presence-update",
+          userId: "u1",
+          displayName: "X",
+          cursorColor: "#000",
+          currentFile: "",
+        }),
+      );
 
       expect(handler).not.toHaveBeenCalled();
     });
@@ -176,7 +184,13 @@ describe("ControlChannel", () => {
       const ws = connectAndGetWs(channel);
       ws.readyState = MockWebSocket.OPEN;
 
-      const msg: ControlMessage = { type: "presence-update", name: "Alice" };
+      const msg: ControlMessage = {
+        type: "presence-update",
+        userId: "u1",
+        displayName: "Alice",
+        cursorColor: "#000",
+        currentFile: "note.md",
+      };
       channel.send(msg);
 
       expect(ws.sent).toHaveLength(1);
@@ -187,14 +201,14 @@ describe("ControlChannel", () => {
       const ws = connectAndGetWs(channel);
       ws.readyState = MockWebSocket.CLOSED;
 
-      channel.send({ type: "presence-update" });
+      channel.send({ type: "ping", timestamp: 0 });
 
       expect(ws.sent).toHaveLength(0);
     });
 
     it("does not send when ws is null", () => {
       channel = new CC(createSettings());
-      channel.send({ type: "presence-update" });
+      channel.send({ type: "ping", timestamp: 0 });
     });
   });
 
@@ -222,7 +236,7 @@ describe("ControlChannel", () => {
       channel = new CC(createSettings(), e2e as any);
       const ws = connectAndGetWs(channel);
 
-      channel.send({ type: "presence-update", name: "Bob" });
+      channel.send({ type: "ping", timestamp: 0 });
 
       expect(ws.sent).toHaveLength(1);
       const sent = JSON.parse(ws.sent[0]);
@@ -496,7 +510,7 @@ describe("ControlChannel", () => {
       const ws = connectAndGetWs(channel);
       ws.readyState = MockWebSocket.CLOSED;
 
-      channel.send({ type: "presence-update" });
+      channel.send({ type: "ping", timestamp: 0 });
 
       expect(ws.sent).toHaveLength(0);
     });

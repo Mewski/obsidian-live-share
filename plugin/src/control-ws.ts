@@ -1,36 +1,17 @@
 import type { E2ECrypto } from "./crypto";
-import type { LiveShareSettings } from "./types";
+import type {
+  ControlMessage,
+  ControlMessageMap,
+  ControlMessageType,
+  LiveShareSettings,
+} from "./types";
 import { toWsUrl } from "./utils";
 
-export type ControlMessageType =
-  | "file-op"
-  | "file-chunk-start"
-  | "file-chunk-data"
-  | "file-chunk-end"
-  | "presence-update"
-  | "presence-leave"
-  | "session-end"
-  | "join-request"
-  | "join-response"
-  | "focus-request"
-  | "summon"
-  | "kick"
-  | "kicked"
-  | "sync-request"
-  | "sync-response"
-  | "set-permission"
-  | "permission-update"
-  | "present-start"
-  | "present-stop"
-  | "ping"
-  | "pong";
+export type { ControlMessage, ControlMessageType };
 
-export interface ControlMessage {
-  type: ControlMessageType;
-  [key: string]: unknown;
-}
-
-type Handler = (msg: ControlMessage) => void;
+type Handler<T extends ControlMessageType = ControlMessageType> = (
+  msg: ControlMessageMap[T],
+) => void;
 
 const RECONNECT_BASE_MS = 1000;
 const RECONNECT_MAX_MS = 30_000;
@@ -38,7 +19,7 @@ const MAX_RECONNECT_ATTEMPTS = 10;
 
 export class ControlChannel {
   private ws: WebSocket | null = null;
-  private handlers = new Map<ControlMessageType, Handler[]>();
+  private handlers = new Map<ControlMessageType, Handler<ControlMessageType>[]>();
   private settings: LiveShareSettings;
   private isDestroyed = false;
   private e2e: E2ECrypto | null = null;
@@ -109,7 +90,7 @@ export class ControlChannel {
         }
         const handlers = this.handlers.get(msg.type);
         if (handlers) {
-          for (const handler of handlers) handler(msg);
+          for (const handler of handlers) handler(msg as never);
         }
       } catch {}
     };
@@ -157,19 +138,19 @@ export class ControlChannel {
     }
   }
 
-  on(type: ControlMessageType, handler: Handler): void {
+  on<T extends ControlMessageType>(type: T, handler: (msg: ControlMessageMap[T]) => void): void {
     let list = this.handlers.get(type);
     if (!list) {
       list = [];
       this.handlers.set(type, list);
     }
-    list.push(handler);
+    list.push(handler as Handler<ControlMessageType>);
   }
 
-  off(type: ControlMessageType, handler: Handler): void {
+  off<T extends ControlMessageType>(type: T, handler: (msg: ControlMessageMap[T]) => void): void {
     const list = this.handlers.get(type);
     if (list) {
-      const idx = list.indexOf(handler);
+      const idx = list.indexOf(handler as Handler<ControlMessageType>);
       if (idx >= 0) list.splice(idx, 1);
     }
   }
@@ -231,8 +212,8 @@ export class ControlChannel {
             encrypted: true,
           }),
         );
-      } else {
-        const op = msg.op as Record<string, unknown>;
+      } else if (msg.type === "file-op") {
+        const op = msg.op as unknown as Record<string, unknown>;
         if (op && typeof op.content === "string") {
           const encryptedOp: Record<string, unknown> = {
             ...op,
@@ -251,7 +232,7 @@ export class ControlChannel {
             }),
           );
         } else if (op) {
-          const encryptedOp = { ...op };
+          const encryptedOp: Record<string, unknown> = { ...op };
           if (typeof op.path === "string") encryptedOp.path = await this.e2e.encryptString(op.path);
           if (typeof op.oldPath === "string")
             encryptedOp.oldPath = await this.e2e.encryptString(op.oldPath);
@@ -265,16 +246,17 @@ export class ControlChannel {
     } catch {}
   }
 
-  private async decryptAndDispatch(msg: ControlMessage): Promise<void> {
+  private async decryptAndDispatch(raw: ControlMessage & { encrypted?: boolean }): Promise<void> {
     if (!this.e2e) return;
     try {
+      const { encrypted: _, ...msg } = raw;
       let decryptedMsg: ControlMessage;
       if (
         (msg.type === "file-chunk-start" || msg.type === "file-chunk-end") &&
         typeof msg.path === "string"
       ) {
         const decryptedPath = await this.e2e.decryptString(msg.path);
-        decryptedMsg = { ...msg, path: decryptedPath, encrypted: undefined };
+        decryptedMsg = { ...msg, path: decryptedPath };
       } else if (msg.type === "file-chunk-data" && typeof msg.data === "string") {
         const decryptedData = await this.e2e.decryptString(msg.data);
         const decryptedPath =
@@ -283,10 +265,9 @@ export class ControlChannel {
           ...msg,
           data: decryptedData,
           path: decryptedPath,
-          encrypted: undefined,
         };
-      } else {
-        const op = msg.op as Record<string, unknown> | undefined;
+      } else if (msg.type === "file-op") {
+        const op = msg.op as unknown as Record<string, unknown>;
         if (op && typeof op.content === "string") {
           const decryptedOp: Record<string, unknown> = {
             ...op,
@@ -300,23 +281,27 @@ export class ControlChannel {
           decryptedMsg = {
             ...msg,
             op: decryptedOp,
-            encrypted: undefined,
-          };
+          } as unknown as ControlMessage;
         } else if (op) {
-          const decryptedOp = { ...op };
+          const decryptedOp: Record<string, unknown> = { ...op };
           if (typeof op.path === "string") decryptedOp.path = await this.e2e.decryptString(op.path);
           if (typeof op.oldPath === "string")
             decryptedOp.oldPath = await this.e2e.decryptString(op.oldPath);
           if (typeof op.newPath === "string")
             decryptedOp.newPath = await this.e2e.decryptString(op.newPath);
-          decryptedMsg = { ...msg, op: decryptedOp, encrypted: undefined };
+          decryptedMsg = {
+            ...msg,
+            op: decryptedOp,
+          } as unknown as ControlMessage;
         } else {
           decryptedMsg = msg;
         }
+      } else {
+        decryptedMsg = msg;
       }
-      const handlers = this.handlers.get(decryptedMsg.type as ControlMessageType);
+      const handlers = this.handlers.get(decryptedMsg.type);
       if (handlers) {
-        for (const handler of handlers) handler(decryptedMsg as ControlMessage);
+        for (const handler of handlers) handler(decryptedMsg as never);
       }
     } catch {}
   }

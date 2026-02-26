@@ -1,28 +1,53 @@
+import type { EditorView } from "@codemirror/view";
 import { MarkdownView, Notice, Plugin, type TAbstractFile, TFile } from "obsidian";
 
-import { ApprovalModal, type JoinRequest } from "./approval-modal";
+import { ApprovalModal } from "./approval-modal";
 import { AuthManager } from "./auth";
 import { BackgroundSync } from "./background-sync";
 import { CollabManager } from "./collab";
 import { ConnectionStateManager } from "./connection-state";
-import { ControlChannel, type ControlMessageType } from "./control-ws";
+import { ControlChannel } from "./control-ws";
 import { E2ECrypto } from "./crypto";
 import { ExclusionManager } from "./exclusion";
 import { FileOpsManager } from "./file-ops";
-import { type FocusRequest, showFocusNotification } from "./focus-notification";
+import { showFocusNotification } from "./focus-notification";
 import { ManifestManager } from "./manifest";
 import { ConfirmModal, PromptModal, UserPickerModal } from "./modals";
 import { PRESENCE_VIEW_TYPE, type PresenceUser, PresenceView } from "./presence-view";
 import { SessionManager } from "./session";
 import { LiveShareSettingTab } from "./settings";
 import { SyncManager } from "./sync";
-import { DEFAULT_SETTINGS, type LiveShareSettings } from "./types";
-import { VAULT_EVENT_SETTLE_MS, ensureFolder, isTextFile, normalizePath } from "./utils";
+import {
+  type ControlMessage,
+  type ControlMessageType,
+  DEFAULT_SETTINGS,
+  type FileOp,
+  type LiveShareSettings,
+} from "./types";
+import {
+  VAULT_EVENT_SETTLE_MS,
+  ensureFolder,
+  isTextFile,
+  normalizePath,
+  parseJwtPayload,
+} from "./utils";
 
-function getCmView(view: MarkdownView): import("@codemirror/view").EditorView | undefined {
+function getCmView(view: MarkdownView): EditorView | undefined {
   // biome-ignore lint/suspicious/noExplicitAny: Obsidian does not expose .cm in its public typings
-  return (view.editor as any).cm as import("@codemirror/view").EditorView | undefined;
+  return (view.editor as any).cm as EditorView | undefined;
 }
+
+const CHUNK_TO_CONTROL = {
+  "chunk-start": "file-chunk-start",
+  "chunk-data": "file-chunk-data",
+  "chunk-end": "file-chunk-end",
+} as const;
+
+const CONTROL_TO_CHUNK: Record<string, string> = {
+  "file-chunk-start": "chunk-start",
+  "file-chunk-data": "chunk-data",
+  "file-chunk-end": "chunk-end",
+};
 
 export default class LiveSharePlugin extends Plugin {
   settings!: LiveShareSettings;
@@ -43,8 +68,11 @@ export default class LiveSharePlugin extends Plugin {
   private unfollowListeners: (() => void)[] = [];
   private connectionStateUnsub: (() => void) | null = null;
   statusBarEl!: HTMLElement;
-
   private isEndingSession = false;
+  private presenceTimer: ReturnType<typeof setTimeout> | null = null;
+  private presenceInterval: ReturnType<typeof setInterval> | null = null;
+  private currentScrollListener: (() => void) | null = null;
+  private isApplyingFollow = false;
 
   private requestBinaryFile = (path: string) => {
     this.controlChannel?.send({ type: "sync-request", path });
@@ -128,11 +156,6 @@ export default class LiveSharePlugin extends Plugin {
     });
   }
 
-  private presenceTimer: ReturnType<typeof setTimeout> | null = null;
-  private presenceInterval: ReturnType<typeof setInterval> | null = null;
-
-  private currentScrollListener: (() => void) | null = null;
-
   private get userId(): string {
     return this.settings.githubUserId || this.settings.clientId;
   }
@@ -193,7 +216,7 @@ export default class LiveSharePlugin extends Plugin {
             "Are you sure you want to end the session? All participants will be disconnected.",
           );
           if (confirmed) this.endSession();
-        })();
+        })().catch(() => {});
       },
     });
 
@@ -206,7 +229,7 @@ export default class LiveSharePlugin extends Plugin {
         (async () => {
           const confirmed = await this.confirm("Are you sure you want to leave the session?");
           if (confirmed) this.endSession();
-        })();
+        })().catch(() => {});
       },
     });
 
@@ -314,7 +337,6 @@ export default class LiveSharePlugin extends Plugin {
       view.setKickHandler((userId) => this.kickUser(userId));
       view.setSummonHandler((userId) => this.summonUser(userId));
       view.setPermissionHandler((userId) => this.setUserPermission(userId));
-      view.setIsHost(this.settings.role === "host");
       return view;
     });
 
@@ -422,11 +444,7 @@ export default class LiveSharePlugin extends Plugin {
       const token = params.token;
       if (!token) return;
       try {
-        const parts = token.split(".");
-        if (parts.length !== 3) throw new Error("Invalid JWT");
-        const b64 = parts[1].replace(/-/g, "+").replace(/_/g, "/");
-        const payload = JSON.parse(atob(b64));
-        if (!payload.sub || !payload.username) throw new Error("Invalid JWT payload");
+        const payload = parseJwtPayload(token);
         this.settings.jwt = token;
         this.settings.githubUserId = payload.sub;
         this.settings.displayName = payload.displayName || payload.username;
@@ -501,7 +519,7 @@ export default class LiveSharePlugin extends Plugin {
     this.manifestManager.updateSettings(this.settings);
   }
 
-  followUser(userId: string) {
+  private followUser(userId: string) {
     if (this.followTarget === userId) {
       this.unfollowUser();
       return;
@@ -523,7 +541,7 @@ export default class LiveSharePlugin extends Plugin {
     if (user) this.applyFollowState(user);
   }
 
-  promptText(placeholder: string): Promise<string | null> {
+  public promptText(placeholder: string): Promise<string | null> {
     return new Promise((resolve) => {
       const modal = new PromptModal(this.app, placeholder, resolve);
       modal.open();
@@ -706,18 +724,16 @@ export default class LiveSharePlugin extends Plugin {
 
     this.fileOpsManager.setSender((op) => {
       if (op.type === "chunk-start" || op.type === "chunk-data" || op.type === "chunk-end") {
-        const typeMap: Record<string, ControlMessageType> = {
-          "chunk-start": "file-chunk-start",
-          "chunk-data": "file-chunk-data",
-          "chunk-end": "file-chunk-end",
-        };
-        this.controlChannel?.send({ ...op, type: typeMap[op.type] });
+        this.controlChannel?.send({
+          ...op,
+          type: CHUNK_TO_CONTROL[op.type],
+        } as ControlMessage);
       } else {
         this.controlChannel?.send({ type: "file-op", op });
       }
     });
     this.controlChannel.on("file-op", (msg) => {
-      const op = msg.op as import("./types").FileOp;
+      const op = msg.op;
       const paths = [
         "path" in op ? op.path : null,
         "oldPath" in op ? op.oldPath : null,
@@ -760,23 +776,17 @@ export default class LiveSharePlugin extends Plugin {
     });
     for (const chunkType of ["file-chunk-start", "file-chunk-data", "file-chunk-end"] as const) {
       this.controlChannel.on(chunkType, (msg) => {
-        const path = msg.path as string;
-        if (!path || !this.manifestManager.isSharedPath(path)) return;
-        const typeMap: Record<string, string> = {
-          "file-chunk-start": "chunk-start",
-          "file-chunk-data": "chunk-data",
-          "file-chunk-end": "chunk-end",
-        };
+        if (!msg.path || !this.manifestManager.isSharedPath(msg.path)) return;
         this.fileOpsManager
           .applyRemoteOp({
             ...msg,
-            type: typeMap[chunkType],
-          } as import("./types").FileOp)
+            type: CONTROL_TO_CHUNK[chunkType],
+          } as FileOp)
           .catch(() => {});
       });
     }
     this.controlChannel.on("presence-update", (msg) => {
-      const user = msg as unknown as PresenceUser;
+      const user: PresenceUser = msg;
       const isNew = !this.remoteUsers.has(user.userId);
       const existing = this.remoteUsers.get(user.userId);
       if (existing?.permission && !user.permission) {
@@ -793,8 +803,8 @@ export default class LiveSharePlugin extends Plugin {
       }
     });
     this.controlChannel.on("presence-leave", (msg) => {
-      const userId = msg.userId as string;
-      if (userId) {
+      if (msg.userId) {
+        const userId = msg.userId;
         const leavingUser = this.remoteUsers.get(userId);
         this.remoteUsers.delete(userId);
         this.refreshPresenceView();
@@ -811,15 +821,15 @@ export default class LiveSharePlugin extends Plugin {
 
     this.controlChannel.on("join-request", (msg) => {
       if (this.settings.role !== "host") return;
-      new ApprovalModal(this.app, msg as unknown as JoinRequest, (approved, permission) => {
+      new ApprovalModal(this.app, msg, (approved, permission) => {
         this.controlChannel?.send({
           type: "join-response",
-          userId: msg.userId as string,
+          userId: msg.userId,
           approved,
           permission,
         });
         if (approved) {
-          const existing = this.remoteUsers.get(msg.userId as string);
+          const existing = this.remoteUsers.get(msg.userId);
           if (existing) existing.permission = permission;
         }
       }).open();
@@ -832,47 +842,43 @@ export default class LiveSharePlugin extends Plugin {
         this.endSession();
         return;
       }
-      const permission = msg.permission as string | undefined;
-      if (permission === "read-only" || permission === "read-write") {
-        this.settings.permission = permission;
+      if (msg.permission) {
+        this.settings.permission = msg.permission;
       }
       this.broadcastPresence();
     });
 
     this.controlChannel.on("permission-update", async (msg) => {
-      const permission = msg.permission as string | undefined;
-      if (permission !== "read-only" && permission !== "read-write") return;
-      this.settings.permission = permission;
+      this.settings.permission = msg.permission;
       this.onActiveFileChange();
-      new Notice(`Live Share: your permission was changed to ${permission}`);
+      new Notice(`Live Share: your permission was changed to ${msg.permission}`);
     });
 
     this.controlChannel.on("focus-request", (msg) => {
-      showFocusNotification(this, msg as unknown as FocusRequest);
+      showFocusNotification(this, msg);
     });
     this.controlChannel.on("summon", async (msg) => {
-      const req = msg as unknown as FocusRequest;
-      const file = this.app.vault.getAbstractFileByPath(req.filePath);
+      const file = this.app.vault.getAbstractFileByPath(msg.filePath);
       if (file instanceof TFile) {
         await this.app.workspace.getLeaf().openFile(file);
         const view = this.app.workspace.getActiveViewOfType(MarkdownView);
         if (view) {
-          view.editor.setCursor({ line: req.line, ch: req.ch });
+          view.editor.setCursor({ line: msg.line, ch: msg.ch });
           view.editor.scrollIntoView(
-            { from: { line: req.line, ch: 0 }, to: { line: req.line, ch: 0 } },
+            { from: { line: msg.line, ch: 0 }, to: { line: msg.line, ch: 0 } },
             true,
           );
         }
       }
       new Notice(
-        `Live Share: ${req.fromDisplayName} summoned you to ${req.filePath}:${req.line + 1}`,
+        `Live Share: ${msg.fromDisplayName} summoned you to ${msg.filePath}:${msg.line + 1}`,
       );
     });
 
     this.controlChannel.on("present-start", (msg) => {
       if (this.settings.role === "host") return;
-      const hostUserId = msg.userId as string;
-      if (!hostUserId) return;
+      if (!msg.userId) return;
+      const hostUserId = msg.userId;
       this.clearUnfollowListeners();
       this.followTarget = hostUserId;
       const user = this.remoteUsers.get(hostUserId);
@@ -882,8 +888,7 @@ export default class LiveSharePlugin extends Plugin {
 
     this.controlChannel.on("present-stop", (msg) => {
       if (this.settings.role === "host") return;
-      const hostUserId = msg.userId as string;
-      if (hostUserId && this.followTarget === hostUserId) {
+      if (msg.userId && this.followTarget === msg.userId) {
         this.followTarget = null;
         this.clearUnfollowListeners();
         new Notice("Live Share: host stopped presenting");
@@ -892,9 +897,8 @@ export default class LiveSharePlugin extends Plugin {
 
     this.controlChannel.on("sync-request", async (msg) => {
       if (this.settings.role !== "host") return;
-      const path = msg.path as string | undefined;
-      if (path && this.manifestManager.isSharedPath(path)) {
-        const file = this.app.vault.getAbstractFileByPath(path);
+      if (msg.path && this.manifestManager.isSharedPath(msg.path)) {
+        const file = this.app.vault.getAbstractFileByPath(msg.path);
         if (file instanceof TFile) {
           this.fileOpsManager.onFileCreate(file);
         }
@@ -1152,8 +1156,6 @@ export default class LiveSharePlugin extends Plugin {
     for (const cleanup of this.unfollowListeners) cleanup();
     this.unfollowListeners = [];
   }
-
-  private isApplyingFollow = false;
 
   private async applyFollowState(user: PresenceUser) {
     if (!user.currentFile || this.isApplyingFollow) return;

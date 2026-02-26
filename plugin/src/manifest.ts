@@ -7,6 +7,7 @@ import type { LiveShareSettings } from "./types";
 import {
   VAULT_EVENT_SETTLE_MS,
   ensureFolder,
+  getFileByPath,
   getPathWarning,
   isTextFile,
   normalizeLineEndings,
@@ -152,7 +153,7 @@ export class ManifestManager {
 
       if (options?.skipText && !entry.binary && isTextFile(path)) continue;
 
-      const localFile = this.vault.getAbstractFileByPath(path) as TFile | null;
+      const localFile = getFileByPath(this.vault, path);
 
       let needsSync = false;
       if (!localFile) {
