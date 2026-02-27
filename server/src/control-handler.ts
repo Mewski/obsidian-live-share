@@ -534,7 +534,7 @@ export function createControlWSS(options?: ControlWSSOptions) {
       }
       room.clients.delete(ws);
       if (wasHost && room.clients.size > 0) {
-        for (const [pendingUserId, pendingWs] of room.pendingApprovals) {
+        for (const [, pendingWs] of room.pendingApprovals) {
           sendTo(pendingWs, { type: "join-response", approved: false });
         }
         room.pendingApprovals.clear();
