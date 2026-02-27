@@ -283,12 +283,12 @@ export class LiveShareSettingTab extends PluginSettingTab {
           );
       });
 
-    const exclusions = new SettingGroup(containerEl).setHeading(
-      "Excluded patterns",
-    );
+    const exclusions = new SettingGroup(containerEl).setHeading("Exclusions");
 
     exclusions.addSetting((setting) => {
-      setting.setDesc("Glob patterns for files to exclude from sharing.");
+      setting
+        .setName("Excluded patterns")
+        .setDesc("Glob patterns for files to exclude from sharing.");
       setting.addButton((button) =>
         button
           .setButtonText("Add exclusion")
@@ -327,12 +327,12 @@ export class LiveShareSettingTab extends PluginSettingTab {
       });
     }
 
-    const readOnly = new SettingGroup(containerEl).setHeading(
-      "Read-only patterns",
-    );
+    const readOnly = new SettingGroup(containerEl).setHeading("Permissions");
 
     readOnly.addSetting((setting) => {
-      setting.setDesc("Glob patterns for files that guests cannot edit.");
+      setting
+        .setName("Read-only patterns")
+        .setDesc("Glob patterns for files that guests cannot edit.");
       setting.addButton((button) =>
         button
           .setButtonText("Add pattern")
