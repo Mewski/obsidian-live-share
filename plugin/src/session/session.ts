@@ -7,6 +7,7 @@ interface InvitePayload {
   r: string;
   t: string;
   e?: string;
+  p?: string;
 }
 
 function generatePassphrase(): string {
@@ -72,11 +73,12 @@ export class SessionManager {
 
     const { settings } = this.plugin;
     const baseUrl = parsedInvite.s.replace(/\/+$/, "");
+    const serverPassword = parsedInvite.p || settings.serverPassword;
 
     const joinHeaders: Record<string, string> = {
       "Content-Type": "application/json",
     };
-    if (settings.serverPassword) joinHeaders["X-Server-Password"] = settings.serverPassword;
+    if (serverPassword) joinHeaders["X-Server-Password"] = serverPassword;
 
     let joinResponse: Response;
     try {
@@ -100,6 +102,7 @@ export class SessionManager {
     settings.roomId = parsedInvite.r;
     settings.token = parsedInvite.t;
     settings.encryptionPassphrase = parsedInvite.e ?? "";
+    if (parsedInvite.p) settings.serverPassword = parsedInvite.p;
     settings.role = "guest";
     await this.plugin.saveSettings();
 
@@ -147,6 +150,7 @@ export class SessionManager {
       r: settings.roomId,
       t: settings.token,
       e: settings.encryptionPassphrase || undefined,
+      p: settings.serverPassword || undefined,
     };
     const invite = `obsliveshare:${btoa(JSON.stringify(payload))}`;
     await navigator.clipboard.writeText(invite);

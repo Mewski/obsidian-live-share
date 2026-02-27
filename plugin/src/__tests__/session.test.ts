@@ -118,6 +118,23 @@ describe("parseInvite", () => {
     });
   });
 
+  it("parses an invite with server password", () => {
+    const result = parseInvite(
+      makeInvite({
+        s: "https://share.example.com",
+        r: "room-pw",
+        t: "tok-pw",
+        p: "s3cret",
+      }),
+    );
+    expect(result).toEqual({
+      s: "https://share.example.com",
+      r: "room-pw",
+      t: "tok-pw",
+      p: "s3cret",
+    });
+  });
+
   it("parses an invite without encryption passphrase (backwards compat)", () => {
     const result = parseInvite(
       makeInvite({
