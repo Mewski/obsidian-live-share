@@ -120,7 +120,9 @@ export class LiveShareSettingTab extends PluginSettingTab {
           disconnected: "Disconnected",
         };
         const stateLabel = stateLabels[connectionState] ?? connectionState;
-        const encrypted = settings.encryptionPassphrase ? "Encrypted" : "Not encrypted";
+        const encrypted = settings.encryptionPassphrase
+          ? "Encrypted"
+          : "Not encrypted";
         setting
           .setName(`${role} · ${stateLabel}`)
           .setDesc(`Room: ${settings.roomId} · ${encrypted}`);
@@ -180,7 +182,9 @@ export class LiveShareSettingTab extends PluginSettingTab {
               .setPlaceholder("Entire vault")
               .setValue(settings.sharedFolder)
               .onChange(async (value) => {
-                settings.sharedFolder = value.replace(/^[./\\]+/, "").replace(/\.\./g, "");
+                settings.sharedFolder = value
+                  .replace(/^[./\\]+/, "")
+                  .replace(/\.\./g, "");
                 await this.plugin.saveSettings();
               });
             if (active) text.setDisabled(true);
@@ -191,24 +195,30 @@ export class LiveShareSettingTab extends PluginSettingTab {
           .setName("Require approval")
           .setDesc("Guests must be approved by the host before joining")
           .addToggle((toggle) => {
-            toggle.setValue(settings.requireApproval).onChange(async (value) => {
-              settings.requireApproval = value;
-              await this.plugin.saveSettings();
-            });
+            toggle
+              .setValue(settings.requireApproval)
+              .onChange(async (value) => {
+                settings.requireApproval = value;
+                await this.plugin.saveSettings();
+              });
             if (active) toggle.setDisabled(true);
           });
       })
       .addSetting((setting) => {
         setting
           .setName("Approval timeout (seconds)")
-          .setDesc("Auto-deny join requests after this many seconds. 0 to disable.")
+          .setDesc(
+            "Auto-deny join requests after this many seconds. 0 to disable.",
+          )
           .addText((text) => {
             text
               .setPlaceholder("60")
               .setValue(String(settings.approvalTimeoutSeconds))
               .onChange(async (value) => {
                 const parsed = Number.parseInt(value, 10);
-                settings.approvalTimeoutSeconds = Number.isNaN(parsed) ? 60 : Math.max(0, parsed);
+                settings.approvalTimeoutSeconds = Number.isNaN(parsed)
+                  ? 60
+                  : Math.max(0, parsed);
                 await this.plugin.saveSettings();
               });
           });
@@ -219,18 +229,24 @@ export class LiveShareSettingTab extends PluginSettingTab {
       .addSetting((setting) => {
         setting
           .setName("Notifications")
-          .setDesc("Show status notices for non-critical events like file syncs and follows")
+          .setDesc(
+            "Show status notices for non-critical events like file syncs and follows",
+          )
           .addToggle((toggle) =>
-            toggle.setValue(settings.notificationsEnabled).onChange(async (value) => {
-              settings.notificationsEnabled = value;
-              await this.plugin.saveSettings();
-            }),
+            toggle
+              .setValue(settings.notificationsEnabled)
+              .onChange(async (value) => {
+                settings.notificationsEnabled = value;
+                await this.plugin.saveSettings();
+              }),
           );
       })
       .addSetting((setting) => {
         setting
           .setName("Auto-reconnect")
-          .setDesc("Automatically rejoin the previous session when Obsidian starts")
+          .setDesc(
+            "Automatically rejoin the previous session when Obsidian starts",
+          )
           .addToggle((toggle) =>
             toggle.setValue(settings.autoReconnect).onChange(async (value) => {
               settings.autoReconnect = value;
@@ -267,18 +283,20 @@ export class LiveShareSettingTab extends PluginSettingTab {
           );
       });
 
-    const advanced = new SettingGroup(containerEl).setHeading("Advanced");
+    const exclusions = new SettingGroup(containerEl).setHeading(
+      "Excluded patterns",
+    );
 
-    advanced.addSetting((setting) => {
-      setting
-        .setName("Excluded patterns")
-        .setDesc("Glob patterns for files to exclude from sharing.");
+    exclusions.addSetting((setting) => {
+      setting.setDesc("Glob patterns for files to exclude from sharing.");
       setting.addButton((button) =>
         button
           .setButtonText("Add exclusion")
           .setCta()
           .onClick(async () => {
-            const value = await this.plugin.promptText("Glob pattern, e.g. *.tmp or drafts/**");
+            const value = await this.plugin.promptText(
+              "Glob pattern, e.g. *.tmp or drafts/**",
+            );
             if (value) {
               const trimmed = value.trim();
               if (trimmed && !settings.excludePatterns.includes(trimmed)) {
@@ -292,14 +310,16 @@ export class LiveShareSettingTab extends PluginSettingTab {
     });
 
     for (const pattern of settings.excludePatterns) {
-      advanced.addSetting((setting) => {
+      exclusions.addSetting((setting) => {
         setting.setName(pattern);
         setting.addExtraButton((button) =>
           button
             .setIcon("cross")
             .setTooltip("Remove this pattern")
             .onClick(async () => {
-              settings.excludePatterns = settings.excludePatterns.filter((p) => p !== pattern);
+              settings.excludePatterns = settings.excludePatterns.filter(
+                (p) => p !== pattern,
+              );
               await this.plugin.saveSettings();
               this.display();
             }),
@@ -307,10 +327,12 @@ export class LiveShareSettingTab extends PluginSettingTab {
       });
     }
 
-    advanced.addSetting((setting) => {
-      setting
-        .setName("Read-only patterns")
-        .setDesc("Glob patterns for files that guests cannot edit.");
+    const readOnly = new SettingGroup(containerEl).setHeading(
+      "Read-only patterns",
+    );
+
+    readOnly.addSetting((setting) => {
+      setting.setDesc("Glob patterns for files that guests cannot edit.");
       setting.addButton((button) =>
         button
           .setButtonText("Add pattern")
@@ -332,14 +354,16 @@ export class LiveShareSettingTab extends PluginSettingTab {
     });
 
     for (const pattern of settings.readOnlyPatterns) {
-      advanced.addSetting((setting) => {
+      readOnly.addSetting((setting) => {
         setting.setName(pattern);
         setting.addExtraButton((button) =>
           button
             .setIcon("cross")
             .setTooltip("Remove this pattern")
             .onClick(async () => {
-              settings.readOnlyPatterns = settings.readOnlyPatterns.filter((p) => p !== pattern);
+              settings.readOnlyPatterns = settings.readOnlyPatterns.filter(
+                (p) => p !== pattern,
+              );
               await this.plugin.saveSettings();
               this.display();
             }),
