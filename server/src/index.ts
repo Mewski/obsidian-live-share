@@ -6,6 +6,7 @@ import cors from "cors";
 import express from "express";
 import rateLimit from "express-rate-limit";
 
+import { closeAuditLog, getLogs, initAuditLog } from "./audit-log.js";
 import { createControlWSS } from "./control-handler.js";
 import { createAuthRouter, verifyJWT } from "./github-auth.js";
 import { type Persistence, getDefaultPersistence } from "./persistence.js";
@@ -72,6 +73,22 @@ export function createApp(
     });
   });
 
+  app.get("/rooms/:id/logs", async (req, res) => {
+    const room = getRoom(req.params.id);
+    if (!room) {
+      res.status(404).json({ error: "room not found" });
+      return;
+    }
+    const token = req.query.token;
+    if (typeof token !== "string" || !safeTokenCompare(token, room.token)) {
+      res.status(403).json({ error: "invalid token" });
+      return;
+    }
+    const limit = Math.min(Number(req.query.limit) || 100, 500);
+    const entries = await getLogs(req.params.id, limit);
+    res.json(entries);
+  });
+
   server.on("upgrade", (req, socket, head) => {
     const url = new URL(req.url || "", `http://${req.headers.host}`);
 
@@ -135,6 +152,7 @@ export function createApp(
     clearInterval(reaperInterval);
     control.closeAll();
     yjs.closeAll();
+    await closeAuditLog();
     if (persistence) await persistence.close();
     server.close();
   }
@@ -146,6 +164,7 @@ const isMain = process.argv[1] && resolve(process.argv[1]) === fileURLToPath(imp
 
 if (isMain) {
   const persistence = getDefaultPersistence();
+  initAuditLog();
   initRooms(persistence)
     .then(async () => {
       const TLS_CERT = process.env.TLS_CERT;

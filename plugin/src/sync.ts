@@ -351,9 +351,7 @@ export class SyncManager {
       result[0] = syncType;
       result.set(decrypted, 1);
       this.handleSync(docId, result);
-    } catch {
-      // ignore decrypt failures (e.g. mismatched passphrase)
-    }
+    } catch {}
   }
 
   private async handleAwarenessEncrypted(docId: string, payload: Uint8Array): Promise<void> {
@@ -364,9 +362,7 @@ export class SyncManager {
     try {
       const decrypted = await this.e2e.decrypt(payload);
       this.handleAwareness(docId, decrypted);
-    } catch {
-      // ignore decrypt failures
-    }
+    } catch {}
   }
 
   private setSynced(docId: string, value: boolean): void {
@@ -404,7 +400,6 @@ export class SyncManager {
   private async sendEncryptedSync(docId: string, payload: Uint8Array): Promise<void> {
     if (!this.e2e || this.ws?.readyState !== WebSocket.OPEN) return;
     try {
-      // Keep syncType (first byte) plaintext for server read-only enforcement
       const syncType = payload[0];
       const rest = payload.length > 1 ? payload.slice(1) : new Uint8Array(0);
       const encrypted = rest.length > 0 ? await this.e2e.encrypt(rest) : rest;
@@ -415,7 +410,6 @@ export class SyncManager {
         this.ws.send(encodeMuxMessage(docId, MUX_SYNC_ENCRYPTED, result));
       }
     } catch {
-      // fall back to plaintext on encryption failure
       if (this.ws?.readyState === WebSocket.OPEN) {
         this.ws.send(encodeMuxMessage(docId, MUX_SYNC, payload));
       }

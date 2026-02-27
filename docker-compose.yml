@@ -1,0 +1,19 @@
+services:
+  server:
+    build: .
+    ports:
+      - "${PORT:-4321}:4321"
+    volumes:
+      - server-data:/app/data
+    environment:
+      - PORT=4321
+      - SERVER_PASSWORD=${SERVER_PASSWORD:-}
+      - REQUIRE_GITHUB_AUTH=${REQUIRE_GITHUB_AUTH:-false}
+      - GITHUB_CLIENT_ID=${GITHUB_CLIENT_ID:-}
+      - GITHUB_CLIENT_SECRET=${GITHUB_CLIENT_SECRET:-}
+      - JWT_SECRET=${JWT_SECRET:-}
+      - CORS_ORIGIN=${CORS_ORIGIN:-*}
+    restart: unless-stopped
+
+volumes:
+  server-data:

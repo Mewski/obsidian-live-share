@@ -1,4 +1,5 @@
 import { Notice, type TAbstractFile, type TFile, type Vault } from "obsidian";
+import { OfflineQueue } from "./offline-queue";
 import type { FileOp } from "./types";
 import {
   VAULT_EVENT_SETTLE_MS,
@@ -14,11 +15,22 @@ import {
 const CHUNK_SIZE = 512 * 1024;
 const MAX_FILE_SIZE = 50 * 1024 * 1024;
 const RENAME_RETRY_DELAY_MS = 300;
+const STALE_TRANSFER_MS = 5 * 60 * 1000;
 
 interface ChunkAssembly {
   chunks: string[];
   totalSize: number;
   binary?: boolean;
+  transferId?: string;
+  lastActivity: number;
+}
+
+interface OutgoingTransfer {
+  path: string;
+  content: string;
+  binary: boolean;
+  totalChunks: number;
+  lastActivity: number;
 }
 
 export class FileOpsManager {
@@ -26,15 +38,64 @@ export class FileOpsManager {
   private sendOp: ((op: FileOp) => void) | null = null;
   private mutedPaths = new Map<string, number>();
   private pendingChunks = new Map<string, ChunkAssembly>();
+  private outgoingTransfers = new Map<string, OutgoingTransfer>();
   private opQueues = new Map<string, Promise<void>>();
   private sendQueues = new Map<string, Promise<void>>();
+  private staleTimer: ReturnType<typeof setInterval> | null = null;
+  private offlineQueue = new OfflineQueue();
+  private isOnline = true;
 
   constructor(vault: Vault) {
     this.vault = vault;
+    this.staleTimer = setInterval(() => this.purgeStaleTransfers(), 60_000);
+  }
+
+  destroy(): void {
+    if (this.staleTimer) {
+      clearInterval(this.staleTimer);
+      this.staleTimer = null;
+    }
+    this.outgoingTransfers.clear();
+    this.pendingChunks.clear();
+    this.offlineQueue.clear();
+  }
+
+  setOnline(online: boolean): void {
+    const wasOffline = !this.isOnline;
+    this.isOnline = online;
+    if (online && wasOffline && this.sendOp) {
+      const ops = this.offlineQueue.drain();
+      for (const op of ops) {
+        this.sendOp(op);
+      }
+    }
+  }
+
+  private purgeStaleTransfers(): void {
+    const now = Date.now();
+    for (const [key, assembly] of this.pendingChunks) {
+      if (now - assembly.lastActivity > STALE_TRANSFER_MS) {
+        this.pendingChunks.delete(key);
+      }
+    }
+    for (const [id, transfer] of this.outgoingTransfers) {
+      if (now - transfer.lastActivity > STALE_TRANSFER_MS) {
+        this.outgoingTransfers.delete(id);
+      }
+    }
   }
 
   setSender(sender: (op: FileOp) => void) {
     this.sendOp = sender;
+  }
+
+  private emitOp(op: FileOp): void {
+    if (!this.sendOp) return;
+    if (!this.isOnline) {
+      this.offlineQueue.enqueue(op);
+      return;
+    }
+    this.sendOp(op);
   }
 
   mutePathEvents(path: string): void {
@@ -58,6 +119,7 @@ export class FileOpsManager {
 
   clearPendingChunks(): void {
     this.pendingChunks.clear();
+    this.outgoingTransfers.clear();
   }
 
   async applyRemoteOp(op: FileOp) {
@@ -179,39 +241,56 @@ export class FileOpsManager {
             new Notice(`Live Share: incoming ${op.path} exceeds 50 MB limit, skipping`);
             break;
           }
-          this.pendingChunks.delete(op.path);
-          this.pendingChunks.set(op.path, {
+          const chunkKey = op.transferId ?? op.path;
+          this.pendingChunks.delete(chunkKey);
+          this.pendingChunks.set(chunkKey, {
             chunks: [],
             totalSize: op.totalSize,
             binary: op.binary,
+            transferId: op.transferId,
+            lastActivity: Date.now(),
           });
           break;
         }
         case "chunk-data": {
-          const assembly = this.pendingChunks.get(op.path);
+          const dataKey = op.transferId ?? op.path;
+          const assembly = this.pendingChunks.get(dataKey);
           if (assembly) {
             assembly.chunks[op.index] = op.data;
+            assembly.lastActivity = Date.now();
           }
           break;
         }
         case "chunk-end": {
-          const assembly = this.pendingChunks.get(op.path);
-          this.pendingChunks.delete(op.path);
+          const endKey = op.transferId ?? op.path;
+          const assembly = this.pendingChunks.get(endKey);
           if (!assembly) break;
 
           const expectedChunks = Math.ceil(assembly.totalSize / CHUNK_SIZE);
-          let chunksValid = true;
+          const missingSeqs: number[] = [];
           for (let i = 0; i < expectedChunks; i++) {
-            if (assembly.chunks[i] === undefined) {
-              chunksValid = false;
+            if (assembly.chunks[i] === undefined) missingSeqs.push(i);
+          }
+          if (missingSeqs.length > 0) {
+            if (assembly.transferId) {
+              const receivedSeqs: number[] = [];
+              for (let i = 0; i < expectedChunks; i++) {
+                if (assembly.chunks[i] !== undefined) receivedSeqs.push(i);
+              }
+              this.sendOp?.({
+                type: "chunk-resume",
+                path: op.path,
+                transferId: assembly.transferId,
+                receivedSeqs,
+              });
               break;
             }
-          }
-          if (!chunksValid) {
+            this.pendingChunks.delete(endKey);
             new Notice(`Live Share: incomplete transfer for ${op.path}, some chunks were lost`);
             break;
           }
 
+          this.pendingChunks.delete(endKey);
           const joined = assembly.chunks.join("");
           const exists = this.vault.getAbstractFileByPath(op.path);
           if (!exists) {
@@ -224,6 +303,30 @@ export class FileOpsManager {
           } else {
             await this.vault.adapter.write(op.path, joined);
           }
+          break;
+        }
+        case "chunk-resume": {
+          const transfer = this.outgoingTransfers.get(op.transferId);
+          if (!transfer) break;
+          transfer.lastActivity = Date.now();
+          const receivedSet = new Set(op.receivedSeqs);
+          for (let i = 0; i < transfer.totalChunks; i++) {
+            if (!receivedSet.has(i)) {
+              const chunk = transfer.content.slice(i * CHUNK_SIZE, (i + 1) * CHUNK_SIZE);
+              this.sendOp?.({
+                type: "chunk-data",
+                path: transfer.path,
+                index: i,
+                data: chunk,
+                transferId: op.transferId,
+              });
+            }
+          }
+          this.sendOp?.({
+            type: "chunk-end",
+            path: transfer.path,
+            transferId: op.transferId,
+          });
           break;
         }
         case "folder-create": {
@@ -245,7 +348,7 @@ export class FileOpsManager {
     const path = normalizePath(file.path);
     if (this.isPathMuted(path) || !this.sendOp) return;
     if (!("extension" in file)) {
-      this.sendOp({ type: "folder-create", path });
+      this.emitOp({ type: "folder-create", path });
       return;
     }
     const prev = this.sendQueues.get(path) ?? Promise.resolve();
@@ -295,7 +398,7 @@ export class FileOpsManager {
         if (content.length > CHUNK_SIZE) {
           this.sendChunked(path, content, true);
         } else {
-          this.sendOp?.({ type: "modify", path, content, binary: true });
+          this.emitOp({ type: "modify", path, content, binary: true });
         }
       } catch {
         new Notice(`Live Share: failed to sync ${path}`);
@@ -311,7 +414,7 @@ export class FileOpsManager {
     if (this.isPathMuted(path) || !this.sendOp) return;
     const prev = this.sendQueues.get(path) ?? Promise.resolve();
     const task = prev.then(() => {
-      if (this.sendOp) this.sendOp({ type: "delete", path });
+      this.emitOp({ type: "delete", path });
     });
     this.sendQueues.set(path, task);
   }
@@ -322,7 +425,7 @@ export class FileOpsManager {
     if (this.isPathMuted(newPath) || this.isPathMuted(oldNorm) || !this.sendOp) return;
     const prev = this.sendQueues.get(oldNorm) ?? Promise.resolve();
     const task = prev.then(() => {
-      if (this.sendOp) this.sendOp({ type: "rename", oldPath: oldNorm, newPath });
+      this.emitOp({ type: "rename", oldPath: oldNorm, newPath });
     });
     this.sendQueues.set(oldNorm, task);
     this.sendQueues.set(newPath, task);
@@ -332,7 +435,7 @@ export class FileOpsManager {
     if (content.length > CHUNK_SIZE) {
       this.sendChunked(path, content, binary);
     } else {
-      this.sendOp?.({
+      this.emitOp({
         type: "create",
         path,
         content,
@@ -343,17 +446,32 @@ export class FileOpsManager {
 
   private sendChunked(path: string, content: string, binary: boolean) {
     if (!this.sendOp) return;
+    const transferId = crypto.randomUUID();
     const totalChunks = Math.ceil(content.length / CHUNK_SIZE);
-    this.sendOp({
+    this.outgoingTransfers.set(transferId, {
+      path,
+      content,
+      binary,
+      totalChunks,
+      lastActivity: Date.now(),
+    });
+    this.emitOp({
       type: "chunk-start",
       path,
       totalSize: content.length,
       binary: binary || undefined,
+      transferId,
     });
     for (let i = 0; i < totalChunks; i++) {
       const chunk = content.slice(i * CHUNK_SIZE, (i + 1) * CHUNK_SIZE);
-      this.sendOp({ type: "chunk-data", path, index: i, data: chunk });
+      this.emitOp({
+        type: "chunk-data",
+        path,
+        index: i,
+        data: chunk,
+        transferId,
+      });
     }
-    this.sendOp({ type: "chunk-end", path });
+    this.emitOp({ type: "chunk-end", path, transferId });
   }
 }

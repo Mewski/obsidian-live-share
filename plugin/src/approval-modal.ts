@@ -6,16 +6,20 @@ export class ApprovalModal extends Modal {
   private request: JoinRequestMessage;
   private onDecision: (approved: boolean, permission: Permission) => void;
   private hasDecided = false;
+  private timeoutSeconds: number;
+  private countdownTimer: ReturnType<typeof setInterval> | null = null;
 
   constructor(
     app: App,
     request: JoinRequestMessage,
     onDecision: (approved: boolean, permission: Permission) => void,
+    timeoutSeconds = 0,
   ) {
     super(app);
     this.setTitle("Join Request");
     this.request = request;
     this.onDecision = onDecision;
+    this.timeoutSeconds = timeoutSeconds;
   }
 
   onOpen() {
@@ -49,6 +53,25 @@ export class ApprovalModal extends Modal {
       });
     }
 
+    let timerEl: HTMLElement | null = null;
+    if (this.timeoutSeconds > 0) {
+      timerEl = contentEl.createEl("p", {
+        cls: "live-share-approval-timer",
+      });
+      let remaining = this.timeoutSeconds;
+      timerEl.setText(`Auto-deny in ${remaining}s`);
+      this.countdownTimer = setInterval(() => {
+        remaining--;
+        if (remaining <= 0) {
+          this.hasDecided = true;
+          this.onDecision(false, "read-only");
+          this.close();
+        } else if (timerEl) {
+          timerEl.setText(`Auto-deny in ${remaining}s`);
+        }
+      }, 1000);
+    }
+
     const buttons = contentEl.createDiv({ cls: "live-share-approval-buttons" });
 
     const approveRW = buttons.createEl("button", {
@@ -79,6 +102,10 @@ export class ApprovalModal extends Modal {
   }
 
   onClose() {
+    if (this.countdownTimer) {
+      clearInterval(this.countdownTimer);
+      this.countdownTimer = null;
+    }
     if (!this.hasDecided) {
       this.onDecision(false, "read-only");
     }

@@ -187,6 +187,20 @@ export class LiveShareSettingTab extends PluginSettingTab {
             });
             if (active) toggle.setDisabled(true);
           });
+      })
+      .addSetting((s) => {
+        s.setName("Approval timeout (seconds)")
+          .setDesc("Auto-deny join requests after this many seconds. 0 to disable.")
+          .addText((text) => {
+            text
+              .setPlaceholder("60")
+              .setValue(String(settings.approvalTimeoutSeconds))
+              .onChange(async (value) => {
+                const parsed = Number.parseInt(value, 10);
+                settings.approvalTimeoutSeconds = Number.isNaN(parsed) ? 60 : Math.max(0, parsed);
+                await this.plugin.saveSettings();
+              });
+          });
       });
 
     if (active) {

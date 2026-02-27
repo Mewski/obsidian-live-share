@@ -1,8 +1,15 @@
 import type { IncomingMessage } from "node:http";
 import { WebSocket, WebSocketServer } from "ws";
 
+import { appendLog } from "./audit-log.js";
 import { verifyJWT } from "./github-auth.js";
-import { clearPermission, clearRoomPermissions, setPermission } from "./permissions.js";
+import {
+  clearPermission,
+  clearRoomPermissions,
+  clearUserFilePermissions,
+  setFilePermission,
+  setPermission,
+} from "./permissions.js";
 import type { Permission } from "./persistence.js";
 import { getRoom, removeRoom, touchRoom } from "./rooms.js";
 
@@ -11,6 +18,7 @@ const ALLOWED_TYPES = new Set([
   "file-chunk-start",
   "file-chunk-data",
   "file-chunk-end",
+  "file-chunk-resume",
   "presence-update",
   "session-end",
   "join-request",
@@ -21,12 +29,17 @@ const ALLOWED_TYPES = new Set([
   "sync-request",
   "set-permission",
   "permission-update",
+  "set-file-permission",
+  "file-permission-update",
   "present-start",
   "present-stop",
   "ping",
   "pong",
-  "host-promoted",
+  "host-transfer-offer",
+  "host-transfer-accept",
+  "host-transfer-decline",
   "host-changed",
+  "host-disconnected",
 ]);
 
 const MSG_RATE_WINDOW = 10_000;
@@ -105,50 +118,20 @@ export function createControlWSS(options?: ControlWSSOptions) {
     return undefined;
   }
 
-  function promoteNewHost(
-    room: ControlRoom,
-    roomId: string,
-    serverRoom: ReturnType<typeof getRoom>,
-  ): void {
-    let candidate: ControlClient | undefined;
-    let earliestJoinOrder = Number.POSITIVE_INFINITY;
-
+  function findClientByUserId(room: ControlRoom, userId: string): ControlClient | undefined {
     for (const client of room.clients.values()) {
-      if (client.isApproved && client.userId && !client.isHost) {
-        if (client.joinOrder < earliestJoinOrder) {
-          earliestJoinOrder = client.joinOrder;
-          candidate = client;
-        }
-      }
+      if (client.userId === userId) return client;
     }
-
-    if (!candidate) return;
-
-    candidate.isHost = true;
-
-    if (candidate.verifiedUserId && serverRoom) {
-      serverRoom.hostUserId = candidate.verifiedUserId;
-      touchRoom(roomId);
-    }
-
-    sendTo(candidate.ws, {
-      type: "host-promoted",
-      userId: candidate.userId,
-      displayName: candidate.displayName,
-    });
-
-    broadcast(
-      room,
-      JSON.stringify({
-        type: "host-changed",
-        userId: candidate.userId,
-        displayName: candidate.displayName,
-      }),
-      candidate.ws,
-    );
+    return undefined;
   }
 
-  const HOST_ONLY_TYPES = new Set(["summon", "present-start", "present-stop", "session-end"]);
+  const HOST_ONLY_TYPES = new Set([
+    "summon",
+    "present-start",
+    "present-stop",
+    "session-end",
+    "host-transfer-offer",
+  ]);
 
   function determineHostStatus(
     client: ControlClient,
@@ -260,6 +243,12 @@ export function createControlWSS(options?: ControlWSSOptions) {
         } else {
           client.isApproved = true;
           setPermission(roomId, client.userId, client.permission);
+          appendLog(roomId, {
+            timestamp: Date.now(),
+            event: "join",
+            userId: client.userId,
+            displayName: client.displayName,
+          });
           sendTo(ws, {
             type: "join-response",
             approved: true,
@@ -284,6 +273,12 @@ export function createControlWSS(options?: ControlWSSOptions) {
             }
             if (targetClient.isApproved && targetClient.userId) {
               setPermission(roomId, targetClient.userId, targetClient.permission);
+              appendLog(roomId, {
+                timestamp: Date.now(),
+                event: "join",
+                userId: targetClient.userId,
+                displayName: targetClient.displayName,
+              });
             }
             sendTo(targetWs, {
               type: "join-response",
@@ -300,6 +295,13 @@ export function createControlWSS(options?: ControlWSSOptions) {
         if (typeof targetUserId !== "string" || !targetUserId) return;
         for (const [clientWs, targetClient] of room.clients) {
           if (targetClient.userId === targetUserId) {
+            appendLog(roomId, {
+              timestamp: Date.now(),
+              event: "kick",
+              userId: targetClient.userId,
+              displayName: targetClient.displayName,
+              details: `kicked by ${client.displayName}`,
+            });
             sendTo(clientWs, { type: "kicked" });
             clientWs.close();
           }
@@ -313,6 +315,13 @@ export function createControlWSS(options?: ControlWSSOptions) {
         const permission = msg.permission;
         if (permission !== "read-write" && permission !== "read-only") return;
         setPermission(roomId, targetUserId, permission);
+        appendLog(roomId, {
+          timestamp: Date.now(),
+          event: "permission-change",
+          userId: targetUserId,
+          displayName: "",
+          details: permission,
+        });
         options?.onPermissionChange?.(roomId, targetUserId, permission);
         for (const [clientWs, targetClient] of room.clients) {
           if (targetClient.userId === targetUserId) {
@@ -320,6 +329,86 @@ export function createControlWSS(options?: ControlWSSOptions) {
             sendTo(clientWs, { type: "permission-update", permission });
           }
         }
+        return;
+      }
+
+      if (msg.type === "set-file-permission" && client.isHost) {
+        const targetUserId = msg.userId;
+        const filePath = msg.filePath;
+        if (typeof targetUserId !== "string" || !targetUserId) return;
+        if (typeof filePath !== "string" || !filePath) return;
+        const permission = msg.permission;
+        if (permission !== "read-write" && permission !== "read-only") return;
+        setFilePermission(roomId, targetUserId, filePath, permission);
+        for (const [clientWs, targetClient] of room.clients) {
+          if (targetClient.userId === targetUserId) {
+            sendTo(clientWs, {
+              type: "file-permission-update",
+              filePath,
+              permission,
+            });
+          }
+        }
+        return;
+      }
+
+      if (msg.type === "host-transfer-offer" && client.isHost) {
+        const targetUserId = msg.userId;
+        if (typeof targetUserId !== "string" || !targetUserId) return;
+        const target = findClientByUserId(room, targetUserId);
+        if (!target || !target.isApproved) return;
+        sendTo(target.ws, {
+          type: "host-transfer-offer",
+          userId: client.userId,
+          displayName: client.displayName,
+        });
+        return;
+      }
+
+      if (msg.type === "host-transfer-accept") {
+        const targetUserId = msg.userId;
+        if (typeof targetUserId !== "string" || !targetUserId) return;
+        const oldHost = findClientByUserId(room, targetUserId);
+        if (!oldHost?.isHost) return;
+        oldHost.isHost = false;
+        client.isHost = true;
+        if (client.verifiedUserId && serverRoom) {
+          serverRoom.hostUserId = client.verifiedUserId;
+          touchRoom(roomId);
+        }
+        appendLog(roomId, {
+          timestamp: Date.now(),
+          event: "host-transfer",
+          userId: client.userId,
+          displayName: client.displayName,
+        });
+        sendTo(client.ws, {
+          type: "host-transfer-complete",
+          userId: client.userId,
+          displayName: client.displayName,
+        });
+        broadcast(
+          room,
+          JSON.stringify({
+            type: "host-changed",
+            userId: client.userId,
+            displayName: client.displayName,
+          }),
+          client.ws,
+        );
+        return;
+      }
+
+      if (msg.type === "host-transfer-decline") {
+        const targetUserId = msg.userId;
+        if (typeof targetUserId !== "string" || !targetUserId) return;
+        const oldHost = findClientByUserId(room, targetUserId);
+        if (!oldHost) return;
+        sendTo(oldHost.ws, {
+          type: "host-transfer-decline",
+          userId: client.userId,
+          displayName: client.displayName,
+        });
         return;
       }
 
@@ -371,6 +460,13 @@ export function createControlWSS(options?: ControlWSSOptions) {
         room.pendingApprovals.delete(closingClient.userId);
         if (closingClient.userId) {
           clearPermission(roomId, closingClient.userId);
+          clearUserFilePermissions(roomId, closingClient.userId);
+          appendLog(roomId, {
+            timestamp: Date.now(),
+            event: "leave",
+            userId: closingClient.userId,
+            displayName: closingClient.displayName,
+          });
           const leaveMsg = JSON.stringify({
             type: "presence-leave",
             userId: closingClient.userId,
@@ -380,7 +476,7 @@ export function createControlWSS(options?: ControlWSSOptions) {
       }
       room.clients.delete(ws);
       if (wasHost && room.clients.size > 0) {
-        promoteNewHost(room, roomId, getRoom(roomId));
+        broadcast(room, JSON.stringify({ type: "host-disconnected" }));
       }
       if (room.clients.size === 0) {
         room.cleanupTimer = setTimeout(() => {

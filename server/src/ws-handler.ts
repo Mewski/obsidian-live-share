@@ -15,7 +15,7 @@ import {
   decodeMuxMessage,
   encodeMuxMessage,
 } from "./mux-protocol.js";
-import { getPermission } from "./permissions.js";
+import { getEffectivePermission, getPermission } from "./permissions.js";
 import type { Permission } from "./persistence.js";
 
 const SYNC_STEP2 = 1;
@@ -122,8 +122,11 @@ export function createYjsWSS() {
     const state = roomStates.get(roomId);
     if (!state || !state.clients.has(client)) return;
 
-    // syncType is always the first byte (plaintext even when encrypted)
-    if (state.readOnlyClients.has(client) && payload.length > 0) {
+    const isReadOnly =
+      state.readOnlyClients.has(client) ||
+      (client.userId &&
+        getEffectivePermission(client.baseRoomId, client.userId, docId) === "read-only");
+    if (isReadOnly && payload.length > 0) {
       const decoder = decoding.createDecoder(payload);
       const syncType = decoding.peekVarUint(decoder);
       if (syncType === SYNC_STEP2 || syncType === SYNC_UPDATE) {
@@ -148,8 +151,6 @@ export function createYjsWSS() {
     const state = roomStates.get(roomId);
     if (!state || !state.clients.has(client)) return;
 
-    // Skip awareness ID tracking for encrypted payloads (can't parse them).
-    // Yjs awareness has a built-in 30s timeout so states will auto-expire.
     if (!encrypted) {
       try {
         const decoder = decoding.createDecoder(payload);

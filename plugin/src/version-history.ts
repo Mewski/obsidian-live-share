@@ -172,12 +172,12 @@ export class VersionHistoryManager {
   }
 
   private captureAutomaticSnapshots(): void {
-    for (const path of this.dirtyFiles) {
+    const paths = [...this.dirtyFiles];
+    this.dirtyFiles.clear();
+    for (const path of paths) {
       try {
         this.captureSnapshot(path);
-      } catch {
-        // skip files that can't be snapshotted (e.g. doc released)
-      }
+      } catch {}
     }
   }
 }

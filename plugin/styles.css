@@ -61,16 +61,6 @@
   cursor: pointer;
 }
 
-/* Read-only banner */
-.live-share-readonly-banner {
-  background: var(--background-secondary);
-  color: var(--text-muted);
-  padding: 4px 12px;
-  font-size: 0.8em;
-  text-align: center;
-  border-bottom: 1px solid var(--background-modifier-border);
-}
-
 /* Status bar */
 .live-share-status-bar {
   cursor: pointer;
@@ -282,6 +272,99 @@
 .live-share-history-actions button {
   padding: 0.25em 0.75em;
   font-size: 0.9em;
+}
+
+/* Comments */
+.live-share-comment-thread {
+  padding: 0.5em;
+}
+
+.live-share-comment-header {
+  margin-bottom: 0.5em;
+}
+
+.live-share-comment-meta {
+  color: var(--text-muted);
+  font-size: 0.9em;
+}
+
+.live-share-comment-resolved {
+  color: var(--text-success);
+  font-size: 0.85em;
+}
+
+.live-share-comment-body {
+  margin: 0.5em 0;
+}
+
+.live-share-comment-time {
+  color: var(--text-faint);
+}
+
+.live-share-comment-replies {
+  border-left: 2px solid var(--background-modifier-border);
+  padding-left: 1em;
+  margin: 1em 0;
+}
+
+.live-share-comment-reply {
+  margin-bottom: 0.75em;
+}
+
+.live-share-comment-list {
+  max-height: 500px;
+  overflow-y: auto;
+}
+
+.live-share-comment-item {
+  padding: 0.75em;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 4px;
+  margin-bottom: 0.5em;
+}
+
+.live-share-comment-item.is-resolved {
+  opacity: 0.6;
+}
+
+.live-share-comment-item-header {
+  margin-bottom: 0.25em;
+}
+
+.live-share-comment-item-actions {
+  display: flex;
+  gap: 0.5em;
+  margin-top: 0.5em;
+}
+
+.live-share-comment-item-actions button {
+  padding: 0.25em 0.75em;
+  font-size: 0.85em;
+}
+
+.live-share-comment-gutter {
+  width: 20px;
+}
+
+.live-share-comment-gutter-icon {
+  cursor: pointer;
+  color: var(--text-accent);
+  font-size: 14px;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+}
+
+.live-share-comment-gutter-icon:hover {
+  color: var(--interactive-accent);
+}
+
+/* Conflict visualization */
+.live-share-conflict {
+  background-color: rgba(255, 200, 0, 0.2);
+  border-bottom: 1px dashed rgba(255, 200, 0, 0.6);
 }
 
 .live-share-preview-content {

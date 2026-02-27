@@ -26,6 +26,7 @@ function createSettings(overrides: Partial<LiveShareSettings> = {}): LiveShareSe
     debugLogPath: "live-share-debug.md",
     autoReconnect: true,
     excludePatterns: [],
+    approvalTimeoutSeconds: 60,
     ...overrides,
   };
 }

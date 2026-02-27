@@ -76,6 +76,8 @@ function sendJSON(ws: WebSocket, msg: Record<string, unknown>) {
   ws.send(JSON.stringify(msg));
 }
 
+const delay = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
 beforeEach(async () => {
   openSockets = [];
   const { server: s } = createApp(noopPersistence);
@@ -99,7 +101,7 @@ describe("Control WebSocket handler", () => {
     const clientA = await connectControl(room.id, room.token);
     const clientB = await connectControl(room.id, room.token);
 
-    await new Promise((r) => setTimeout(r, 100));
+    await delay(100);
 
     sendJSON(clientA.ws, {
       type: "presence-update",
@@ -113,7 +115,7 @@ describe("Control WebSocket handler", () => {
     expect(msg.userId).toBe("userA");
     expect(msg.displayName).toBe("Alice");
 
-    await new Promise((r) => setTimeout(r, 300));
+    await delay(300);
     expect(clientA.messages.length).toBe(0);
   });
 
@@ -122,11 +124,11 @@ describe("Control WebSocket handler", () => {
     const clientA = await connectControl(room.id, room.token);
     const clientB = await connectControl(room.id, room.token);
 
-    await new Promise((r) => setTimeout(r, 100));
+    await delay(100);
 
     sendJSON(clientA.ws, { type: "unknown-type", payload: "test" });
 
-    await new Promise((r) => setTimeout(r, 300));
+    await delay(300);
     expect(clientB.messages.length).toBe(0);
   });
 
@@ -136,7 +138,7 @@ describe("Control WebSocket handler", () => {
     const host = await connectControl(room.id, room.token);
     const guest = await connectControl(room.id, room.token);
 
-    await new Promise((r) => setTimeout(r, 100));
+    await delay(100);
 
     sendJSON(host.ws, {
       type: "presence-update",
@@ -151,7 +153,7 @@ describe("Control WebSocket handler", () => {
       displayName: "Guest",
     });
 
-    await new Promise((r) => setTimeout(r, 100));
+    await delay(100);
 
     sendJSON(host.ws, { type: "kick", userId: "guest-1" });
 
@@ -171,7 +173,7 @@ describe("Control WebSocket handler", () => {
     const host = await connectControl(room.id, room.token);
     const guest = await connectControl(room.id, room.token);
 
-    await new Promise((r) => setTimeout(r, 100));
+    await delay(100);
 
     sendJSON(host.ws, {
       type: "presence-update",
@@ -186,7 +188,7 @@ describe("Control WebSocket handler", () => {
       displayName: "Guest",
     });
 
-    await new Promise((r) => setTimeout(r, 100));
+    await delay(100);
 
     const guestClosed = new Promise<void>((resolve) => {
       guest.ws.on("close", () => resolve());
@@ -214,7 +216,7 @@ describe("Control WebSocket handler", () => {
     const clientB = await connectControl(room.id, room.token);
     const clientC = await connectControl(room.id, room.token);
 
-    await new Promise((r) => setTimeout(r, 100));
+    await delay(100);
 
     sendJSON(clientA.ws, {
       type: "focus-request",
@@ -233,7 +235,7 @@ describe("Control WebSocket handler", () => {
     expect(msgC.type).toBe("focus-request");
     expect(msgC.filePath).toBe("notes/hello.md");
 
-    await new Promise((r) => setTimeout(r, 300));
+    await delay(300);
     expect(clientA.messages.length).toBe(0);
   });
 
@@ -244,14 +246,14 @@ describe("Control WebSocket handler", () => {
     const clientB = await connectControl(room.id, room.token);
     const clientC = await connectControl(room.id, room.token);
 
-    await new Promise((r) => setTimeout(r, 100));
+    await delay(100);
 
     sendJSON(clientC.ws, {
       type: "presence-update",
       userId: "userC",
       displayName: "Charlie",
     });
-    await new Promise((r) => setTimeout(r, 100));
+    await delay(100);
 
     sendJSON(clientA.ws, {
       type: "presence-update",
@@ -264,7 +266,7 @@ describe("Control WebSocket handler", () => {
       displayName: "Bob",
     });
 
-    await new Promise((r) => setTimeout(r, 100));
+    await delay(100);
 
     clientA.messages.length = 0;
     clientB.messages.length = 0;
@@ -281,7 +283,7 @@ describe("Control WebSocket handler", () => {
     expect(msgA.type).toBe("summon");
     expect(msgA.targetUserId).toBe("userA");
 
-    await new Promise((r) => setTimeout(r, 300));
+    await delay(300);
     expect(clientB.messages.length).toBe(0);
   });
 
@@ -292,14 +294,14 @@ describe("Control WebSocket handler", () => {
     const clientB = await connectControl(room.id, room.token);
     const clientC = await connectControl(room.id, room.token);
 
-    await new Promise((r) => setTimeout(r, 100));
+    await delay(100);
 
     sendJSON(clientC.ws, {
       type: "presence-update",
       userId: "userC",
       displayName: "Charlie",
     });
-    await new Promise((r) => setTimeout(r, 100));
+    await delay(100);
 
     sendJSON(clientA.ws, {
       type: "presence-update",
@@ -312,7 +314,7 @@ describe("Control WebSocket handler", () => {
       displayName: "Bob",
     });
 
-    await new Promise((r) => setTimeout(r, 100));
+    await delay(100);
 
     clientA.messages.length = 0;
     clientB.messages.length = 0;
@@ -335,7 +337,7 @@ describe("Control WebSocket handler", () => {
     expect(msgB.type).toBe("summon");
     expect(msgB.targetUserId).toBe("__all__");
 
-    await new Promise((r) => setTimeout(r, 300));
+    await delay(300);
     expect(clientC.messages.length).toBe(0);
   });
 
@@ -348,12 +350,12 @@ describe("Control WebSocket handler", () => {
 
     serverRoom!.defaultPermission = "read-write";
     const host = await connectControl(room.id, room.token);
-    await new Promise((r) => setTimeout(r, 50));
+    await delay(50);
 
     serverRoom!.defaultPermission = "read-only";
 
     const guest = await connectControl(room.id, room.token);
-    await new Promise((r) => setTimeout(r, 100));
+    await delay(100);
 
     sendJSON(guest.ws, {
       type: "file-op",
@@ -362,7 +364,7 @@ describe("Control WebSocket handler", () => {
       content: "should not arrive",
     });
 
-    await new Promise((r) => setTimeout(r, 300));
+    await delay(300);
     expect(host.messages.length).toBe(0);
 
     sendJSON(guest.ws, {
@@ -383,7 +385,7 @@ describe("Control WebSocket handler", () => {
     const clientA = await connectControl(room.id, room.token);
     const clientB = await connectControl(room.id, room.token);
 
-    await new Promise((r) => setTimeout(r, 100));
+    await delay(100);
 
     sendJSON(clientA.ws, {
       type: "presence-update",
@@ -397,12 +399,12 @@ describe("Control WebSocket handler", () => {
       displayName: "Bob",
     });
 
-    await new Promise((r) => setTimeout(r, 100));
+    await delay(100);
 
     clientA.ws.close();
     clientB.ws.close();
 
-    await new Promise((r) => setTimeout(r, 300));
+    await delay(300);
 
     const lateComer = await connectControl(room.id, room.token);
     expect(lateComer.ws.readyState).toBe(WebSocket.OPEN);
@@ -415,7 +417,7 @@ describe("Control WebSocket handler", () => {
     const host = await connectControl(room.id, room.token);
     const guest = await connectControl(room.id, room.token);
 
-    await new Promise((r) => setTimeout(r, 100));
+    await delay(100);
 
     sendJSON(host.ws, {
       type: "presence-update",
@@ -424,7 +426,7 @@ describe("Control WebSocket handler", () => {
       isHost: true,
     });
 
-    await new Promise((r) => setTimeout(r, 100));
+    await delay(100);
 
     host.messages.length = 0;
 
@@ -444,7 +446,7 @@ describe("Control WebSocket handler", () => {
     expect(parsed.approved).toBe(true);
     expect(parsed.permission).toBe("read-write");
 
-    await new Promise((r) => setTimeout(r, 300));
+    await delay(300);
     expect(host.messages.length).toBe(0);
   });
 
@@ -454,7 +456,7 @@ describe("Control WebSocket handler", () => {
     const clientA = await connectControl(room.id, room.token);
     const clientB = await connectControl(room.id, room.token);
 
-    await new Promise((r) => setTimeout(r, 100));
+    await delay(100);
 
     sendJSON(clientA.ws, {
       type: "presence-update",
@@ -467,13 +469,13 @@ describe("Control WebSocket handler", () => {
       displayName: "Bob",
     });
 
-    await new Promise((r) => setTimeout(r, 100));
+    await delay(100);
     clientA.messages.length = 0;
     clientB.messages.length = 0;
 
     sendJSON(clientB.ws, { type: "kick", userId: "userA" });
 
-    await new Promise((r) => setTimeout(r, 300));
+    await delay(300);
     const kickedMsg = clientA.messages.find((m) => {
       const parsed = JSON.parse(m);
       return parsed.type === "kicked";
@@ -488,14 +490,14 @@ describe("Control WebSocket handler", () => {
     const clientA = await connectControl(room.id, room.token);
     const clientB = await connectControl(room.id, room.token);
 
-    await new Promise((r) => setTimeout(r, 100));
+    await delay(100);
 
     sendJSON(clientA.ws, {
       type: "presence-update",
       userId: "userA",
       displayName: "Alice",
     });
-    await new Promise((r) => setTimeout(r, 100));
+    await delay(100);
     clientA.messages.length = 0;
     clientB.messages.length = 0;
 
@@ -506,26 +508,8 @@ describe("Control WebSocket handler", () => {
     expect(msg.type).toBe("session-end");
     expect(msg.reason).toBe("host-left");
 
-    await new Promise((r) => setTimeout(r, 300));
+    await delay(300);
     expect(clientA.messages.length).toBe(0);
-  });
-
-  it("drops unknown message types silently", async () => {
-    const room = await createRoom("ctrl-follow");
-
-    const clientA = await connectControl(room.id, room.token);
-    const clientB = await connectControl(room.id, room.token);
-
-    await new Promise((r) => setTimeout(r, 100));
-
-    sendJSON(clientA.ws, {
-      type: "follow-update",
-      followingUserId: "userB",
-      filePath: "notes/today.md",
-    });
-
-    await new Promise((r) => setTimeout(r, 300));
-    expect(clientB.messages.length).toBe(0);
   });
 
   it("disconnects client exceeding rate limit", async () => {
@@ -533,7 +517,7 @@ describe("Control WebSocket handler", () => {
 
     const client = await connectControl(room.id, room.token);
 
-    await new Promise((r) => setTimeout(r, 50));
+    await delay(50);
 
     const closedPromise = new Promise<number>((resolve) => {
       client.ws.on("close", (code: number) => resolve(code));
@@ -558,7 +542,7 @@ describe("Control WebSocket handler", () => {
     serverRoom!.requireApproval = true;
 
     const host = await connectControl(room.id, room.token);
-    await new Promise((r) => setTimeout(r, 50));
+    await delay(50);
 
     sendJSON(host.ws, {
       type: "presence-update",
@@ -566,10 +550,10 @@ describe("Control WebSocket handler", () => {
       displayName: "Host",
       isHost: true,
     });
-    await new Promise((r) => setTimeout(r, 100));
+    await delay(100);
 
     const guest = await connectControl(room.id, room.token);
-    await new Promise((r) => setTimeout(r, 50));
+    await delay(50);
 
     host.messages.length = 0;
     sendJSON(guest.ws, {
@@ -597,7 +581,7 @@ describe("Control WebSocket handler", () => {
       permission: "read-write",
     });
 
-    await new Promise((r) => setTimeout(r, 300));
+    await delay(300);
   });
 
   it("host can change guest permission via set-permission", async () => {
@@ -606,7 +590,7 @@ describe("Control WebSocket handler", () => {
     const host = await connectControl(room.id, room.token);
     const guest = await connectControl(room.id, room.token);
 
-    await new Promise((r) => setTimeout(r, 100));
+    await delay(100);
 
     sendJSON(host.ws, {
       type: "presence-update",
@@ -620,7 +604,7 @@ describe("Control WebSocket handler", () => {
       displayName: "Guest",
     });
 
-    await new Promise((r) => setTimeout(r, 100));
+    await delay(100);
     guest.messages.length = 0;
     host.messages.length = 0;
 
@@ -645,7 +629,7 @@ describe("Control WebSocket handler", () => {
       content: "should not arrive",
     });
 
-    await new Promise((r) => setTimeout(r, 300));
+    await delay(300);
     expect(host.messages.length).toBe(0);
 
     sendJSON(host.ws, {
@@ -681,7 +665,7 @@ describe("Control WebSocket handler", () => {
     const host = await connectControl(room.id, room.token);
     const guest = await connectControl(room.id, room.token);
 
-    await new Promise((r) => setTimeout(r, 100));
+    await delay(100);
 
     sendJSON(host.ws, {
       type: "presence-update",
@@ -695,7 +679,7 @@ describe("Control WebSocket handler", () => {
       displayName: "Guest",
     });
 
-    await new Promise((r) => setTimeout(r, 100));
+    await delay(100);
     host.messages.length = 0;
     guest.messages.length = 0;
 
@@ -705,7 +689,7 @@ describe("Control WebSocket handler", () => {
       permission: "read-only",
     });
 
-    await new Promise((r) => setTimeout(r, 300));
+    await delay(300);
     const permMsg = host.messages.find((m) => {
       const parsed = JSON.parse(m);
       return parsed.type === "permission-update";
@@ -722,23 +706,23 @@ describe("Control WebSocket handler", () => {
     serverRoom!.requireApproval = true;
 
     const host = await connectControl(room.id, room.token);
-    await new Promise((r) => setTimeout(r, 50));
+    await delay(50);
     sendJSON(host.ws, {
       type: "presence-update",
       userId: "host-1",
       displayName: "Host",
       isHost: true,
     });
-    await new Promise((r) => setTimeout(r, 100));
+    await delay(100);
 
     const guest = await connectControl(room.id, room.token);
-    await new Promise((r) => setTimeout(r, 50));
+    await delay(50);
     sendJSON(guest.ws, {
       type: "join-request",
       userId: "unapproved-guest",
       displayName: "Guest",
     });
-    await new Promise((r) => setTimeout(r, 100));
+    await delay(100);
 
     host.messages.length = 0;
     sendJSON(guest.ws, {
@@ -748,7 +732,7 @@ describe("Control WebSocket handler", () => {
       content: "should not arrive",
     });
 
-    await new Promise((r) => setTimeout(r, 300));
+    await delay(300);
     const fileOpMsg = host.messages.find((m) => {
       const parsed = JSON.parse(m);
       return parsed.type === "file-op";
@@ -760,32 +744,32 @@ describe("Control WebSocket handler", () => {
     const room = await createRoom("ctrl-userid-lock");
 
     const host = await connectControl(room.id, room.token);
-    await new Promise((r) => setTimeout(r, 50));
+    await delay(50);
     sendJSON(host.ws, {
       type: "join-request",
       userId: "host-1",
       displayName: "Host",
     });
-    await new Promise((r) => setTimeout(r, 100));
+    await delay(100);
 
     const guest = await connectControl(room.id, room.token);
-    await new Promise((r) => setTimeout(r, 50));
+    await delay(50);
     sendJSON(guest.ws, {
       type: "join-request",
       userId: "original-id",
       displayName: "Original",
     });
-    await new Promise((r) => setTimeout(r, 100));
+    await delay(100);
 
     sendJSON(guest.ws, {
       type: "join-request",
       userId: "spoofed-id",
       displayName: "Spoofed",
     });
-    await new Promise((r) => setTimeout(r, 100));
+    await delay(100);
 
     sendJSON(host.ws, { type: "kick", userId: "spoofed-id" });
-    await new Promise((r) => setTimeout(r, 300));
+    await delay(300);
     expect(guest.ws.readyState).toBe(WebSocket.OPEN);
 
     const guestClosed = new Promise<void>((resolve) => {
@@ -800,23 +784,23 @@ describe("Control WebSocket handler", () => {
     const room = await createRoom("ctrl-host-via-join");
 
     const client = await connectControl(room.id, room.token);
-    await new Promise((r) => setTimeout(r, 50));
+    await delay(50);
 
     sendJSON(client.ws, {
       type: "join-request",
       userId: "first-user",
       displayName: "First",
     });
-    await new Promise((r) => setTimeout(r, 100));
+    await delay(100);
 
     const guest = await connectControl(room.id, room.token);
-    await new Promise((r) => setTimeout(r, 50));
+    await delay(50);
     sendJSON(guest.ws, {
       type: "join-request",
       userId: "second-user",
       displayName: "Second",
     });
-    await new Promise((r) => setTimeout(r, 100));
+    await delay(100);
 
     const guestClosed = new Promise<void>((resolve) => {
       guest.ws.on("close", () => resolve());
@@ -832,7 +816,7 @@ describe("Control WebSocket handler", () => {
     const host = await connectControl(room.id, room.token);
     const guest = await connectControl(room.id, room.token);
 
-    await new Promise((r) => setTimeout(r, 100));
+    await delay(100);
 
     sendJSON(host.ws, {
       type: "presence-update",
@@ -846,7 +830,7 @@ describe("Control WebSocket handler", () => {
       displayName: "Guest",
     });
 
-    await new Promise((r) => setTimeout(r, 100));
+    await delay(100);
     guest.messages.length = 0;
 
     sendJSON(host.ws, {
@@ -855,7 +839,274 @@ describe("Control WebSocket handler", () => {
       permission: "admin",
     });
 
-    await new Promise((r) => setTimeout(r, 300));
+    await delay(300);
     expect(guest.messages.length).toBe(0);
+  });
+
+  it("host-transfer-offer forwarded to target guest", async () => {
+    const room = await createRoom("ctrl-transfer-offer");
+
+    const host = await connectControl(room.id, room.token);
+    const guest = await connectControl(room.id, room.token);
+
+    await delay(100);
+
+    sendJSON(host.ws, {
+      type: "presence-update",
+      userId: "host-1",
+      displayName: "Host",
+      isHost: true,
+    });
+    sendJSON(guest.ws, {
+      type: "join-request",
+      userId: "guest-1",
+      displayName: "Guest",
+    });
+
+    await delay(100);
+    guest.messages.length = 0;
+
+    sendJSON(host.ws, {
+      type: "host-transfer-offer",
+      userId: "guest-1",
+    });
+
+    await waitForMessages(guest.messages, 1);
+    const msg = JSON.parse(guest.messages[0]);
+    expect(msg.type).toBe("host-transfer-offer");
+    expect(msg.userId).toBe("host-1");
+    expect(msg.displayName).toBe("Host");
+  });
+
+  it("non-host cannot send host-transfer-offer", async () => {
+    const room = await createRoom("ctrl-transfer-nonhost");
+
+    const host = await connectControl(room.id, room.token);
+    const guest = await connectControl(room.id, room.token);
+
+    await delay(100);
+
+    sendJSON(host.ws, {
+      type: "presence-update",
+      userId: "host-1",
+      displayName: "Host",
+      isHost: true,
+    });
+    sendJSON(guest.ws, {
+      type: "presence-update",
+      userId: "guest-1",
+      displayName: "Guest",
+    });
+
+    await delay(100);
+    host.messages.length = 0;
+
+    sendJSON(guest.ws, {
+      type: "host-transfer-offer",
+      userId: "host-1",
+    });
+
+    await delay(300);
+    const offerMsg = host.messages.find((m) => JSON.parse(m).type === "host-transfer-offer");
+    expect(offerMsg).toBeUndefined();
+  });
+
+  it("host-transfer-accept swaps roles and broadcasts host-changed", async () => {
+    const room = await createRoom("ctrl-transfer-accept");
+
+    const host = await connectControl(room.id, room.token);
+    const guest = await connectControl(room.id, room.token);
+
+    await delay(100);
+
+    sendJSON(host.ws, {
+      type: "presence-update",
+      userId: "host-1",
+      displayName: "Host",
+      isHost: true,
+    });
+    sendJSON(guest.ws, {
+      type: "join-request",
+      userId: "guest-1",
+      displayName: "Guest",
+    });
+
+    await delay(100);
+
+    sendJSON(host.ws, {
+      type: "host-transfer-offer",
+      userId: "guest-1",
+    });
+
+    // Wait for guest to receive join-response + offer
+    await delay(300);
+    guest.messages.length = 0;
+    host.messages.length = 0;
+
+    sendJSON(guest.ws, {
+      type: "host-transfer-accept",
+      userId: "host-1",
+    });
+
+    await waitForMessages(guest.messages, 1);
+    const completeMsg = JSON.parse(guest.messages[0]);
+    expect(completeMsg.type).toBe("host-transfer-complete");
+
+    await waitForMessages(host.messages, 1);
+    const changedMsg = JSON.parse(host.messages[0]);
+    expect(changedMsg.type).toBe("host-changed");
+    expect(changedMsg.userId).toBe("guest-1");
+    expect(changedMsg.displayName).toBe("Guest");
+  });
+
+  it("host-transfer-decline forwarded to old host", async () => {
+    const room = await createRoom("ctrl-transfer-decline");
+
+    const host = await connectControl(room.id, room.token);
+    const guest = await connectControl(room.id, room.token);
+
+    await delay(100);
+
+    sendJSON(host.ws, {
+      type: "presence-update",
+      userId: "host-1",
+      displayName: "Host",
+      isHost: true,
+    });
+    sendJSON(guest.ws, {
+      type: "join-request",
+      userId: "guest-1",
+      displayName: "Guest",
+    });
+
+    await delay(100);
+
+    sendJSON(host.ws, {
+      type: "host-transfer-offer",
+      userId: "guest-1",
+    });
+
+    await delay(300);
+    guest.messages.length = 0;
+    host.messages.length = 0;
+
+    sendJSON(guest.ws, {
+      type: "host-transfer-decline",
+      userId: "host-1",
+    });
+
+    await waitForMessages(host.messages, 1);
+    const declineMsg = JSON.parse(host.messages[0]);
+    expect(declineMsg.type).toBe("host-transfer-decline");
+    expect(declineMsg.userId).toBe("guest-1");
+  });
+
+  it("host disconnect broadcasts host-disconnected", async () => {
+    const room = await createRoom("ctrl-host-disconnect");
+
+    const host = await connectControl(room.id, room.token);
+    const guest = await connectControl(room.id, room.token);
+
+    await delay(100);
+
+    sendJSON(host.ws, {
+      type: "presence-update",
+      userId: "host-1",
+      displayName: "Host",
+      isHost: true,
+    });
+    sendJSON(guest.ws, {
+      type: "presence-update",
+      userId: "guest-1",
+      displayName: "Guest",
+    });
+
+    await delay(100);
+    guest.messages.length = 0;
+
+    host.ws.close();
+
+    await waitForMessages(guest.messages, 2);
+    const hostDisconnected = guest.messages.find((m) => {
+      const parsed = JSON.parse(m);
+      return parsed.type === "host-disconnected";
+    });
+    expect(hostDisconnected).toBeDefined();
+  });
+
+  it("set-file-permission from host sends file-permission-update to target", async () => {
+    const room = await createRoom("ctrl-file-perm");
+
+    const host = await connectControl(room.id, room.token);
+    const guest = await connectControl(room.id, room.token);
+
+    await delay(100);
+
+    sendJSON(host.ws, {
+      type: "presence-update",
+      userId: "host-1",
+      displayName: "Host",
+      isHost: true,
+    });
+    sendJSON(guest.ws, {
+      type: "presence-update",
+      userId: "guest-1",
+      displayName: "Guest",
+    });
+
+    await delay(100);
+    guest.messages.length = 0;
+    host.messages.length = 0;
+
+    sendJSON(host.ws, {
+      type: "set-file-permission",
+      userId: "guest-1",
+      filePath: "secret.md",
+      permission: "read-only",
+    });
+
+    await waitForMessages(guest.messages, 1);
+    const permMsg = JSON.parse(guest.messages[0]);
+    expect(permMsg.type).toBe("file-permission-update");
+    expect(permMsg.filePath).toBe("secret.md");
+    expect(permMsg.permission).toBe("read-only");
+
+    await delay(200);
+    expect(host.messages.length).toBe(0);
+  });
+
+  it("non-host cannot send set-file-permission", async () => {
+    const room = await createRoom("ctrl-file-perm-nonhost");
+
+    const host = await connectControl(room.id, room.token);
+    const guest = await connectControl(room.id, room.token);
+
+    await delay(100);
+
+    sendJSON(host.ws, {
+      type: "presence-update",
+      userId: "host-1",
+      displayName: "Host",
+      isHost: true,
+    });
+    sendJSON(guest.ws, {
+      type: "presence-update",
+      userId: "guest-1",
+      displayName: "Guest",
+    });
+
+    await delay(100);
+    host.messages.length = 0;
+
+    sendJSON(guest.ws, {
+      type: "set-file-permission",
+      userId: "host-1",
+      filePath: "secret.md",
+      permission: "read-only",
+    });
+
+    await delay(300);
+    const permMsg = host.messages.find((m) => JSON.parse(m).type === "file-permission-update");
+    expect(permMsg).toBeUndefined();
   });
 });

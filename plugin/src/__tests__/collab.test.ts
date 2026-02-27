@@ -28,9 +28,48 @@ vi.mock("@codemirror/state", () => {
     }
   }
   const readOnlyFacet = { of: (val: boolean) => ({ readOnly: val }) };
+  const MockStateEffect = {
+    define: () => ({
+      of: (val: unknown) => ({ type: "state-effect", value: val }),
+    }),
+  };
+  const MockStateField = {
+    define: () => "mock-state-field",
+  };
+  const MockTransaction = { remote: "remote" };
+  const MockRangeSet = {
+    empty: [],
+    of: (ranges: unknown[]) => ranges,
+  };
   return {
     Compartment: MockCompartment,
     EditorState: { readOnly: readOnlyFacet },
+    RangeSet: MockRangeSet,
+    StateEffect: MockStateEffect,
+    StateField: MockStateField,
+    Transaction: MockTransaction,
+  };
+});
+
+vi.mock("@codemirror/view", () => {
+  class MockGutterMarker {
+    range(from: number) {
+      return { from, marker: this };
+    }
+  }
+  return {
+    Decoration: {
+      mark: () => ({ range: () => ({}) }),
+      set: () => "mock-decoration-set",
+      none: "mock-decoration-none",
+    },
+    EditorView: {
+      updateListener: { of: () => "mock-update-listener" },
+      decorations: { from: () => "mock-decorations-from" },
+      domEventHandlers: () => "mock-dom-event-handlers",
+    },
+    GutterMarker: MockGutterMarker,
+    gutter: () => "mock-gutter",
   };
 });
 
@@ -176,7 +215,8 @@ describe("CollabManager", () => {
       await collab.activateForFile(view as any, "test.md", syncManager as any, "host");
 
       expect(view.dispatch).toHaveBeenCalled();
-      expect(reconfigureCalls).toContainEqual(["yCollab-extension"]);
+      const lastReconfigure = reconfigureCalls[reconfigureCalls.length - 1] as unknown[];
+      expect(lastReconfigure[0]).toBe("yCollab-extension");
     });
 
     it("adds readOnly extension for read-only permission", async () => {
@@ -193,9 +233,8 @@ describe("CollabManager", () => {
 
       expect(view.dispatch).toHaveBeenCalled();
       const lastReconfigure = reconfigureCalls[reconfigureCalls.length - 1] as unknown[];
-      expect(lastReconfigure).toHaveLength(2);
       expect(lastReconfigure[0]).toBe("yCollab-extension");
-      expect(lastReconfigure[1]).toEqual({ readOnly: true });
+      expect(lastReconfigure).toContainEqual({ readOnly: true });
     });
 
     it("does not add readOnly extension for read-write permission", async () => {
@@ -211,7 +250,9 @@ describe("CollabManager", () => {
       );
 
       expect(view.dispatch).toHaveBeenCalled();
-      expect(reconfigureCalls).toContainEqual(["yCollab-extension"]);
+      const lastReconfigure = reconfigureCalls[reconfigureCalls.length - 1] as unknown[];
+      expect(lastReconfigure[0]).toBe("yCollab-extension");
+      expect(lastReconfigure).not.toContainEqual({ readOnly: true });
     });
 
     it("bails out if file switched during sync wait", async () => {

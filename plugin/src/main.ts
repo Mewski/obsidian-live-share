@@ -2,15 +2,21 @@ import type { EditorView } from "@codemirror/view";
 import { MarkdownView, Menu, Notice, Plugin, type TAbstractFile, TFile } from "obsidian";
 
 import { ApprovalModal } from "./approval-modal";
+import { AuditLogModal } from "./audit-modal";
 import { AuthManager } from "./auth";
 import { BackgroundSync } from "./background-sync";
+import { CanvasSync } from "./canvas-sync";
 import { CollabManager } from "./collab";
+import { AddCommentModal, CommentListModal, CommentThreadModal } from "./comment-modal";
+import { CommentManager } from "./comments";
 import { ConnectionStateManager } from "./connection-state";
 import { ControlChannel } from "./control-ws";
 import { E2ECrypto } from "./crypto";
 import { DebugLogger } from "./debug-logger";
 import { ExclusionManager } from "./exclusion";
+import { ExplorerIndicators } from "./explorer-indicators";
 import { FileOpsManager } from "./file-ops";
+import { FilePermissionModal, type FilePermissionUser } from "./file-permission-modal";
 import { showFocusNotification } from "./focus-notification";
 import { HistoryModal } from "./history-modal";
 import { ManifestManager } from "./manifest";
@@ -21,10 +27,10 @@ import { LiveShareSettingTab } from "./settings";
 import { SyncManager } from "./sync";
 import {
   type ControlMessage,
-  type ControlMessageType,
   DEFAULT_SETTINGS,
   type FileOp,
   type LiveShareSettings,
+  type Permission,
 } from "./types";
 import {
   VAULT_EVENT_SETTLE_MS,
@@ -44,13 +50,15 @@ const CHUNK_TO_CONTROL = {
   "chunk-start": "file-chunk-start",
   "chunk-data": "file-chunk-data",
   "chunk-end": "file-chunk-end",
+  "chunk-resume": "file-chunk-resume",
 } as const;
 
-const CONTROL_TO_CHUNK: Record<string, string> = {
-  "file-chunk-start": "chunk-start",
-  "file-chunk-data": "chunk-data",
-  "file-chunk-end": "chunk-end",
-};
+const CONTROL_TO_CHUNK = Object.fromEntries(
+  Object.entries(CHUNK_TO_CONTROL).map(([k, v]) => [v, k]),
+) as Record<
+  (typeof CHUNK_TO_CONTROL)[keyof typeof CHUNK_TO_CONTROL],
+  keyof typeof CHUNK_TO_CONTROL
+>;
 
 export default class LiveSharePlugin extends Plugin {
   settings!: LiveShareSettings;
@@ -65,8 +73,12 @@ export default class LiveSharePlugin extends Plugin {
   connectionState!: ConnectionStateManager;
   logger!: DebugLogger;
   versionHistory!: VersionHistoryManager;
+  commentManager: CommentManager | null = null;
+  canvasSync: CanvasSync | null = null;
+  explorerIndicators: ExplorerIndicators | null = null;
   controlChannel: ControlChannel | null = null;
   private remoteUsers = new Map<string, PresenceUser>();
+  private filePermissions = new Map<string, Permission>();
   private isPresenting = false;
   private followTarget: string | null = null;
   private followSuppressUnfollow = false;
@@ -364,6 +376,24 @@ export default class LiveSharePlugin extends Plugin {
     });
 
     this.addCommand({
+      id: "transfer-host",
+      name: "Transfer host role",
+      checkCallback: (checking) => {
+        if (this.settings.role !== "host" || !this.sessionManager.isActive) return false;
+        if (this.remoteUsers.size === 0) return false;
+        if (checking) return true;
+        new UserPickerModal(this.app, this.remoteUsers, (userId) => {
+          this.controlChannel?.send({
+            type: "host-transfer-offer",
+            userId,
+          });
+          const user = this.remoteUsers.get(userId);
+          this.notify(`Live Share: offered host role to ${user?.displayName ?? userId}`);
+        }).open();
+      },
+    });
+
+    this.addCommand({
       id: "show-version-history",
       name: "Show version history",
       editorCallback: (_editor, view) => {
@@ -396,6 +426,74 @@ export default class LiveSharePlugin extends Plugin {
         } catch {
           new Notice("Live Share: failed to create snapshot");
         }
+      },
+    });
+
+    this.addCommand({
+      id: "show-audit-log",
+      name: "Show audit log",
+      checkCallback: (checking) => {
+        if (this.settings.role !== "host" || !this.sessionManager.isActive) return false;
+        if (checking) return true;
+        this.fetchAuditLog();
+      },
+    });
+
+    this.addCommand({
+      id: "set-file-permissions",
+      name: "Set file permissions",
+      checkCallback: (checking) => {
+        if (this.settings.role !== "host" || !this.sessionManager.isActive) return false;
+        const activeView = this.app.workspace.getActiveViewOfType(MarkdownView);
+        if (!activeView?.file) return false;
+        if (this.remoteUsers.size === 0) return false;
+        if (checking) return true;
+        const filePath = activeView.file.path;
+        const users: FilePermissionUser[] = [];
+        for (const [userId, user] of this.remoteUsers) {
+          users.push({
+            userId,
+            displayName: user.displayName,
+            permission: user.permission ?? "read-write",
+          });
+        }
+        new FilePermissionModal(this.app, filePath, users, (userId, fp, permission) => {
+          this.controlChannel?.send({
+            type: "set-file-permission",
+            userId,
+            filePath: fp,
+            permission,
+          });
+        }).open();
+      },
+    });
+
+    this.addCommand({
+      id: "add-comment",
+      name: "Add comment at cursor",
+      editorCallback: (editor, view) => {
+        if (!this.commentManager || !view.file) return;
+        const filePath = view.file.path;
+        const cursor = editor.getCursor();
+        new AddCommentModal(this.app, (text) => {
+          this.commentManager?.addComment(filePath, cursor.line, text);
+          this.notify("Live Share: comment added");
+        }).open();
+      },
+    });
+
+    this.addCommand({
+      id: "show-comments",
+      name: "Show comments for this file",
+      editorCallback: (_editor, view) => {
+        if (!this.commentManager || !view.file) return;
+        new CommentListModal(this.app, view.file.path, this.commentManager, (line) => {
+          const mdView = this.app.workspace.getActiveViewOfType(MarkdownView);
+          if (mdView) {
+            mdView.editor.setCursor({ line, ch: 0 });
+            mdView.editor.scrollIntoView({ from: { line, ch: 0 }, to: { line, ch: 0 } }, true);
+          }
+        }).open();
       },
     });
 
@@ -494,6 +592,13 @@ export default class LiveSharePlugin extends Plugin {
 
         if (isTextFile(file.path)) {
           if (this.backgroundSync.isRecentDiskWrite(file.path)) return;
+          if (
+            file.path.endsWith(".canvas") &&
+            this.canvasSync?.isSubscribed(file.path) &&
+            !this.canvasSync.isRecentDiskWrite(file.path)
+          ) {
+            await this.canvasSync.handleLocalModify(file.path);
+          }
           if (this.settings.role === "host") {
             await this.backgroundSync.handleLocalTextModify(file.path);
           }
@@ -572,7 +677,7 @@ export default class LiveSharePlugin extends Plugin {
       if (cmView) this.collabManager.deactivateAll(cmView);
     }
 
-    this.fileOpsManager.clearPendingChunks();
+    this.fileOpsManager.destroy();
     this.backgroundSync.destroy();
     this.manifestManager.destroy();
     this.syncManager.destroy();
@@ -673,6 +778,12 @@ export default class LiveSharePlugin extends Plugin {
   private cleanupSession() {
     this.versionHistory.stopAutoCapture();
     this.saveVersionHistory();
+    this.commentManager?.destroy();
+    this.commentManager = null;
+    this.explorerIndicators?.destroy();
+    this.explorerIndicators = null;
+    this.canvasSync?.destroy();
+    this.canvasSync = null;
     this.backgroundSync.destroy();
     this.syncManager.disconnect();
     this.controlChannel?.destroy();
@@ -690,6 +801,7 @@ export default class LiveSharePlugin extends Plugin {
       this.presenceInterval = null;
     }
     this.remoteUsers.clear();
+    this.filePermissions.clear();
     this.refreshPresenceView();
     this.fileOpsManager.clearPendingChunks();
     this.manifestManager.destroy();
@@ -848,6 +960,7 @@ export default class LiveSharePlugin extends Plugin {
       this.logger.log("connection", `control channel ${controlState}`);
       if (controlState === "connected") {
         this.connectionState.transition({ type: "connected" });
+        this.fileOpsManager.setOnline(true);
         if (this.settings.role === "guest") {
           this.controlChannel?.send({
             type: "join-request",
@@ -862,7 +975,9 @@ export default class LiveSharePlugin extends Plugin {
         }
       } else if (controlState === "reconnecting") {
         this.connectionState.transition({ type: "reconnecting" });
+        this.fileOpsManager.setOnline(false);
       } else {
+        this.fileOpsManager.setOnline(false);
         this.connectionState.transition({ type: "disconnect" });
         if (this.sessionManager.isActive && !this.isEndingSession) {
           new Notice("Live Share: connection lost, session ended");
@@ -933,7 +1048,12 @@ export default class LiveSharePlugin extends Plugin {
           this.logger.error("file-op", "failed to apply remote file-op", err);
         });
     });
-    for (const chunkType of ["file-chunk-start", "file-chunk-data", "file-chunk-end"] as const) {
+    for (const chunkType of [
+      "file-chunk-start",
+      "file-chunk-data",
+      "file-chunk-end",
+      "file-chunk-resume",
+    ] as const) {
       this.controlChannel.on(chunkType, (msg) => {
         if (!msg.path || !this.manifestManager.isSharedPath(msg.path)) return;
         this.fileOpsManager
@@ -979,18 +1099,23 @@ export default class LiveSharePlugin extends Plugin {
 
     this.controlChannel.on("join-request", (msg) => {
       if (this.settings.role !== "host") return;
-      new ApprovalModal(this.app, msg, (approved, permission) => {
-        this.controlChannel?.send({
-          type: "join-response",
-          userId: msg.userId,
-          approved,
-          permission,
-        });
-        if (approved) {
-          const existing = this.remoteUsers.get(msg.userId);
-          if (existing) existing.permission = permission;
-        }
-      }).open();
+      new ApprovalModal(
+        this.app,
+        msg,
+        (approved, permission) => {
+          this.controlChannel?.send({
+            type: "join-response",
+            userId: msg.userId,
+            approved,
+            permission,
+          });
+          if (approved) {
+            const existing = this.remoteUsers.get(msg.userId);
+            if (existing) existing.permission = permission;
+          }
+        },
+        this.settings.approvalTimeoutSeconds,
+      ).open();
     });
 
     this.controlChannel.on("join-response", async (msg) => {
@@ -1073,7 +1198,27 @@ export default class LiveSharePlugin extends Plugin {
       this.endSession();
     });
 
-    this.controlChannel.on("host-promoted", async () => {
+    this.controlChannel.on("host-transfer-offer", (msg) => {
+      new ConfirmModal(
+        this.app,
+        `${msg.displayName ?? msg.userId} wants to make you the host. Accept?`,
+        (accepted) => {
+          if (accepted) {
+            this.controlChannel?.send({
+              type: "host-transfer-accept",
+              userId: msg.userId,
+            });
+          } else {
+            this.controlChannel?.send({
+              type: "host-transfer-decline",
+              userId: msg.userId,
+            });
+          }
+        },
+      ).open();
+    });
+
+    this.controlChannel.on("host-transfer-complete", async () => {
       this.settings.role = "host";
       this.settings.permission = "read-write";
       await this.saveSettings();
@@ -1081,8 +1226,17 @@ export default class LiveSharePlugin extends Plugin {
       this.broadcastPresence();
       this.updateStatusBar();
       this.refreshPresenceView();
-      new Notice("Live Share: you have been promoted to host");
-      this.logger.log("session", "promoted to host");
+      new Notice("Live Share: you are now the host");
+      this.logger.log("session", "became host via transfer");
+    });
+
+    this.controlChannel.on("host-transfer-decline", (msg) => {
+      this.notify(`Live Share: ${msg.displayName ?? msg.userId} declined host transfer`);
+    });
+
+    this.controlChannel.on("host-disconnected", () => {
+      new Notice("Live Share: the host has disconnected");
+      this.logger.log("session", "host disconnected");
     });
 
     this.controlChannel.on("host-changed", (msg) => {
@@ -1094,11 +1248,30 @@ export default class LiveSharePlugin extends Plugin {
       this.logger.log("session", `host changed to ${msg.userId}`);
     });
 
+    this.controlChannel.on("file-permission-update", (msg) => {
+      this.filePermissions.set(msg.filePath, msg.permission);
+      this.explorerIndicators?.update(this.filePermissions);
+      this.onActiveFileChange();
+      this.notify(`Live Share: ${msg.filePath} set to ${msg.permission}`);
+    });
+
     this.versionHistory.startAutoCapture();
+    this.explorerIndicators = new ExplorerIndicators();
+    this.commentManager = new CommentManager(
+      this.syncManager,
+      this.userId,
+      this.settings.displayName,
+    );
+    this.canvasSync = new CanvasSync(this.app.vault, this.syncManager, this.fileOpsManager);
     const entries = this.manifestManager.getEntries();
+    const role = this.settings.role === "host" ? "host" : "guest";
     for (const [path] of entries) {
       if (isTextFile(path)) {
         this.versionHistory.trackFile(path);
+        this.commentManager.subscribeFile(path);
+        if (path.endsWith(".canvas")) {
+          this.canvasSync.subscribe(path, role);
+        }
       }
     }
 
@@ -1121,16 +1294,34 @@ export default class LiveSharePlugin extends Plugin {
         ? filePath
         : null;
     this.backgroundSync.setActiveFile(sharedPath);
+    const effectivePermission = sharedPath
+      ? (this.filePermissions.get(sharedPath) ?? this.settings.permission)
+      : this.settings.permission;
     this.collabManager.activateForFile(
       cmView,
       sharedPath,
       this.syncManager,
       this.settings.role,
-      this.settings.permission,
+      effectivePermission,
       {
         name: this.settings.displayName,
         color: this.settings.cursorColor,
         colorLight: `${this.settings.cursorColor}33`,
+      },
+      this.commentManager,
+      (line: number) => {
+        if (!this.commentManager || !sharedPath) return;
+        const comments = this.commentManager
+          .getComments(sharedPath)
+          .filter((c) => !c.resolved && c.anchorIndex === line);
+        if (comments.length > 0) {
+          new CommentThreadModal(this.app, sharedPath, comments[0], this.commentManager).open();
+        } else {
+          new AddCommentModal(this.app, (text) => {
+            this.commentManager?.addComment(sharedPath, line, text);
+            this.notify("Live Share: comment added");
+          }).open();
+        }
       },
     );
 
@@ -1337,6 +1528,22 @@ export default class LiveSharePlugin extends Plugin {
     this.notify(`Live Share: set ${user.displayName} to ${newPermission}`);
   }
 
+  private async fetchAuditLog() {
+    if (!this.settings.serverUrl || !this.settings.roomId || !this.settings.token) return;
+    try {
+      const url = `${this.settings.serverUrl}/rooms/${this.settings.roomId}/logs?token=${encodeURIComponent(this.settings.token)}&limit=100`;
+      const res = await fetch(url);
+      if (!res.ok) {
+        new Notice("Live Share: failed to fetch audit log");
+        return;
+      }
+      const entries = await res.json();
+      new AuditLogModal(this.app, entries).open();
+    } catch {
+      new Notice("Live Share: failed to fetch audit log");
+    }
+  }
+
   private async reloadFromHost() {
     if (!this.controlChannel) return;
     this.notify("Live Share: reloading all files from host...");
@@ -1457,19 +1664,13 @@ export default class LiveSharePlugin extends Plugin {
       .then((raw) => {
         try {
           this.versionHistory.loadStore(JSON.parse(raw));
-        } catch {
-          // ignore corrupt snapshot file
-        }
+        } catch {}
       })
-      .catch(() => {
-        // file doesn't exist yet, that's fine
-      });
+      .catch(() => {});
   }
 
   private saveVersionHistory(): void {
     const store = this.versionHistory.getStore();
-    this.app.vault.adapter.write(this.snapshotPath, JSON.stringify(store)).catch(() => {
-      // ignore write errors for snapshots
-    });
+    this.app.vault.adapter.write(this.snapshotPath, JSON.stringify(store)).catch(() => {});
   }
 }

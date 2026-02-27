@@ -1,11 +1,13 @@
-import { Compartment, EditorState } from "@codemirror/state";
-import type { Extension } from "@codemirror/state";
+import { Compartment, EditorState, type Extension } from "@codemirror/state";
 import type { EditorView } from "@codemirror/view";
 import { Notice } from "obsidian";
 import { yCollab } from "y-codemirror.next";
 import type * as awarenessProtocol from "y-protocols/awareness";
 import * as Y from "yjs";
 
+import { commentGutterExtension, updateCommentPositions } from "./comment-gutter";
+import type { CommentManager } from "./comments";
+import { conflictExtension } from "./conflict-decoration";
 import type { SyncManager } from "./sync";
 import type { Permission, SessionRole } from "./types";
 import { applyMinimalYTextUpdate, normalizeLineEndings } from "./utils";
@@ -22,6 +24,7 @@ export class CollabManager {
   private currentView: EditorView | null = null;
   private currentAwareness: awarenessProtocol.Awareness | null = null;
   private activationGen = 0;
+  private commentUnsub: (() => void) | null = null;
 
   getBaseExtension(): Extension {
     return this.compartment.of([]);
@@ -34,6 +37,8 @@ export class CollabManager {
     role?: SessionRole,
     permission?: Permission,
     cursorUser?: CursorUser,
+    commentManager?: CommentManager | null,
+    onCommentGutterClick?: (line: number) => void,
   ) {
     const gen = ++this.activationGen;
 
@@ -96,12 +101,29 @@ export class CollabManager {
       undoManager: false,
     });
     const extensions: Extension[] = Array.isArray(collabExt) ? [...collabExt] : [collabExt];
+    extensions.push(conflictExtension());
+    if (commentManager && onCommentGutterClick) {
+      extensions.push(commentGutterExtension(onCommentGutterClick));
+    }
     if (permission === "read-only") {
       extensions.push(EditorState.readOnly.of(true));
     }
     view.dispatch({
       effects: this.compartment.reconfigure(extensions),
     });
+
+    this.commentUnsub?.();
+    this.commentUnsub = null;
+    if (commentManager && filePath) {
+      const path = filePath;
+      const refreshComments = () => {
+        if (this.currentPath !== path || this.currentView !== view) return;
+        const comments = commentManager.getComments(path);
+        updateCommentPositions(view, comments);
+      };
+      refreshComments();
+      this.commentUnsub = commentManager.onCommentsChange(path, refreshComments);
+    }
 
     const sel = view.state.selection.main;
     const anchor = Y.createRelativePositionFromTypeIndex(docHandle.text, sel.anchor);
@@ -115,6 +137,8 @@ export class CollabManager {
       this.currentAwareness.setLocalState(null);
       this.currentAwareness = null;
     }
+    this.commentUnsub?.();
+    this.commentUnsub = null;
     this.currentPath = null;
     this.currentView = null;
     view.dispatch({ effects: this.compartment.reconfigure([]) });

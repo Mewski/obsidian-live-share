@@ -23,6 +23,7 @@ export interface LiveShareSettings {
   debugLogPath: string;
   autoReconnect: boolean;
   excludePatterns: string[];
+  approvalTimeoutSeconds: number;
 }
 
 export const DEFAULT_SETTINGS: LiveShareSettings = {
@@ -46,6 +47,7 @@ export const DEFAULT_SETTINGS: LiveShareSettings = {
   debugLogPath: "live-share-debug.md",
   autoReconnect: true,
   excludePatterns: [],
+  approvalTimeoutSeconds: 60,
 };
 
 export interface FileCreateOp {
@@ -78,6 +80,7 @@ export interface FileChunkStartOp {
   path: string;
   totalSize: number;
   binary?: boolean;
+  transferId?: string;
 }
 
 export interface FileChunkDataOp {
@@ -85,11 +88,20 @@ export interface FileChunkDataOp {
   path: string;
   index: number;
   data: string;
+  transferId?: string;
 }
 
 export interface FileChunkEndOp {
   type: "chunk-end";
   path: string;
+  transferId?: string;
+}
+
+export interface FileChunkResumeOp {
+  type: "chunk-resume";
+  path: string;
+  transferId: string;
+  receivedSeqs: number[];
 }
 
 export interface FolderCreateOp {
@@ -105,6 +117,7 @@ export type FileOp =
   | FileChunkStartOp
   | FileChunkDataOp
   | FileChunkEndOp
+  | FileChunkResumeOp
   | FolderCreateOp;
 
 export interface FileOpMessage {
@@ -117,6 +130,7 @@ export interface ChunkStartMessage {
   path: string;
   totalSize: number;
   binary?: boolean;
+  transferId?: string;
 }
 
 export interface ChunkDataMessage {
@@ -124,11 +138,20 @@ export interface ChunkDataMessage {
   path: string;
   index: number;
   data: string;
+  transferId?: string;
 }
 
 export interface ChunkEndMessage {
   type: "file-chunk-end";
   path: string;
+  transferId?: string;
+}
+
+export interface ChunkResumeMessage {
+  type: "file-chunk-resume";
+  path: string;
+  transferId: string;
+  receivedSeqs: number[];
 }
 
 export interface PresenceUpdateMessage {
@@ -231,10 +254,44 @@ export interface PongMessage {
   timestamp?: number;
 }
 
-export interface HostPromotedMessage {
-  type: "host-promoted";
+export interface SetFilePermissionMessage {
+  type: "set-file-permission";
+  userId: string;
+  filePath: string;
+  permission: Permission;
+}
+
+export interface FilePermissionUpdateMessage {
+  type: "file-permission-update";
+  filePath: string;
+  permission: Permission;
+}
+
+export interface HostTransferOfferMessage {
+  type: "host-transfer-offer";
+  userId: string;
+  displayName?: string;
+}
+
+export interface HostTransferAcceptMessage {
+  type: "host-transfer-accept";
+  userId: string;
+}
+
+export interface HostTransferDeclineMessage {
+  type: "host-transfer-decline";
+  userId: string;
+  displayName?: string;
+}
+
+export interface HostTransferCompleteMessage {
+  type: "host-transfer-complete";
   userId: string;
   displayName: string;
+}
+
+export interface HostDisconnectedMessage {
+  type: "host-disconnected";
 }
 
 export interface HostChangedMessage {
@@ -248,6 +305,7 @@ export type ControlMessage =
   | ChunkStartMessage
   | ChunkDataMessage
   | ChunkEndMessage
+  | ChunkResumeMessage
   | PresenceUpdateMessage
   | PresenceLeaveMessage
   | JoinRequestMessage
@@ -264,7 +322,13 @@ export type ControlMessage =
   | SessionEndMessage
   | PingMessage
   | PongMessage
-  | HostPromotedMessage
+  | SetFilePermissionMessage
+  | FilePermissionUpdateMessage
+  | HostTransferOfferMessage
+  | HostTransferAcceptMessage
+  | HostTransferDeclineMessage
+  | HostTransferCompleteMessage
+  | HostDisconnectedMessage
   | HostChangedMessage;
 
 export type ControlMessageType = ControlMessage["type"];
@@ -274,6 +338,7 @@ export interface ControlMessageMap {
   "file-chunk-start": ChunkStartMessage;
   "file-chunk-data": ChunkDataMessage;
   "file-chunk-end": ChunkEndMessage;
+  "file-chunk-resume": ChunkResumeMessage;
   "presence-update": PresenceUpdateMessage;
   "presence-leave": PresenceLeaveMessage;
   "join-request": JoinRequestMessage;
@@ -290,6 +355,12 @@ export interface ControlMessageMap {
   "session-end": SessionEndMessage;
   ping: PingMessage;
   pong: PongMessage;
-  "host-promoted": HostPromotedMessage;
+  "host-transfer-offer": HostTransferOfferMessage;
+  "host-transfer-accept": HostTransferAcceptMessage;
+  "host-transfer-decline": HostTransferDeclineMessage;
+  "host-transfer-complete": HostTransferCompleteMessage;
+  "host-disconnected": HostDisconnectedMessage;
   "host-changed": HostChangedMessage;
+  "set-file-permission": SetFilePermissionMessage;
+  "file-permission-update": FilePermissionUpdateMessage;
 }
