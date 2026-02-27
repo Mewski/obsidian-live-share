@@ -1,7 +1,5 @@
-import { type App, MarkdownView, PluginSettingTab, SettingGroup } from "obsidian";
+import { type App, PluginSettingTab, SettingGroup } from "obsidian";
 import type LiveSharePlugin from "../main";
-import { normalizePath, toCanonicalPath } from "../utils";
-import { FilePermissionModal, type FilePermissionUser } from "./file-permission-modal";
 
 export class LiveShareSettingTab extends PluginSettingTab {
   private plugin: LiveSharePlugin;
@@ -132,34 +130,6 @@ export class LiveShareSettingTab extends PluginSettingTab {
           }),
         );
         if (settings.role === "host") {
-          setting.addButton((button) =>
-            button.setButtonText("File permissions").onClick(() => {
-              const activeView = this.plugin.app.workspace.getActiveViewOfType(MarkdownView);
-              if (!activeView?.file || this.plugin.remoteUsers.size === 0) return;
-              const filePath = toCanonicalPath(normalizePath(activeView.file.path));
-              const users: FilePermissionUser[] = [];
-              for (const [userId, user] of this.plugin.remoteUsers) {
-                users.push({
-                  userId,
-                  displayName: user.displayName,
-                  permission: user.permission ?? "read-write",
-                });
-              }
-              new FilePermissionModal(
-                this.plugin.app,
-                filePath,
-                users,
-                (userId, targetPath, permission) => {
-                  this.plugin.controlChannel?.send({
-                    type: "set-file-permission",
-                    userId,
-                    filePath: targetPath,
-                    permission,
-                  });
-                },
-              ).open();
-            }),
-          );
           setting.addButton((button) =>
             button
               .setButtonText("End session")

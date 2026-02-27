@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { Router } from "express";
 import { nanoid } from "nanoid";
 
@@ -96,7 +97,7 @@ roomRouter.post("/", async (req, res) => {
 
   const now = Date.now();
   const room: Room = {
-    id: nanoid(12),
+    id: randomUUID(),
     token: nanoid(24),
     name,
     createdAt: now,
