@@ -67,18 +67,21 @@ export function createAuthRouter(): Router {
 
       let tokenResponse: Response;
       try {
-        tokenResponse = await fetch("https://github.com/login/oauth/access_token", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Accept: "application/json",
+        tokenResponse = await fetch(
+          "https://github.com/login/oauth/access_token",
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Accept: "application/json",
+            },
+            body: JSON.stringify({
+              client_id: GITHUB_CLIENT_ID,
+              client_secret: GITHUB_CLIENT_SECRET,
+              code,
+            }),
           },
-          body: JSON.stringify({
-            client_id: GITHUB_CLIENT_ID,
-            client_secret: GITHUB_CLIENT_SECRET,
-            code,
-          }),
-        });
+        );
       } catch {
         res.status(502).send("Failed to contact GitHub");
         return;
@@ -135,7 +138,9 @@ export function createAuthRouter(): Router {
         .replace(/"/g, "&quot;");
 
       const obsidianUri = `obsidian://live-share-auth?token=${encodeURIComponent(jwtToken)}`;
-      const safeAvatar = githubUser.avatar_url.replace(/&/g, "&amp;").replace(/"/g, "&quot;");
+      const safeAvatar = githubUser.avatar_url
+        .replace(/&/g, "&amp;")
+        .replace(/"/g, "&quot;");
       res.send(`<!DOCTYPE html>
 <html><head>
 <meta charset="utf-8">
@@ -173,18 +178,6 @@ h1{font-size:18px;font-weight:600;margin-bottom:2px}
     <button class="copy-btn" id="copy" onclick="navigator.clipboard.writeText(document.getElementById('token').value).then(()=>{document.getElementById('copy').innerHTML='<span class=check>Copied!</span>'})">Copy</button>
   </div>
 </div>
-<script>
-setTimeout(()=>{
-  location.href=${JSON.stringify(obsidianUri)};
-  setTimeout(()=>{
-    document.getElementById('open').textContent='Redirected';
-    document.getElementById('open').style.background='#50c878';
-    document.querySelector('.card').insertAdjacentHTML('beforeend',
-      '<p class="close-msg">You can close this tab.</p>');
-    try{window.close()}catch{}
-  },500);
-},300);
-</script>
 </body></html>`);
     } catch (err) {
       console.error("[auth] failed to handle OAuth callback:", err);
