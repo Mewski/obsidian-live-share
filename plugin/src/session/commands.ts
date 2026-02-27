@@ -8,13 +8,13 @@ export function registerCommands(plugin: LiveSharePlugin): void {
   plugin.addCommand({
     id: "start-session",
     name: "Start session",
-    callback: () => plugin.startSession(),
+    callback: () => void plugin.startSession(),
   });
 
   plugin.addCommand({
     id: "join-session",
     name: "Join session",
-    callback: () => plugin.joinSession(),
+    callback: () => void plugin.joinSession(),
   });
 
   plugin.addCommand({
@@ -27,8 +27,10 @@ export function registerCommands(plugin: LiveSharePlugin): void {
         const confirmed = await plugin.confirm(
           "Are you sure you want to end the session? All participants will be disconnected.",
         );
-        if (confirmed) plugin.endSession();
-      })().catch(() => {});
+        if (confirmed) void plugin.endSession();
+      })().catch(() => {
+        // Confirmation dialog was dismissed
+      });
     },
   });
 
@@ -40,8 +42,10 @@ export function registerCommands(plugin: LiveSharePlugin): void {
       if (checking) return true;
       (async () => {
         const confirmed = await plugin.confirm("Are you sure you want to leave the session?");
-        if (confirmed) plugin.endSession();
-      })().catch(() => {});
+        if (confirmed) void plugin.endSession();
+      })().catch(() => {
+        // Confirmation dialog was dismissed
+      });
     },
   });
 
@@ -54,19 +58,19 @@ export function registerCommands(plugin: LiveSharePlugin): void {
   plugin.addCommand({
     id: "show-collaborators",
     name: "Show collaborators panel",
-    callback: () => plugin.activatePresenceView(),
+    callback: () => void plugin.activatePresenceView(),
   });
 
   plugin.addCommand({
     id: "log-in",
     name: "Log in with GitHub",
-    callback: () => plugin.authManager.authenticate(),
+    callback: () => void plugin.authManager.authenticate(),
   });
 
   plugin.addCommand({
     id: "log-out",
     name: "Log out",
-    callback: () => plugin.authManager.logout(),
+    callback: () => void plugin.authManager.logout(),
   });
 
   plugin.addCommand({
@@ -84,7 +88,7 @@ export function registerCommands(plugin: LiveSharePlugin): void {
         line: cursor.line,
         ch: cursor.ch,
       });
-      plugin.notify("Live Share: focus request sent");
+      plugin.notify("Live share: focus request sent");
     },
   });
 
@@ -106,7 +110,7 @@ export function registerCommands(plugin: LiveSharePlugin): void {
         line: cursor.line,
         ch: cursor.ch,
       });
-      plugin.notify("Live Share: summon sent to all participants");
+      plugin.notify("Live share: summon sent to all participants");
     },
   });
 
@@ -116,7 +120,7 @@ export function registerCommands(plugin: LiveSharePlugin): void {
     checkCallback: (checking) => {
       if (plugin.settings.role !== "guest" || !plugin.sessionManager.isActive) return false;
       if (checking) return true;
-      plugin.reloadFromHost();
+      void plugin.reloadFromHost();
     },
   });
 
@@ -156,7 +160,7 @@ export function registerCommands(plugin: LiveSharePlugin): void {
           userId,
         });
         const user = plugin.remoteUsers.get(userId);
-        plugin.notify(`Live Share: offered host role to ${user?.displayName ?? userId}`);
+        plugin.notify(`Live share: offered host role to ${user?.displayName ?? userId}`);
       }).open();
     },
   });
@@ -167,7 +171,7 @@ export function registerCommands(plugin: LiveSharePlugin): void {
     checkCallback: (checking) => {
       if (plugin.settings.role !== "host" || !plugin.sessionManager.isActive) return false;
       if (checking) return true;
-      plugin.fetchAuditLog();
+      void plugin.fetchAuditLog();
     },
   });
 }

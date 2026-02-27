@@ -90,7 +90,7 @@ export class ManifestManager {
           });
         }
       } catch {
-        new Notice(`Live Share: failed to read ${file.path}, skipping`);
+        new Notice(`Live share: failed to read ${file.path}, skipping`);
       }
     }
 
@@ -200,7 +200,9 @@ export class ManifestManager {
           }
         }
         synced++;
-      } catch {}
+      } catch {
+        // Failed to sync individual file, continue with rest
+      }
     }
 
     return synced;

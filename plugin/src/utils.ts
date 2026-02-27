@@ -194,7 +194,9 @@ export async function ensureFolder(vault: Vault, path: string): Promise<void> {
     if (!folder) {
       try {
         await vault.createFolder(current);
-      } catch {}
+      } catch {
+        // Folder may already exist from a concurrent create
+      }
     }
   }
 }

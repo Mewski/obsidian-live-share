@@ -16,10 +16,10 @@ export class AuditLogModal extends Modal {
     super(app);
   }
 
-  onOpen() {
+  override onOpen() {
     const { contentEl } = this;
     contentEl.empty();
-    contentEl.createEl("h2", { text: "Audit Log" });
+    contentEl.createEl("h2", { text: "Audit log" });
 
     if (this.entries.length === 0) {
       contentEl.createEl("p", { text: "No audit log entries." });
@@ -39,7 +39,7 @@ export class AuditLogModal extends Modal {
     }
   }
 
-  onClose() {
+  override onClose() {
     this.contentEl.empty();
   }
 }

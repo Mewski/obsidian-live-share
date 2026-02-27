@@ -7,12 +7,12 @@ export class PromptModal extends Modal {
 
   constructor(app: App, placeholder: string, resolve: (value: string | null) => void) {
     super(app);
-    this.setTitle("Live Share");
+    this.setTitle("Live share");
     this.placeholder = placeholder;
     this.resolve = resolve;
   }
 
-  onOpen() {
+  override onOpen() {
     const { contentEl } = this;
     const input = contentEl.createEl("input", {
       type: "text",
@@ -40,7 +40,7 @@ export class PromptModal extends Modal {
     this.close();
   }
 
-  onClose() {
+  override onClose() {
     this.resolve(this.result || null);
     this.contentEl.empty();
   }
@@ -80,12 +80,12 @@ export class ConfirmModal extends Modal {
 
   constructor(app: App, message: string, resolve: (value: boolean) => void) {
     super(app);
-    this.setTitle("Live Share");
+    this.setTitle("Live share");
     this.message = message;
     this.resolve = resolve;
   }
 
-  onOpen() {
+  override onOpen() {
     const { contentEl } = this;
     contentEl.createEl("p", { text: this.message });
     const buttons = contentEl.createDiv({ cls: "live-share-confirm-buttons" });
@@ -106,7 +106,7 @@ export class ConfirmModal extends Modal {
     });
   }
 
-  onClose() {
+  override onClose() {
     if (!this.hasDecided) this.resolve(false);
     this.contentEl.empty();
   }

@@ -1,12 +1,15 @@
 import { minimatch } from "minimatch";
 
-const DEFAULT_EXCLUDES = [".obsidian/**", ".trash/**"];
-
 export class ExclusionManager {
-  private patterns: string[] = [...DEFAULT_EXCLUDES];
+  private patterns: string[] = [];
+  private configDir = "";
+
+  setConfigDir(configDir: string): void {
+    this.configDir = configDir;
+  }
 
   setPatterns(custom: string[]): void {
-    this.patterns = [...DEFAULT_EXCLUDES, ...custom];
+    this.patterns = [`${this.configDir}/**`, ".trash/**", ...custom];
   }
 
   isExcluded(path: string): boolean {

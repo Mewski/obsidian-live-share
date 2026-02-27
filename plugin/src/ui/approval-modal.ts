@@ -16,13 +16,13 @@ export class ApprovalModal extends Modal {
     timeoutSeconds = 0,
   ) {
     super(app);
-    this.setTitle("Join Request");
+    this.setTitle("Join request");
     this.request = request;
     this.onDecision = onDecision;
     this.timeoutSeconds = timeoutSeconds;
   }
 
-  onOpen() {
+  override onOpen() {
     const { contentEl } = this;
 
     const info = contentEl.createDiv({ cls: "live-share-approval-info" });
@@ -35,7 +35,9 @@ export class ApprovalModal extends Modal {
             cls: "live-share-approval-avatar",
           });
         }
-      } catch {}
+      } catch {
+        // Invalid avatar URL, skip rendering
+      }
     }
     const nameEl = info.createEl("p");
     nameEl.appendText(`${this.request.displayName} wants to join your session.`);
@@ -75,7 +77,7 @@ export class ApprovalModal extends Modal {
     const buttons = contentEl.createDiv({ cls: "live-share-approval-buttons" });
 
     const approveRW = buttons.createEl("button", {
-      text: "Approve (Read-Write)",
+      text: "Approve (read-write)",
       cls: "mod-cta",
     });
     approveRW.addEventListener("click", () => {
@@ -85,7 +87,7 @@ export class ApprovalModal extends Modal {
     });
 
     const approveRO = buttons.createEl("button", {
-      text: "Approve (Read-Only)",
+      text: "Approve (read-only)",
     });
     approveRO.addEventListener("click", () => {
       this.hasDecided = true;
@@ -101,7 +103,7 @@ export class ApprovalModal extends Modal {
     });
   }
 
-  onClose() {
+  override onClose() {
     if (this.countdownTimer) {
       clearInterval(this.countdownTimer);
       this.countdownTimer = null;

@@ -266,7 +266,7 @@ export class CanvasSync {
       setTimeout(() => {
         this.writeTimers.delete(path);
         const content = serializeCanvas(nodesMap, edgesMap);
-        this.writeToDisk(path, content);
+        void this.writeToDisk(path, content);
       }, DEBOUNCE_MS),
     );
   }
@@ -282,7 +282,7 @@ export class CanvasSync {
       await this.vault.adapter.write(diskPath, content);
       this.lastWrittenContent.set(path, content);
     } catch {
-      new Notice(`Live Share: failed to write canvas ${diskPath}`);
+      new Notice(`Live share: failed to write canvas ${diskPath}`);
     } finally {
       setTimeout(() => {
         this.recentDiskWrites.delete(path);

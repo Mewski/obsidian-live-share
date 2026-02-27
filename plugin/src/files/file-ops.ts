@@ -1,4 +1,4 @@
-import { Notice, type TAbstractFile, type TFile, type Vault } from "obsidian";
+import { Notice, type TAbstractFile, TFile, type Vault } from "obsidian";
 import { OfflineQueue } from "../sync/offline-queue";
 import type { FileOp } from "../types";
 import {
@@ -167,14 +167,14 @@ export class FileOpsManager {
       switch (op.type) {
         case "create": {
           const exists = this.vault.getAbstractFileByPath(op.path);
-          if (exists) {
+          if (exists && exists instanceof TFile) {
             if (op.binary) {
               const binaryData = base64ToArrayBuffer(op.content);
-              await this.vault.modifyBinary(exists as TFile, binaryData);
+              await this.vault.modifyBinary(exists, binaryData);
             } else {
-              await this.vault.modify(exists as TFile, op.content);
+              await this.vault.modify(exists, op.content);
             }
-          } else {
+          } else if (!exists) {
             const parentDir = op.path.substring(0, op.path.lastIndexOf("/"));
             if (parentDir) await ensureFolder(this.vault, parentDir);
             if (op.binary) {
@@ -188,12 +188,12 @@ export class FileOpsManager {
         }
         case "modify": {
           const file = this.vault.getAbstractFileByPath(op.path);
-          if (file) {
+          if (file instanceof TFile) {
             if (op.binary) {
               const binaryData = base64ToArrayBuffer(op.content);
-              await this.vault.modifyBinary(file as TFile, binaryData);
+              await this.vault.modifyBinary(file, binaryData);
             } else {
-              await this.vault.modify(file as TFile, op.content);
+              await this.vault.modify(file, op.content);
             }
           }
           break;
@@ -203,7 +203,9 @@ export class FileOpsManager {
           if (file) {
             try {
               await this.vault.trash(file, true);
-            } catch {}
+            } catch {
+              // File may have already been deleted
+            }
           }
           this.pendingChunks.delete(op.path);
           break;
@@ -223,8 +225,8 @@ export class FileOpsManager {
             if (parentDir) await ensureFolder(this.vault, parentDir);
             try {
               await this.vault.rename(file, op.newPath);
-            } catch {
-              if (!this.vault.getAbstractFileByPath(op.newPath)) throw new Error("rename failed");
+            } catch (renameErr) {
+              if (!this.vault.getAbstractFileByPath(op.newPath)) throw renameErr;
             }
           } else if (file && alreadyExists) {
             await this.vault.trash(file, true);
@@ -234,7 +236,7 @@ export class FileOpsManager {
         case "chunk-start": {
           if (op.totalSize <= 0 || op.totalSize > MAX_FILE_SIZE) {
             if (op.totalSize > MAX_FILE_SIZE) {
-              new Notice(`Live Share: incoming ${op.path} exceeds 50 MB limit, skipping`);
+              new Notice(`Live share: incoming ${op.path} exceeds 50 MB limit, skipping`);
             }
             break;
           }
@@ -285,7 +287,7 @@ export class FileOpsManager {
               break;
             }
             this.pendingChunks.delete(endKey);
-            new Notice(`Live Share: incomplete transfer for ${op.path}, some chunks were lost`);
+            new Notice(`Live share: incomplete transfer for ${op.path}, some chunks were lost`);
             break;
           }
 
@@ -335,7 +337,7 @@ export class FileOpsManager {
       }
     } catch {
       const opPath = "path" in op ? op.path : "unknown";
-      new Notice(`Live Share: failed to apply ${op.type} for ${opPath}`);
+      new Notice(`Live share: failed to apply ${op.type} for ${opPath}`);
     } finally {
       setTimeout(() => {
         for (const path of paths) this.unmutePathEvents(path);
@@ -347,30 +349,32 @@ export class FileOpsManager {
     const localPath = normalizePath(file.path);
     if (this.isPathMuted(localPath) || !this.sendOp) return;
     const wirePath = toCanonicalPath(localPath);
-    if (!("extension" in file)) {
+    if (!(file instanceof TFile)) {
       this.emitOp({ type: "folder-create", path: wirePath });
       return;
     }
     const prev = this.sendQueues.get(localPath) ?? Promise.resolve();
     const binary = !isTextFile(file.path);
+    const tfile = file;
     const task = prev.then(async () => {
       if (!this.sendOp) return;
       try {
         if (binary) {
-          const binaryContent = await this.vault.readBinary(file as TFile);
+          const binaryContent = await this.vault.readBinary(tfile);
           if (this.isPathMuted(localPath)) return;
           if (binaryContent.byteLength > MAX_FILE_SIZE) {
-            new Notice(`Live Share: ${localPath} exceeds 50 MB limit, skipping`);
+            new Notice(`Live share: ${localPath} exceeds 50 MB limit, skipping`);
             return;
           }
           this.sendFileContent(wirePath, arrayBufferToBase64(binaryContent), true);
         } else {
-          const content = normalizeLineEndings(await this.vault.read(file as TFile));
+          const content = normalizeLineEndings(await this.vault.read(tfile));
           if (this.isPathMuted(localPath)) return;
           this.sendFileContent(wirePath, content, false);
         }
       } catch {
-        new Notice(`Live Share: failed to sync ${localPath}`);
+        // File may have been deleted/renamed before we could read it
+        new Notice(`Live share: failed to sync ${localPath}`);
       }
     });
     this.sendQueues.set(localPath, task);
@@ -381,18 +385,19 @@ export class FileOpsManager {
   async onFileModify(file: TAbstractFile) {
     const localPath = normalizePath(file.path);
     if (this.isPathMuted(localPath) || !this.sendOp) return;
-    if (!("extension" in file)) return;
+    if (!(file instanceof TFile)) return;
     const binary = !isTextFile(file.path);
     if (!binary) return;
     const wirePath = toCanonicalPath(localPath);
+    const tfile = file;
     const prev = this.sendQueues.get(localPath) ?? Promise.resolve();
     const task = prev.then(async () => {
       if (!this.sendOp) return;
       try {
-        const binaryContent = await this.vault.readBinary(file as TFile);
+        const binaryContent = await this.vault.readBinary(tfile);
         if (this.isPathMuted(localPath)) return;
         if (binaryContent.byteLength > MAX_FILE_SIZE) {
-          new Notice(`Live Share: ${localPath} exceeds 50 MB limit, skipping`);
+          new Notice(`Live share: ${localPath} exceeds 50 MB limit, skipping`);
           return;
         }
         const content = arrayBufferToBase64(binaryContent);
@@ -407,7 +412,7 @@ export class FileOpsManager {
           });
         }
       } catch {
-        new Notice(`Live Share: failed to sync ${localPath}`);
+        new Notice(`Live share: failed to sync ${localPath}`);
       }
     });
     this.sendQueues.set(localPath, task);

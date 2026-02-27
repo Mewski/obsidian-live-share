@@ -65,11 +65,11 @@ export class PresenceView extends ItemView {
     this.render();
   }
 
-  async onOpen() {
+  override async onOpen() {
     this.render();
   }
 
-  async onClose() {
+  override async onClose() {
     this.contentEl.empty();
   }
 
@@ -134,7 +134,9 @@ export class PresenceView extends ItemView {
             });
             hasAvatar = true;
           }
-        } catch {}
+        } catch {
+          // Invalid avatar URL, skip rendering
+        }
       }
       if (!hasAvatar) {
         avatar.setText(this.getInitial(user.displayName));
@@ -155,6 +157,7 @@ export class PresenceView extends ItemView {
       }
       if (user.permission === "read-only") {
         nameRow.createEl("span", {
+          // eslint-disable-next-line obsidianmd/ui/sentence-case
           text: "R/O",
           cls: "live-share-badge mod-readonly",
         });

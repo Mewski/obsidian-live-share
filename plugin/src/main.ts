@@ -1,5 +1,5 @@
 import type { EditorView } from "@codemirror/view";
-import { MarkdownView, Menu, Notice, Plugin, TFile } from "obsidian";
+import { MarkdownView, Menu, Notice, Plugin, TFile, requestUrl } from "obsidian";
 
 import { minimatch } from "minimatch";
 import { DebugLogger } from "./debug-logger";
@@ -134,7 +134,7 @@ export default class LiveSharePlugin extends Plugin {
           this.requestBinaryFile,
           { skipText: true },
         );
-        if (syncedCount > 0) this.notify(`Live Share: synced ${syncedCount} file(s)`);
+        if (syncedCount > 0) this.notify(`Live share: synced ${syncedCount} file(s)`);
         for (const path of actuallyAdded) {
           if (isTextFile(path)) {
             await this.backgroundSync.onFileAdded(path);
@@ -147,7 +147,7 @@ export default class LiveSharePlugin extends Plugin {
         if (file) await this.app.vault.trash(file, true);
       }
       if (actuallyRemoved.length > 0)
-        this.notify(`Live Share: removed ${actuallyRemoved.length} file(s)`);
+        this.notify(`Live share: removed ${actuallyRemoved.length} file(s)`);
     });
   }
 
@@ -174,7 +174,9 @@ export default class LiveSharePlugin extends Plugin {
             await this.saveData(this.settings);
           }
         }
-      } catch {}
+      } catch {
+        // Config file may not exist or be invalid JSON
+      }
     }
 
     this.syncManager = new SyncManager(this.settings);
@@ -184,6 +186,7 @@ export default class LiveSharePlugin extends Plugin {
     this.manifestManager = new ManifestManager(this.app.vault, this.settings);
     this.authManager = new AuthManager(this);
     this.exclusionManager = new ExclusionManager();
+    this.exclusionManager.setConfigDir(this.app.vault.configDir);
     this.exclusionManager.setPatterns(this.settings.excludePatterns);
     this.manifestManager.setExclusionManager(this.exclusionManager);
     this.backgroundSync = new BackgroundSync(
@@ -203,7 +206,7 @@ export default class LiveSharePlugin extends Plugin {
     this.registerEditorExtension(this.collabManager.getBaseExtension());
 
     this.statusBarEl = this.addStatusBarItem();
-    this.statusBarEl.addEventListener("click", () => this.activatePresenceView());
+    this.statusBarEl.addEventListener("click", () => void this.activatePresenceView());
     this.statusBarEl.addClass("live-share-status-bar");
     this.updateStatusBar();
 
@@ -212,14 +215,14 @@ export default class LiveSharePlugin extends Plugin {
     this.registerView(PRESENCE_VIEW_TYPE, (leaf) => {
       const view = new PresenceView(leaf);
       view.setFollowHandler((userId) => this.presenceManager?.followUser(userId));
-      view.setKickHandler((userId) => this.kickUser(userId));
+      view.setKickHandler((userId) => void this.kickUser(userId));
       view.setSummonHandler((userId) => this.summonUser(userId));
       view.setPermissionHandler((userId) => this.setUserPermission(userId));
       return view;
     });
 
     const ribbonEl = this.addRibbonIcon("users", "Collaborators", () => {
-      this.activatePresenceView();
+      void this.activatePresenceView();
     });
     const ribbonCtxHandler = (event: MouseEvent) => {
       event.preventDefault();
@@ -243,14 +246,14 @@ export default class LiveSharePlugin extends Plugin {
           (payload.displayName || payload.username || "").trim() || "Anonymous";
         this.settings.avatarUrl = payload.avatar || "";
         await this.saveSettings();
-        new Notice(`Live Share: authenticated as ${this.settings.displayName}`);
+        new Notice(`Live share: authenticated as ${this.settings.displayName}`);
       } catch {
-        new Notice("Live Share: invalid auth token");
+        new Notice("Live share: invalid auth token");
       }
     });
 
     this.registerObsidianProtocolHandler("live-share", (params) => {
-      if (params.invite) this.joinWithInvite(params.invite);
+      if (params.invite) void this.joinWithInvite(params.invite);
     });
 
     if (
@@ -315,7 +318,7 @@ export default class LiveSharePlugin extends Plugin {
       this.onActiveFileChange();
     } catch {
       this.logger.error("session", "failed to resume session");
-      await this.abortSession("Live Share: failed to resume previous session");
+      await this.abortSession("Live share: failed to resume previous session");
     }
   }
 
@@ -397,7 +400,7 @@ export default class LiveSharePlugin extends Plugin {
 
   public async startSession() {
     if (this.sessionManager.isActive) {
-      new Notice("Live Share: session already active");
+      new Notice("Live share: session already active");
       return;
     }
 
@@ -411,17 +414,17 @@ export default class LiveSharePlugin extends Plugin {
         this.registerManifestChangeHandler();
         this.onActiveFileChange();
         this.logger.log("session", `started, room=${this.settings.roomId}`);
-        this.notify("Live Share: session started, invite copied to clipboard");
+        this.notify("Live share: session started, invite copied to clipboard");
       } catch {
         this.logger.error("session", "failed to start session");
-        await this.abortSession("Live Share: failed to start session");
+        await this.abortSession("Live share: failed to start session");
       }
     }
   }
 
   public async joinSession() {
     if (this.sessionManager.isActive) {
-      new Notice("Live Share: session already active");
+      new Notice("Live share: session already active");
       return;
     }
 
@@ -443,17 +446,17 @@ export default class LiveSharePlugin extends Plugin {
         this.registerManifestChangeHandler();
         this.onActiveFileChange();
         this.logger.log("session", `joined, room=${this.settings.roomId}`);
-        this.notify(`Live Share: joined session, synced ${syncedCount} file(s)`);
+        this.notify(`Live share: joined session, synced ${syncedCount} file(s)`);
       } catch {
         this.logger.error("session", "failed to join session");
-        await this.abortSession("Live Share: failed to join session");
+        await this.abortSession("Live share: failed to join session");
       }
     }
   }
 
   private async joinWithInvite(inviteString: string) {
     if (this.sessionManager.isActive) {
-      new Notice("Live Share: session already active");
+      new Notice("Live share: session already active");
       return;
     }
 
@@ -472,17 +475,17 @@ export default class LiveSharePlugin extends Plugin {
         this.registerManifestChangeHandler();
         this.onActiveFileChange();
         this.logger.log("session", `joined via link, room=${this.settings.roomId}`);
-        this.notify(`Live Share: joined session, synced ${syncedCount} file(s)`);
+        this.notify(`Live share: joined session, synced ${syncedCount} file(s)`);
       } catch {
         this.logger.error("session", "failed to join via link");
-        await this.abortSession("Live Share: failed to join session");
+        await this.abortSession("Live share: failed to join session");
       }
     }
   }
 
   public async endSession() {
     if (!this.sessionManager.isActive) {
-      new Notice("Live Share: no active session");
+      new Notice("Live share: no active session");
       return;
     }
 
@@ -502,7 +505,7 @@ export default class LiveSharePlugin extends Plugin {
 
       this.cleanupSession();
       this.notify(
-        this.settings.role === "host" ? "Live Share: session ended" : "Live Share: left session",
+        this.settings.role === "host" ? "Live share: session ended" : "Live share: left session",
       );
     } finally {
       await this.sessionManager.endSession();
@@ -558,14 +561,14 @@ export default class LiveSharePlugin extends Plugin {
       } else if (controlState === "auth-required") {
         this.fileOpsManager.setOnline(false);
         this.connectionState.transition({ type: "auth-expired" });
-        new Notice("Live Share: authentication required - sign in via settings");
-        this.endSession();
+        new Notice("Live share: authentication required - sign in via settings");
+        void this.endSession();
       } else {
         this.fileOpsManager.setOnline(false);
         this.connectionState.transition({ type: "disconnect" });
         if (this.sessionManager.isActive && !this.isEndingSession) {
-          new Notice("Live Share: connection lost, session ended");
-          this.endSession();
+          new Notice("Live share: connection lost, session ended");
+          void this.endSession();
         }
       }
     });
@@ -652,7 +655,7 @@ export default class LiveSharePlugin extends Plugin {
     ) {
       effectivePermission = "read-only";
     }
-    this.collabManager.activateForFile(
+    void this.collabManager.activateForFile(
       cmView,
       sharedPath,
       this.syncManager,
@@ -685,13 +688,13 @@ export default class LiveSharePlugin extends Plugin {
     const state = this.connectionState.getState();
     switch (state) {
       case "disconnected":
-        this.statusBarEl.setText("Live Share: off");
+        this.statusBarEl.setText("Live share: off");
         break;
       case "connecting":
-        this.statusBarEl.setText("Live Share: connecting...");
+        this.statusBarEl.setText("Live share: connecting...");
         break;
       case "reconnecting":
-        this.statusBarEl.setText("Live Share: reconnecting...");
+        this.statusBarEl.setText("Live share: reconnecting...");
         break;
       case "connected": {
         const count = this.remoteUsers.size;
@@ -700,14 +703,14 @@ export default class LiveSharePlugin extends Plugin {
         const latency = this.controlChannel?.getLatency();
         const latencyStr = latency ? ` ${latency}ms` : "";
         const presentingLabel = this.presenceManager?.getIsPresenting() ? " [presenting]" : "";
-        this.statusBarEl.setText(`Live Share: ${role}${users}${latencyStr}${presentingLabel}`);
+        this.statusBarEl.setText(`Live share: ${role}${users}${latencyStr}${presentingLabel}`);
         break;
       }
       case "error":
-        this.statusBarEl.setText("Live Share: error");
+        this.statusBarEl.setText("Live share: error");
         break;
       case "auth-required":
-        this.statusBarEl.setText("Live Share: auth needed");
+        this.statusBarEl.setText("Live share: auth needed");
         break;
     }
   }
@@ -721,13 +724,13 @@ export default class LiveSharePlugin extends Plugin {
         item
           .setTitle("Start session")
           .setIcon("play")
-          .onClick(() => this.startSession()),
+          .onClick(() => void this.startSession()),
       );
       menu.addItem((item) =>
         item
           .setTitle("Join session")
           .setIcon("log-in")
-          .onClick(() => this.joinSession()),
+          .onClick(() => void this.joinSession()),
       );
     } else {
       menu.addItem((item) =>
@@ -740,7 +743,7 @@ export default class LiveSharePlugin extends Plugin {
         item
           .setTitle("Show collaborators")
           .setIcon("users")
-          .onClick(() => this.activatePresenceView()),
+          .onClick(() => void this.activatePresenceView()),
       );
       menu.addSeparator();
       if (this.settings.role === "host") {
@@ -749,11 +752,12 @@ export default class LiveSharePlugin extends Plugin {
             .setTitle("End session")
             .setIcon("square")
             .setWarning(true)
-            .onClick(async () => {
-              const confirmed = await this.confirm(
+            .onClick(() => {
+              void this.confirm(
                 "Are you sure you want to end the session? All participants will be disconnected.",
-              );
-              if (confirmed) this.endSession();
+              ).then((confirmed) => {
+                if (confirmed) void this.endSession();
+              });
             }),
         );
       } else {
@@ -762,9 +766,10 @@ export default class LiveSharePlugin extends Plugin {
             .setTitle("Leave session")
             .setIcon("log-out")
             .setWarning(true)
-            .onClick(async () => {
-              const confirmed = await this.confirm("Are you sure you want to leave the session?");
-              if (confirmed) this.endSession();
+            .onClick(() => {
+              void this.confirm("Are you sure you want to leave the session?").then((confirmed) => {
+                if (confirmed) void this.endSession();
+              });
             }),
         );
       }
@@ -821,7 +826,7 @@ export default class LiveSharePlugin extends Plugin {
     this.remoteUsers.delete(userId);
     this.refreshPresenceView();
     this.updateStatusBar();
-    this.notify(`Live Share: kicked ${name}`);
+    this.notify(`Live share: kicked ${name}`);
   }
 
   setUserPermission(userId: string) {
@@ -837,7 +842,7 @@ export default class LiveSharePlugin extends Plugin {
     });
     user.permission = newPermission;
     this.refreshPresenceView();
-    this.notify(`Live Share: set ${user.displayName} to ${newPermission}`);
+    this.notify(`Live share: set ${user.displayName} to ${newPermission}`);
   }
 
   async fetchAuditLog() {
@@ -848,27 +853,22 @@ export default class LiveSharePlugin extends Plugin {
         Authorization: `Bearer ${this.settings.token}`,
       };
       if (this.settings.serverPassword) headers["X-Server-Password"] = this.settings.serverPassword;
-      const res = await fetch(url, { headers });
-      if (!res.ok) {
-        new Notice("Live Share: failed to fetch audit log");
-        return;
-      }
-      const entries = await res.json();
-      new AuditLogModal(this.app, entries).open();
+      const res = await requestUrl({ url, headers });
+      new AuditLogModal(this.app, res.json).open();
     } catch {
-      new Notice("Live Share: failed to fetch audit log");
+      new Notice("Live share: failed to fetch audit log");
     }
   }
 
   async reloadFromHost() {
     if (!this.controlChannel) return;
-    this.notify("Live Share: reloading all files from host...");
+    this.notify("Live share: reloading all files from host...");
     const syncedCount = await this.manifestManager.syncFromManifest(
       this.mutePathEvents,
       this.unmutePathEvents,
       this.requestBinaryFile,
     );
-    if (syncedCount > 0) this.notify(`Live Share: reloaded ${syncedCount} file(s) from host`);
+    if (syncedCount > 0) this.notify(`Live share: reloaded ${syncedCount} file(s) from host`);
   }
 
   summonUser(userId: string) {
@@ -886,7 +886,7 @@ export default class LiveSharePlugin extends Plugin {
     const cursor = view?.editor?.getCursor();
     const filePath = view?.file?.path;
     if (!filePath) {
-      new Notice("Live Share: open a file first to summon");
+      new Notice("Live share: open a file first to summon");
       return;
     }
     this.controlChannel.send({
@@ -899,7 +899,7 @@ export default class LiveSharePlugin extends Plugin {
       ch: cursor?.ch ?? 0,
     });
     const user = this.remoteUsers.get(userId);
-    this.notify(`Live Share: summoned ${user?.displayName ?? userId}`);
+    this.notify(`Live share: summoned ${user?.displayName ?? userId}`);
   }
 
   confirm(message: string): Promise<boolean> {

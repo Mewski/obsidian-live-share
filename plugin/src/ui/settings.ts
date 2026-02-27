@@ -21,9 +21,10 @@ export class LiveShareSettingTab extends PluginSettingTab {
       .addSetting((setting) => {
         setting
           .setName("Server URL")
-          .setDesc("The Live Share server to connect to")
+          .setDesc("The server to connect to")
           .addText((text) => {
             text
+              // eslint-disable-next-line obsidianmd/ui/sentence-case
               .setPlaceholder("http://localhost:3000")
               .setValue(settings.serverUrl)
               .onChange(async (value) => {
@@ -258,6 +259,7 @@ export class LiveShareSettingTab extends PluginSettingTab {
           .setDesc("Path within your vault for the debug log")
           .addText((text) =>
             text
+              // eslint-disable-next-line obsidianmd/ui/sentence-case
               .setPlaceholder("live-share-debug.md")
               .setValue(settings.debugLogPath)
               .onChange(async (value) => {

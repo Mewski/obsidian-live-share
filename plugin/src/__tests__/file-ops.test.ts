@@ -1,6 +1,14 @@
+import { TFile } from "obsidian";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { FileOpsManager } from "../files/file-ops";
 import type { FileOp } from "../types";
+
+function createMockTFile(path: string): TFile {
+  const file = new TFile();
+  file.path = path;
+  (file as any).extension = path.split(".").pop() || "";
+  return file;
+}
 
 function createMockVault() {
   const files = new Map<string, { path: string; extension: string }>();
@@ -150,7 +158,7 @@ describe("FileOpsManager", () => {
 
   describe("local event handlers", () => {
     it("broadcasts file create with content", async () => {
-      const file = { path: "created.md", extension: "md" } as any;
+      const file = createMockTFile("created.md");
       manager.onFileCreate(file);
       await new Promise((r) => setTimeout(r, 10));
       expect(sentOps.length).toBe(1);
@@ -268,7 +276,7 @@ describe("FileOpsManager", () => {
     });
 
     it("modifies existing binary file", async () => {
-      const file = { path: "image.png", extension: "png" };
+      const file = createMockTFile("image.png");
       vault.files.set("image.png", file);
 
       await manager.applyRemoteOp({
@@ -427,7 +435,7 @@ describe("FileOpsManager", () => {
 
   describe("modify operations", () => {
     it("modifies existing text file content", async () => {
-      const file = { path: "doc.md", extension: "md" };
+      const file = createMockTFile("doc.md");
       vault.files.set("doc.md", file);
 
       await manager.applyRemoteOp({
@@ -450,7 +458,7 @@ describe("FileOpsManager", () => {
 
   describe("local event edge cases", () => {
     it("handles binary file create (reads as binary)", async () => {
-      const file = { path: "photo.png", extension: "png" } as any;
+      const file = createMockTFile("photo.png");
       manager.onFileCreate(file);
 
       await new Promise((r) => setTimeout(r, 10));
@@ -466,7 +474,7 @@ describe("FileOpsManager", () => {
     });
 
     it("broadcasts binary modify for binary files", async () => {
-      const file = { path: "image.png", extension: "png" } as any;
+      const file = createMockTFile("image.png");
       manager.onFileModify(file);
 
       await new Promise((r) => setTimeout(r, 10));

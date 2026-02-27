@@ -139,11 +139,11 @@ export function registerControlHandlers(plugin: LiveSharePlugin): void {
     ).open();
   });
 
-  channel.on("join-response", async (msg) => {
+  channel.on("join-response", (msg) => {
     if (plugin.settings.role !== "guest") return;
     if (msg.approved === false) {
-      new Notice("Live Share: join request denied by host");
-      plugin.endSession();
+      new Notice("Live share: join request denied by host");
+      void plugin.endSession();
       return;
     }
     if (msg.permission) {
@@ -161,34 +161,38 @@ export function registerControlHandlers(plugin: LiveSharePlugin): void {
     plugin.presenceManager?.broadcastPresence();
   });
 
-  channel.on("permission-update", async (msg) => {
+  channel.on("permission-update", (msg) => {
     plugin.settings.permission = msg.permission;
     plugin.onActiveFileChange();
-    plugin.notify(`Live Share: your permission was changed to ${msg.permission}`);
+    plugin.notify(`Live share: your permission was changed to ${msg.permission}`);
   });
 
   channel.on("focus-request", (msg) => {
     showFocusNotification(plugin, msg);
   });
 
-  channel.on("summon", async (msg) => {
+  channel.on("summon", (msg) => {
     const file = plugin.app.vault.getAbstractFileByPath(toLocalPath(msg.filePath));
     if (file instanceof TFile) {
-      await plugin.app.workspace.getLeaf().openFile(file);
-      const view = plugin.app.workspace.getActiveViewOfType(MarkdownView);
-      if (view) {
-        view.editor.setCursor({ line: msg.line, ch: msg.ch });
-        view.editor.scrollIntoView(
-          {
-            from: { line: msg.line, ch: 0 },
-            to: { line: msg.line, ch: 0 },
-          },
-          true,
-        );
-      }
+      void plugin.app.workspace
+        .getLeaf()
+        .openFile(file)
+        .then(() => {
+          const view = plugin.app.workspace.getActiveViewOfType(MarkdownView);
+          if (view) {
+            view.editor.setCursor({ line: msg.line, ch: msg.ch });
+            view.editor.scrollIntoView(
+              {
+                from: { line: msg.line, ch: 0 },
+                to: { line: msg.line, ch: 0 },
+              },
+              true,
+            );
+          }
+        });
     }
     new Notice(
-      `Live Share: ${msg.fromDisplayName} summoned you to ${msg.filePath}:${msg.line + 1}`,
+      `Live share: ${msg.fromDisplayName} summoned you to ${msg.filePath}:${msg.line + 1}`,
     );
   });
 
@@ -200,24 +204,24 @@ export function registerControlHandlers(plugin: LiveSharePlugin): void {
     if (msg.userId) plugin.presenceManager?.handlePresentStop(msg.userId);
   });
 
-  channel.on("sync-request", async (msg) => {
+  channel.on("sync-request", (msg) => {
     if (plugin.settings.role !== "host") return;
     if (msg.path && plugin.manifestManager.isSharedPath(msg.path)) {
       const file = plugin.app.vault.getAbstractFileByPath(toLocalPath(msg.path));
       if (file instanceof TFile) {
-        plugin.fileOpsManager.onFileCreate(file);
+        void plugin.fileOpsManager.onFileCreate(file);
       }
     }
   });
 
   channel.on("kicked", () => {
-    new Notice("Live Share: you have been removed from the session");
-    plugin.endSession();
+    new Notice("Live share: you have been removed from the session");
+    void plugin.endSession();
   });
 
   channel.on("session-end", () => {
-    new Notice("Live Share: the host ended the session");
-    plugin.endSession();
+    new Notice("Live share: the host ended the session");
+    void plugin.endSession();
   });
 
   channel.on("host-transfer-offer", (msg) => {
@@ -240,45 +244,54 @@ export function registerControlHandlers(plugin: LiveSharePlugin): void {
     ).open();
   });
 
-  channel.on("host-transfer-complete", async () => {
+  channel.on("host-transfer-complete", () => {
     plugin.settings.role = "host";
     plugin.settings.permission = "read-write";
-    await plugin.saveSettings();
-    await plugin.backgroundSync.startAll("host");
-    await plugin.manifestManager.publishManifest({ purge: false });
-    plugin.presenceManager?.broadcastPresence();
-    plugin.updateStatusBar();
-    plugin.refreshPresenceView();
-    new Notice("Live Share: you are now the host");
-    plugin.logger.log("session", "became host via transfer");
+    void plugin
+      .saveSettings()
+      .then(() => plugin.backgroundSync.startAll("host"))
+      .then(() => plugin.manifestManager.publishManifest({ purge: false }))
+      .then(() => {
+        plugin.presenceManager?.broadcastPresence();
+        plugin.updateStatusBar();
+        plugin.refreshPresenceView();
+        new Notice("Live share: you are now the host");
+        plugin.logger.log("session", "became host via transfer");
+      });
   });
 
   channel.on("host-transfer-decline", (msg) => {
-    plugin.notify(`Live Share: ${msg.displayName ?? msg.userId} declined host transfer`);
+    plugin.notify(`Live share: ${msg.displayName ?? msg.userId} declined host transfer`);
   });
 
   channel.on("host-disconnected", () => {
-    new Notice("Live Share: the host has disconnected");
+    new Notice("Live share: the host has disconnected");
     plugin.logger.log("session", "host disconnected");
   });
 
-  channel.on("host-changed", async (msg) => {
+  channel.on("host-changed", (msg) => {
+    const finish = () => {
+      for (const [userId, user] of plugin.remoteUsers) {
+        user.isHost = userId === msg.userId;
+      }
+      plugin.presenceManager?.broadcastPresence();
+      plugin.onActiveFileChange();
+      plugin.updateStatusBar();
+      plugin.refreshPresenceView();
+      plugin.notify(`Live share: ${msg.displayName} is now the host`);
+      plugin.logger.log("session", `host changed to ${msg.userId}`);
+    };
     if (plugin.settings.role === "host") {
       plugin.settings.role = "guest";
       if (plugin.presenceManager?.getIsPresenting()) {
         plugin.presenceManager.togglePresent();
       }
-      await plugin.saveSettings();
-      await plugin.backgroundSync.startAll("guest");
+      void plugin
+        .saveSettings()
+        .then(() => plugin.backgroundSync.startAll("guest"))
+        .then(finish);
+    } else {
+      finish();
     }
-    for (const [userId, user] of plugin.remoteUsers) {
-      user.isHost = userId === msg.userId;
-    }
-    plugin.presenceManager?.broadcastPresence();
-    plugin.onActiveFileChange();
-    plugin.updateStatusBar();
-    plugin.refreshPresenceView();
-    plugin.notify(`Live Share: ${msg.displayName} is now the host`);
-    plugin.logger.log("session", `host changed to ${msg.userId}`);
   });
 }

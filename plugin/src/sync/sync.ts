@@ -276,7 +276,7 @@ export class SyncManager {
         this.handleSync(docId, payload);
         break;
       case MUX_SYNC_ENCRYPTED:
-        this.handleSyncEncrypted(docId, payload);
+        void this.handleSyncEncrypted(docId, payload);
         break;
       case MUX_SYNC_REQUEST:
         this.handleSyncRequest(docId);
@@ -285,7 +285,7 @@ export class SyncManager {
         this.handleAwareness(docId, payload);
         break;
       case MUX_AWARENESS_ENCRYPTED:
-        this.handleAwarenessEncrypted(docId, payload);
+        void this.handleAwarenessEncrypted(docId, payload);
         break;
     }
   }
@@ -355,7 +355,9 @@ export class SyncManager {
       result[0] = syncType;
       result.set(decrypted, 1);
       this.handleSync(docId, result);
-    } catch {}
+    } catch {
+      // Decryption failure — drop silently to preserve E2E guarantee
+    }
   }
 
   private async handleAwarenessEncrypted(docId: string, payload: Uint8Array): Promise<void> {
@@ -366,7 +368,9 @@ export class SyncManager {
     try {
       const decrypted = await this.e2e.decrypt(payload);
       this.handleAwareness(docId, decrypted);
-    } catch {}
+    } catch {
+      // Decryption failure — drop silently to preserve E2E guarantee
+    }
   }
 
   private setSynced(docId: string, value: boolean): void {

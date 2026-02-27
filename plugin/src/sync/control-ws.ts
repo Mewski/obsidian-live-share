@@ -95,7 +95,7 @@ export class ControlChannel {
         }
 
         if (msg.encrypted && this.e2e?.enabled) {
-          this.decryptAndDispatch(msg);
+          void this.decryptAndDispatch(msg);
           return;
         }
         const handlers = this.handlers.get(msg.type);
@@ -149,7 +149,7 @@ export class ControlChannel {
       msg.type === "file-chunk-data" ||
       msg.type === "file-chunk-end";
     if (this.e2e?.enabled && encryptable) {
-      this.encryptAndSend(msg);
+      void this.encryptAndSend(msg);
     } else {
       this.ws.send(JSON.stringify(msg));
     }

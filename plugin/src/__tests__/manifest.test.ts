@@ -171,6 +171,8 @@ describe("ManifestManager", () => {
       it("excludes files matching exclusion patterns", () => {
         const manager = new ManifestManager(vault as any, createSettings());
         const exclusion = new ExclusionManager();
+        exclusion.setConfigDir(".obsidian");
+        exclusion.setPatterns([]);
         manager.setExclusionManager(exclusion);
 
         expect(manager.isSharedPath(".obsidian/config")).toBe(false);

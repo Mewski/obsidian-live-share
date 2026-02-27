@@ -46,7 +46,9 @@ export class DebugLogger {
     if (this.buffer.length === 0) return;
     const lines = `${this.buffer.join("\n")}\n`;
     this.buffer = [];
-    this.vault.adapter.append(this.logPath, lines).catch(() => {});
+    this.vault.adapter.append(this.logPath, lines).catch(() => {
+      // Best-effort logging, discard write failures
+    });
   }
 
   destroy(): void {

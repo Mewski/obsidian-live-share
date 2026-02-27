@@ -1,39 +1,38 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-interface MockStyleElement {
-  id: string;
-  textContent: string;
-  tagName: string;
-  remove: ReturnType<typeof vi.fn>;
+interface MockElement {
+  classes: Set<string>;
+  addClass: (cls: string) => void;
+  removeClass: (cls: string) => void;
 }
 
-let headChildren: Set<MockStyleElement>;
+let elements: Map<string, MockElement>;
 
 beforeEach(() => {
-  headChildren = new Set();
+  elements = new Map();
+
+  vi.stubGlobal("CSS", {
+    escape: (value: string) => value.replace(/"/g, '\\"'),
+  });
 
   vi.stubGlobal("document", {
-    createElement: vi.fn((tag: string) => {
-      const el: MockStyleElement = {
-        id: "",
-        textContent: "",
-        tagName: tag.toUpperCase(),
-        remove: vi.fn(() => {
-          headChildren.delete(el);
-        }),
-      };
-      return el;
-    }),
-    head: {
-      appendChild: vi.fn((el: MockStyleElement) => {
-        headChildren.add(el);
-      }),
-    },
-    getElementById: vi.fn((id: string) => {
-      for (const child of headChildren) {
-        if (child.id === id) return child;
+    querySelector: vi.fn((selector: string) => {
+      const match = selector.match(/data-path="(.+?)"/);
+      if (!match) return null;
+      const path = match[1].replace(/\\"/g, '"');
+      if (!elements.has(path)) {
+        const el: MockElement = {
+          classes: new Set(),
+          addClass(cls: string) {
+            this.classes.add(cls);
+          },
+          removeClass(cls: string) {
+            this.classes.delete(cls);
+          },
+        };
+        elements.set(path, el);
       }
-      return null;
+      return elements.get(path)!;
     }),
   });
 });
@@ -45,20 +44,13 @@ afterEach(() => {
 const { ExplorerIndicators } = await import("../ui/explorer-indicators");
 
 describe("ExplorerIndicators", () => {
-  it("creates a style element on construction", () => {
-    const indicators = new ExplorerIndicators();
-    expect(document.createElement).toHaveBeenCalledWith("style");
-    expect(document.head.appendChild).toHaveBeenCalled();
-    indicators.destroy();
-  });
-
-  it("generates CSS for read-only files", () => {
+  it("adds class to read-only file elements", () => {
     const indicators = new ExplorerIndicators();
     indicators.update(["secret.md"]);
 
-    const styleEl = [...headChildren][0];
-    expect(styleEl.textContent).toContain("secret.md");
-    expect(styleEl.textContent).toContain("\\1F512");
+    const el = elements.get("secret.md");
+    expect(el).toBeDefined();
+    expect(el!.classes.has("live-share-readonly")).toBe(true);
     indicators.destroy();
   });
 
@@ -66,35 +58,46 @@ describe("ExplorerIndicators", () => {
     const indicators = new ExplorerIndicators();
     indicators.update(["a.md", "b.md"]);
 
-    const styleEl = [...headChildren][0];
-    expect(styleEl.textContent).toContain("a.md");
-    expect(styleEl.textContent).toContain("b.md");
+    expect(elements.get("a.md")!.classes.has("live-share-readonly")).toBe(true);
+    expect(elements.get("b.md")!.classes.has("live-share-readonly")).toBe(true);
     indicators.destroy();
   });
 
-  it("clears CSS when updated with empty array", () => {
+  it("removes class when updated with empty array", () => {
     const indicators = new ExplorerIndicators();
     indicators.update(["a.md"]);
-    indicators.update([]);
+    expect(elements.get("a.md")!.classes.has("live-share-readonly")).toBe(true);
 
-    const styleEl = [...headChildren][0];
-    expect(styleEl.textContent).toBe("");
+    indicators.update([]);
+    expect(elements.get("a.md")!.classes.has("live-share-readonly")).toBe(false);
     indicators.destroy();
   });
 
-  it("removes style element on destroy", () => {
+  it("removes classes on destroy", () => {
     const indicators = new ExplorerIndicators();
-    const styleEl = [...headChildren][0];
+    indicators.update(["a.md", "b.md"]);
     indicators.destroy();
-    expect(styleEl.remove).toHaveBeenCalled();
+
+    expect(elements.get("a.md")!.classes.has("live-share-readonly")).toBe(false);
+    expect(elements.get("b.md")!.classes.has("live-share-readonly")).toBe(false);
   });
 
   it("handles paths with special characters", () => {
     const indicators = new ExplorerIndicators();
     indicators.update(['folder/file "name".md']);
 
-    const styleEl = [...headChildren][0];
-    expect(styleEl.textContent).toContain('\\"name\\"');
+    expect(document.querySelector).toHaveBeenCalled();
+    indicators.destroy();
+  });
+
+  it("only adds class to new paths and removes from old ones", () => {
+    const indicators = new ExplorerIndicators();
+    indicators.update(["a.md", "b.md"]);
+    indicators.update(["b.md", "c.md"]);
+
+    expect(elements.get("a.md")!.classes.has("live-share-readonly")).toBe(false);
+    expect(elements.get("b.md")!.classes.has("live-share-readonly")).toBe(true);
+    expect(elements.get("c.md")!.classes.has("live-share-readonly")).toBe(true);
     indicators.destroy();
   });
 });

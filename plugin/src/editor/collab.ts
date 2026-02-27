@@ -46,7 +46,9 @@ export class CollabManager {
           this.currentView.dispatch({
             effects: this.compartment.reconfigure([]),
           });
-        } catch {}
+        } catch {
+          // Previous view may have been destroyed
+        }
       }
       this.currentAwareness = null;
     }
@@ -68,11 +70,13 @@ export class CollabManager {
       await syncManager.waitForSync(filePath);
     } catch {
       if (this.activationGen !== gen) return;
-      new Notice("Live Share: sync timed out");
+      new Notice("Live share: sync timed out");
       this.currentAwareness = null;
       try {
         view.dispatch({ effects: this.compartment.reconfigure([]) });
-      } catch {}
+      } catch {
+        // View may have been destroyed during sync
+      }
       return;
     }
 

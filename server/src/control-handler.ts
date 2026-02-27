@@ -128,10 +128,12 @@ export function createControlWSS(options?: ControlWSSOptions) {
   }
 
   const HOST_ONLY_TYPES = new Set([
+    "kick",
     "summon",
     "present-start",
     "present-stop",
     "session-end",
+    "set-permission",
     "host-transfer-offer",
   ]);
 
@@ -485,6 +487,7 @@ export function createControlWSS(options?: ControlWSSOptions) {
       if (msg.type === "presence-update") {
         if (typeof msg.userId === "string" && msg.userId && !client.userId) {
           client.userId = msg.userId.slice(0, 128);
+          determineHostStatus(client, room, serverRoom);
         }
         if (typeof msg.displayName === "string") client.displayName = msg.displayName.slice(0, 100);
       }

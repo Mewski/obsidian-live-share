@@ -1,4 +1,4 @@
-import { Notice } from "obsidian";
+import { Notice, requestUrl } from "obsidian";
 
 import type LiveSharePlugin from "../main";
 
@@ -27,9 +27,10 @@ export class SessionManager {
     };
     if (settings.serverPassword) headers["X-Server-Password"] = settings.serverPassword;
 
-    let createResponse: Response;
+    let roomData: { id: string; token: string; name: string };
     try {
-      createResponse = await fetch(`${baseUrl}/rooms`, {
+      const createResponse = await requestUrl({
+        url: `${baseUrl}/rooms`,
         method: "POST",
         headers,
         body: JSON.stringify({
@@ -38,22 +39,12 @@ export class SessionManager {
           readOnlyPatterns: settings.readOnlyPatterns,
         }),
       });
-    } catch {
-      new Notice("Live Share: cannot reach server");
+      roomData = createResponse.json;
+    } catch (err) {
+      const msg = err instanceof Error && err.message ? err.message : "cannot reach server";
+      new Notice(`Live share: ${msg}`);
       return false;
     }
-
-    if (!createResponse.ok) {
-      const err = await createResponse.json().catch(() => ({ error: "unknown" }));
-      new Notice(`Live Share: ${(err as { error: string }).error}`);
-      return false;
-    }
-
-    const roomData = (await createResponse.json()) as {
-      id: string;
-      token: string;
-      name: string;
-    };
 
     settings.roomId = roomData.id;
     settings.token = roomData.token;
@@ -68,7 +59,7 @@ export class SessionManager {
   async joinSession(inviteString: string): Promise<boolean> {
     const parsedInvite = parseInvite(inviteString);
     if (!parsedInvite) {
-      new Notice("Live Share: invalid invite string");
+      new Notice("Live share: invalid invite string");
       return false;
     }
 
@@ -81,21 +72,16 @@ export class SessionManager {
     };
     if (serverPassword) joinHeaders["X-Server-Password"] = serverPassword;
 
-    let joinResponse: Response;
     try {
-      joinResponse = await fetch(`${baseUrl}/rooms/${parsedInvite.r}/join`, {
+      await requestUrl({
+        url: `${baseUrl}/rooms/${parsedInvite.r}/join`,
         method: "POST",
         headers: joinHeaders,
         body: JSON.stringify({ token: parsedInvite.t }),
       });
-    } catch {
-      new Notice("Live Share: cannot reach server");
-      return false;
-    }
-
-    if (!joinResponse.ok) {
-      const err = await joinResponse.json().catch(() => ({ error: "unknown" }));
-      new Notice(`Live Share: ${(err as { error: string }).error}`);
+    } catch (err) {
+      const msg = err instanceof Error && err.message ? err.message : "cannot reach server";
+      new Notice(`Live share: ${msg}`);
       return false;
     }
 
@@ -120,11 +106,15 @@ export class SessionManager {
       };
       if (settings.serverPassword) deleteHeaders["X-Server-Password"] = settings.serverPassword;
       try {
-        await fetch(`${baseUrl}/rooms/${settings.roomId}`, {
+        await requestUrl({
+          url: `${baseUrl}/rooms/${settings.roomId}`,
           method: "DELETE",
           headers: deleteHeaders,
+          throw: false,
         });
-      } catch {}
+      } catch {
+        // Best-effort cleanup, server may already be gone
+      }
     }
 
     settings.roomId = "";
@@ -142,7 +132,7 @@ export class SessionManager {
   async copyInvite(): Promise<void> {
     const { settings } = this.plugin;
     if (!settings.roomId || !settings.token) {
-      new Notice("Live Share: no active session");
+      new Notice("Live share: no active session");
       return;
     }
 
@@ -155,7 +145,7 @@ export class SessionManager {
     };
     const invite = `obsliveshare:${btoa(JSON.stringify(payload))}`;
     await navigator.clipboard.writeText(invite);
-    new Notice("Live Share: invite link copied to clipboard");
+    new Notice("Live share: invite link copied to clipboard");
   }
 }
 
@@ -179,6 +169,7 @@ export function parseInvite(raw: string): InvitePayload | null {
     }
     return null;
   } catch {
+    // Invalid base64 or JSON
     return null;
   }
 }

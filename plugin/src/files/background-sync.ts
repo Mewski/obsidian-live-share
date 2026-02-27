@@ -51,7 +51,7 @@ export class BackgroundSync {
       try {
         await this.subscribe(path);
       } catch {
-        new Notice(`Live Share: failed to sync ${path}`);
+        new Notice(`Live share: failed to sync ${path}`);
       }
     }
   }
@@ -131,10 +131,10 @@ export class BackgroundSync {
       const docHandle = this.syncManager.getDoc(oldActive);
       if (docHandle) {
         const content = docHandle.text.toString();
-        this.writeToDisk(oldActive, content);
+        void this.writeToDisk(oldActive, content);
         if (this.role === "host") {
           const file = getFileByPath(this.vault, toLocalPath(oldActive));
-          if (file) this.manifestManager.updateFile(file, content);
+          if (file) void this.manifestManager.updateFile(file, content);
         }
       }
     }
@@ -277,7 +277,7 @@ export class BackgroundSync {
     this.writeTimers.delete(path);
     const docHandle = this.syncManager.getDoc(path);
     if (docHandle) {
-      this.writeToDisk(path, docHandle.text.toString());
+      void this.writeToDisk(path, docHandle.text.toString());
     }
   }
 
@@ -288,7 +288,7 @@ export class BackgroundSync {
       path,
       setTimeout(() => {
         this.writeTimers.delete(path);
-        this.writeToDisk(path, text.toString());
+        void this.writeToDisk(path, text.toString());
       }, DEBOUNCE_MS),
     );
   }
@@ -318,7 +318,7 @@ export class BackgroundSync {
       await this.vault.adapter.write(diskPath, content);
       this.lastWrittenContent.set(path, content);
     } catch {
-      new Notice(`Live Share: failed to write ${diskPath}`);
+      new Notice(`Live share: failed to write ${diskPath}`);
     } finally {
       setTimeout(() => {
         this.recentDiskWrites.delete(path);

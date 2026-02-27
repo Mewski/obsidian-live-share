@@ -21,7 +21,10 @@
   "devDependencies": {
     "@biomejs/biome": "^1.9.0",
     "@types/node": "^22.0.0",
+    "@typescript-eslint/parser": "^8.56.1",
     "esbuild": "^0.24.0",
+    "eslint": "^9.39.3",
+    "eslint-plugin-obsidianmd": "^0.1.9",
     "obsidian": "latest",
     "tslib": "^2.7.0",
     "typescript": "^5.5.0",

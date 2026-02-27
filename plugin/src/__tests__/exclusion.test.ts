@@ -6,6 +6,8 @@ describe("ExclusionManager", () => {
 
   beforeEach(() => {
     manager = new ExclusionManager();
+    manager.setConfigDir(".obsidian");
+    manager.setPatterns([]);
   });
 
   describe("default exclusion patterns", () => {
