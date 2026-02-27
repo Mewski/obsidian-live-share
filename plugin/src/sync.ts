@@ -4,11 +4,14 @@ import * as awarenessProtocol from "y-protocols/awareness";
 import * as syncProtocol from "y-protocols/sync";
 import * as Y from "yjs";
 
+import type { E2ECrypto } from "./crypto";
 import {
   MUX_AWARENESS,
+  MUX_AWARENESS_ENCRYPTED,
   MUX_SUBSCRIBE,
   MUX_SUBSCRIBED,
   MUX_SYNC,
+  MUX_SYNC_ENCRYPTED,
   MUX_SYNC_REQUEST,
   MUX_UNSUBSCRIBE,
   decodeMuxMessage,
@@ -46,9 +49,15 @@ export class SyncManager {
   private shouldConnect = false;
   private reconnectAttempts = 0;
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+  private e2e: E2ECrypto | null = null;
+  private sendQueue: Promise<void> = Promise.resolve();
 
   constructor(settings: LiveShareSettings) {
     this.settings = settings;
+  }
+
+  setE2E(e2e: E2ECrypto | null): void {
+    this.e2e = e2e;
   }
 
   updateSettings(settings: LiveShareSettings) {
@@ -262,11 +271,17 @@ export class SyncManager {
       case MUX_SYNC:
         this.handleSync(docId, payload);
         break;
+      case MUX_SYNC_ENCRYPTED:
+        this.handleSyncEncrypted(docId, payload);
+        break;
       case MUX_SYNC_REQUEST:
         this.handleSyncRequest(docId);
         break;
       case MUX_AWARENESS:
         this.handleAwareness(docId, payload);
+        break;
+      case MUX_AWARENESS_ENCRYPTED:
+        this.handleAwarenessEncrypted(docId, payload);
         break;
     }
   }
@@ -324,6 +339,36 @@ export class SyncManager {
     awarenessProtocol.applyAwarenessUpdate(awareness, payload, "remote");
   }
 
+  private async handleSyncEncrypted(docId: string, payload: Uint8Array): Promise<void> {
+    if (!this.e2e?.enabled || payload.length <= 1) {
+      this.handleSync(docId, payload);
+      return;
+    }
+    try {
+      const syncType = payload[0];
+      const decrypted = await this.e2e.decrypt(payload.slice(1));
+      const result = new Uint8Array(1 + decrypted.length);
+      result[0] = syncType;
+      result.set(decrypted, 1);
+      this.handleSync(docId, result);
+    } catch {
+      // ignore decrypt failures (e.g. mismatched passphrase)
+    }
+  }
+
+  private async handleAwarenessEncrypted(docId: string, payload: Uint8Array): Promise<void> {
+    if (!this.e2e?.enabled) {
+      this.handleAwareness(docId, payload);
+      return;
+    }
+    try {
+      const decrypted = await this.e2e.decrypt(payload);
+      this.handleAwareness(docId, decrypted);
+    } catch {
+      // ignore decrypt failures
+    }
+  }
+
   private setSynced(docId: string, value: boolean): void {
     const prev = this.synced.get(docId);
     this.synced.set(docId, value);
@@ -338,8 +383,56 @@ export class SyncManager {
   }
 
   private sendMux(docId: string, msgType: number, payload?: Uint8Array): void {
-    if (this.ws?.readyState === WebSocket.OPEN) {
-      this.ws.send(encodeMuxMessage(docId, msgType, payload));
+    if (!this.e2e?.enabled || !payload || payload.length === 0) {
+      if (this.ws?.readyState === WebSocket.OPEN) {
+        this.ws.send(encodeMuxMessage(docId, msgType, payload));
+      }
+      return;
+    }
+
+    if (msgType === MUX_SYNC) {
+      this.sendQueue = this.sendQueue.then(() => this.sendEncryptedSync(docId, payload));
+    } else if (msgType === MUX_AWARENESS) {
+      this.sendQueue = this.sendQueue.then(() => this.sendEncryptedAwareness(docId, payload));
+    } else {
+      if (this.ws?.readyState === WebSocket.OPEN) {
+        this.ws.send(encodeMuxMessage(docId, msgType, payload));
+      }
+    }
+  }
+
+  private async sendEncryptedSync(docId: string, payload: Uint8Array): Promise<void> {
+    if (!this.e2e || this.ws?.readyState !== WebSocket.OPEN) return;
+    try {
+      // Keep syncType (first byte) plaintext for server read-only enforcement
+      const syncType = payload[0];
+      const rest = payload.length > 1 ? payload.slice(1) : new Uint8Array(0);
+      const encrypted = rest.length > 0 ? await this.e2e.encrypt(rest) : rest;
+      const result = new Uint8Array(1 + encrypted.length);
+      result[0] = syncType;
+      result.set(encrypted, 1);
+      if (this.ws?.readyState === WebSocket.OPEN) {
+        this.ws.send(encodeMuxMessage(docId, MUX_SYNC_ENCRYPTED, result));
+      }
+    } catch {
+      // fall back to plaintext on encryption failure
+      if (this.ws?.readyState === WebSocket.OPEN) {
+        this.ws.send(encodeMuxMessage(docId, MUX_SYNC, payload));
+      }
+    }
+  }
+
+  private async sendEncryptedAwareness(docId: string, payload: Uint8Array): Promise<void> {
+    if (!this.e2e || this.ws?.readyState !== WebSocket.OPEN) return;
+    try {
+      const encrypted = await this.e2e.encrypt(payload);
+      if (this.ws?.readyState === WebSocket.OPEN) {
+        this.ws.send(encodeMuxMessage(docId, MUX_AWARENESS_ENCRYPTED, encrypted));
+      }
+    } catch {
+      if (this.ws?.readyState === WebSocket.OPEN) {
+        this.ws.send(encodeMuxMessage(docId, MUX_AWARENESS, payload));
+      }
     }
   }
 

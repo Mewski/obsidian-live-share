@@ -12,6 +12,7 @@ import { DebugLogger } from "./debug-logger";
 import { ExclusionManager } from "./exclusion";
 import { FileOpsManager } from "./file-ops";
 import { showFocusNotification } from "./focus-notification";
+import { HistoryModal } from "./history-modal";
 import { ManifestManager } from "./manifest";
 import { ConfirmModal, PromptModal, UserPickerModal } from "./modals";
 import { PRESENCE_VIEW_TYPE, type PresenceUser, PresenceView } from "./presence-view";
@@ -32,6 +33,7 @@ import {
   normalizePath,
   parseJwtPayload,
 } from "./utils";
+import { VersionHistoryManager } from "./version-history";
 
 function getCmView(view: MarkdownView): EditorView | undefined {
   // biome-ignore lint/suspicious/noExplicitAny: Obsidian does not expose .cm in its public typings
@@ -62,6 +64,7 @@ export default class LiveSharePlugin extends Plugin {
   backgroundSync!: BackgroundSync;
   connectionState!: ConnectionStateManager;
   logger!: DebugLogger;
+  versionHistory!: VersionHistoryManager;
   controlChannel: ControlChannel | null = null;
   private remoteUsers = new Map<string, PresenceUser>();
   private isPresenting = false;
@@ -207,6 +210,12 @@ export default class LiveSharePlugin extends Plugin {
       this.settings.debugLogPath,
       this.settings.debugLogging,
     );
+    this.versionHistory = new VersionHistoryManager(
+      this.syncManager,
+      this.userId,
+      this.settings.displayName,
+    );
+    this.loadVersionHistory();
     this.connectionStateUnsub = this.connectionState.onChange(() => this.updateStatusBar());
 
     this.registerEditorExtension(this.collabManager.getBaseExtension());
@@ -354,6 +363,42 @@ export default class LiveSharePlugin extends Plugin {
       },
     });
 
+    this.addCommand({
+      id: "show-version-history",
+      name: "Show version history",
+      editorCallback: (_editor, view) => {
+        if (!view.file) return;
+        const filePath = view.file.path;
+        const snapshots = this.versionHistory.getSnapshots(filePath);
+        new HistoryModal(
+          this.app,
+          filePath,
+          snapshots,
+          (index) => this.versionHistory.restoreSnapshot(filePath, index),
+          (index) => {
+            this.versionHistory.applySnapshot(filePath, index);
+            this.saveVersionHistory();
+          },
+        ).open();
+      },
+    });
+
+    this.addCommand({
+      id: "create-snapshot",
+      name: "Create snapshot",
+      editorCallback: async (_editor, view) => {
+        if (!view.file) return;
+        const label = await this.promptText("Snapshot label (optional)");
+        try {
+          this.versionHistory.captureSnapshot(view.file.path, label || undefined);
+          await this.saveVersionHistory();
+          this.notify("Live Share: snapshot created");
+        } catch {
+          new Notice("Live Share: failed to create snapshot");
+        }
+      },
+    });
+
     this.registerView(PRESENCE_VIEW_TYPE, (leaf) => {
       const view = new PresenceView(leaf);
       view.setFollowHandler((userId) => this.followUser(userId));
@@ -393,6 +438,7 @@ export default class LiveSharePlugin extends Plugin {
                 : await this.app.vault.readBinary(file);
               if (isTextFile(file.path)) {
                 await this.backgroundSync.onFileAdded(file.path);
+                this.versionHistory.trackFile(file.path);
               }
               await this.manifestManager.updateFile(file, content);
             } catch {
@@ -411,6 +457,7 @@ export default class LiveSharePlugin extends Plugin {
         this.fileOpsManager.onFileDelete(file);
         if (this.settings.role === "host") {
           this.backgroundSync.onFileRemoved(file.path);
+          this.versionHistory.untrackFile(file.path);
           this.manifestManager.removeFile(file.path);
         }
       }),
@@ -426,6 +473,10 @@ export default class LiveSharePlugin extends Plugin {
           return;
         this.fileOpsManager.onFileRename(file, oldPath);
         await this.backgroundSync.onFileRenamed(oldPath, file.path);
+        this.versionHistory.untrackFile(oldPath);
+        if (isTextFile(file.path)) {
+          this.versionHistory.trackFile(file.path);
+        }
         if (this.settings.role === "host") {
           this.manifestManager.renameFile(oldPath, file.path, this.syncManager);
         }
@@ -620,6 +671,8 @@ export default class LiveSharePlugin extends Plugin {
   }
 
   private cleanupSession() {
+    this.versionHistory.stopAutoCapture();
+    this.saveVersionHistory();
     this.backgroundSync.destroy();
     this.syncManager.disconnect();
     this.controlChannel?.destroy();
@@ -786,6 +839,7 @@ export default class LiveSharePlugin extends Plugin {
       await e2e.init();
     }
 
+    this.syncManager.setE2E(e2e ?? null);
     this.controlChannel = new ControlChannel(this.settings, e2e);
     this.controlChannel.onError((context, err) => {
       this.logger.error("control-ws", `${context} error`, err);
@@ -920,9 +974,6 @@ export default class LiveSharePlugin extends Plugin {
           this.followTarget = null;
           this.clearUnfollowListeners();
         }
-        if (leavingUser?.isHost && this.settings.role === "guest") {
-          new Notice("Live Share: host disconnected, your changes may not be saved");
-        }
       }
     });
 
@@ -1021,6 +1072,35 @@ export default class LiveSharePlugin extends Plugin {
       new Notice("Live Share: the host ended the session");
       this.endSession();
     });
+
+    this.controlChannel.on("host-promoted", async () => {
+      this.settings.role = "host";
+      this.settings.permission = "read-write";
+      await this.saveSettings();
+      await this.manifestManager.publishManifest({ purge: false });
+      this.broadcastPresence();
+      this.updateStatusBar();
+      this.refreshPresenceView();
+      new Notice("Live Share: you have been promoted to host");
+      this.logger.log("session", "promoted to host");
+    });
+
+    this.controlChannel.on("host-changed", (msg) => {
+      for (const [userId, user] of this.remoteUsers) {
+        user.isHost = userId === msg.userId;
+      }
+      this.refreshPresenceView();
+      this.notify(`Live Share: ${msg.displayName} is now the host`);
+      this.logger.log("session", `host changed to ${msg.userId}`);
+    });
+
+    this.versionHistory.startAutoCapture();
+    const entries = this.manifestManager.getEntries();
+    for (const [path] of entries) {
+      if (isTextFile(path)) {
+        this.versionHistory.trackFile(path);
+      }
+    }
 
     this.broadcastPresence();
     if (this.presenceInterval) clearInterval(this.presenceInterval);
@@ -1364,6 +1444,32 @@ export default class LiveSharePlugin extends Plugin {
     return new Promise((resolve) => {
       const modal = new ConfirmModal(this.app, message, resolve);
       modal.open();
+    });
+  }
+
+  private get snapshotPath(): string {
+    return `${this.manifest.dir}/snapshots.json`;
+  }
+
+  private loadVersionHistory(): void {
+    this.app.vault.adapter
+      .read(this.snapshotPath)
+      .then((raw) => {
+        try {
+          this.versionHistory.loadStore(JSON.parse(raw));
+        } catch {
+          // ignore corrupt snapshot file
+        }
+      })
+      .catch(() => {
+        // file doesn't exist yet, that's fine
+      });
+  }
+
+  private saveVersionHistory(): void {
+    const store = this.versionHistory.getStore();
+    this.app.vault.adapter.write(this.snapshotPath, JSON.stringify(store)).catch(() => {
+      // ignore write errors for snapshots
     });
   }
 }

@@ -25,6 +25,8 @@ const ALLOWED_TYPES = new Set([
   "present-stop",
   "ping",
   "pong",
+  "host-promoted",
+  "host-changed",
 ]);
 
 const MSG_RATE_WINDOW = 10_000;
@@ -41,12 +43,14 @@ interface ControlClient {
   isApproved: boolean;
   permission: Permission;
   msgTimestamps: number[];
+  joinOrder: number;
 }
 
 interface ControlRoom {
   clients: Map<WebSocket, ControlClient>;
   pendingApprovals: Map<string, WebSocket>;
   cleanupTimer?: ReturnType<typeof setTimeout>;
+  nextJoinOrder: number;
 }
 
 export interface ControlWSSOptions {
@@ -63,7 +67,11 @@ export function createControlWSS(options?: ControlWSSOptions) {
   function getOrCreateRoom(roomId: string): ControlRoom {
     let room = rooms.get(roomId);
     if (!room) {
-      room = { clients: new Map(), pendingApprovals: new Map() };
+      room = {
+        clients: new Map(),
+        pendingApprovals: new Map(),
+        nextJoinOrder: 0,
+      };
       rooms.set(roomId, room);
     }
     if (room.cleanupTimer) {
@@ -95,6 +103,49 @@ export function createControlWSS(options?: ControlWSSOptions) {
       if (client.isHost) return client;
     }
     return undefined;
+  }
+
+  function promoteNewHost(
+    room: ControlRoom,
+    roomId: string,
+    serverRoom: ReturnType<typeof getRoom>,
+  ): void {
+    let candidate: ControlClient | undefined;
+    let earliestJoinOrder = Number.POSITIVE_INFINITY;
+
+    for (const client of room.clients.values()) {
+      if (client.isApproved && client.userId && !client.isHost) {
+        if (client.joinOrder < earliestJoinOrder) {
+          earliestJoinOrder = client.joinOrder;
+          candidate = client;
+        }
+      }
+    }
+
+    if (!candidate) return;
+
+    candidate.isHost = true;
+
+    if (candidate.verifiedUserId && serverRoom) {
+      serverRoom.hostUserId = candidate.verifiedUserId;
+      touchRoom(roomId);
+    }
+
+    sendTo(candidate.ws, {
+      type: "host-promoted",
+      userId: candidate.userId,
+      displayName: candidate.displayName,
+    });
+
+    broadcast(
+      room,
+      JSON.stringify({
+        type: "host-changed",
+        userId: candidate.userId,
+        displayName: candidate.displayName,
+      }),
+      candidate.ws,
+    );
   }
 
   const HOST_ONLY_TYPES = new Set(["summon", "present-start", "present-stop", "session-end"]);
@@ -134,6 +185,7 @@ export function createControlWSS(options?: ControlWSSOptions) {
       isApproved: true,
       permission: serverRoom?.defaultPermission || "read-write",
       msgTimestamps: [],
+      joinOrder: room.nextJoinOrder++,
     };
     room.clients.set(ws, client);
 
@@ -314,6 +366,7 @@ export function createControlWSS(options?: ControlWSSOptions) {
 
     ws.on("close", () => {
       const closingClient = room.clients.get(ws);
+      const wasHost = closingClient?.isHost ?? false;
       if (closingClient) {
         room.pendingApprovals.delete(closingClient.userId);
         if (closingClient.userId) {
@@ -326,6 +379,9 @@ export function createControlWSS(options?: ControlWSSOptions) {
         }
       }
       room.clients.delete(ws);
+      if (wasHost && room.clients.size > 0) {
+        promoteNewHost(room, roomId, getRoom(roomId));
+      }
       if (room.clients.size === 0) {
         room.cleanupTimer = setTimeout(() => {
           if (room.clients.size === 0) {

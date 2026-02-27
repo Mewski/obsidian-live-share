@@ -231,6 +231,18 @@ export interface PongMessage {
   timestamp?: number;
 }
 
+export interface HostPromotedMessage {
+  type: "host-promoted";
+  userId: string;
+  displayName: string;
+}
+
+export interface HostChangedMessage {
+  type: "host-changed";
+  userId: string;
+  displayName: string;
+}
+
 export type ControlMessage =
   | FileOpMessage
   | ChunkStartMessage
@@ -251,7 +263,9 @@ export type ControlMessage =
   | SyncRequestMessage
   | SessionEndMessage
   | PingMessage
-  | PongMessage;
+  | PongMessage
+  | HostPromotedMessage
+  | HostChangedMessage;
 
 export type ControlMessageType = ControlMessage["type"];
 
@@ -276,4 +290,6 @@ export interface ControlMessageMap {
   "session-end": SessionEndMessage;
   ping: PingMessage;
   pong: PongMessage;
+  "host-promoted": HostPromotedMessage;
+  "host-changed": HostChangedMessage;
 }

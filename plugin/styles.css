@@ -250,3 +250,47 @@
 .live-share-user-actions .clickable-icon.mod-warning:hover {
   color: var(--text-error);
 }
+
+/* Version history modal */
+.live-share-history-list {
+  max-height: 500px;
+  overflow-y: auto;
+  margin: 1em 0;
+}
+
+.live-share-history-item {
+  padding: 0.75em;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 4px;
+  margin-bottom: 0.5em;
+}
+
+.live-share-history-header {
+  margin-bottom: 0.5em;
+}
+
+.live-share-history-author {
+  color: var(--text-muted);
+  font-size: 0.9em;
+}
+
+.live-share-history-actions {
+  display: flex;
+  gap: 0.5em;
+}
+
+.live-share-history-actions button {
+  padding: 0.25em 0.75em;
+  font-size: 0.9em;
+}
+
+.live-share-preview-content {
+  max-height: 400px;
+  overflow: auto;
+  padding: 1em;
+  background: var(--background-secondary);
+  border-radius: 4px;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  margin: 1em 0;
+}

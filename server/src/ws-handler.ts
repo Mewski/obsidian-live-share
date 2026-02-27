@@ -5,9 +5,11 @@ import { WebSocket, WebSocketServer } from "ws";
 
 import {
   MUX_AWARENESS,
+  MUX_AWARENESS_ENCRYPTED,
   MUX_SUBSCRIBE,
   MUX_SUBSCRIBED,
   MUX_SYNC,
+  MUX_SYNC_ENCRYPTED,
   MUX_SYNC_REQUEST,
   MUX_UNSUBSCRIBE,
   decodeMuxMessage,
@@ -115,11 +117,12 @@ export function createYjsWSS() {
     removeClientFromRoom(client, roomId);
   }
 
-  function handleSync(client: MuxClient, docId: string, payload: Uint8Array) {
+  function handleSync(client: MuxClient, docId: string, payload: Uint8Array, encrypted = false) {
     const roomId = `${client.baseRoomId}:${docId}`;
     const state = roomStates.get(roomId);
     if (!state || !state.clients.has(client)) return;
 
+    // syncType is always the first byte (plaintext even when encrypted)
     if (state.readOnlyClients.has(client) && payload.length > 0) {
       const decoder = decoding.createDecoder(payload);
       const syncType = decoding.peekVarUint(decoder);
@@ -128,34 +131,45 @@ export function createYjsWSS() {
       }
     }
 
-    const msg = encodeMuxMessage(docId, MUX_SYNC, payload);
+    const msgType = encrypted ? MUX_SYNC_ENCRYPTED : MUX_SYNC;
+    const msg = encodeMuxMessage(docId, msgType, payload);
     for (const peer of state.clients) {
       if (peer !== client) safeSend(peer.ws, msg);
     }
   }
 
-  function handleAwareness(client: MuxClient, docId: string, payload: Uint8Array) {
+  function handleAwareness(
+    client: MuxClient,
+    docId: string,
+    payload: Uint8Array,
+    encrypted = false,
+  ) {
     const roomId = `${client.baseRoomId}:${docId}`;
     const state = roomStates.get(roomId);
     if (!state || !state.clients.has(client)) return;
 
-    try {
-      const decoder = decoding.createDecoder(payload);
-      const len = decoding.readVarUint(decoder);
-      let ids = state.clientAwarenessIds.get(client);
-      if (!ids) {
-        ids = new Set();
-        state.clientAwarenessIds.set(client, ids);
+    // Skip awareness ID tracking for encrypted payloads (can't parse them).
+    // Yjs awareness has a built-in 30s timeout so states will auto-expire.
+    if (!encrypted) {
+      try {
+        const decoder = decoding.createDecoder(payload);
+        const len = decoding.readVarUint(decoder);
+        let ids = state.clientAwarenessIds.get(client);
+        if (!ids) {
+          ids = new Set();
+          state.clientAwarenessIds.set(client, ids);
+        }
+        for (let i = 0; i < len; i++) {
+          const clientId = decoding.readVarUint(decoder);
+          ids.add(clientId);
+        }
+      } catch (err) {
+        console.debug("[yjs-mux] malformed awareness data, skipping:", err);
       }
-      for (let i = 0; i < len; i++) {
-        const clientId = decoding.readVarUint(decoder);
-        ids.add(clientId);
-      }
-    } catch (err) {
-      console.debug("[yjs-mux] malformed awareness data, skipping:", err);
     }
 
-    const msg = encodeMuxMessage(docId, MUX_AWARENESS, payload);
+    const msgType = encrypted ? MUX_AWARENESS_ENCRYPTED : MUX_AWARENESS;
+    const msg = encodeMuxMessage(docId, msgType, payload);
     for (const peer of state.clients) {
       if (peer !== client) safeSend(peer.ws, msg);
     }
@@ -226,8 +240,14 @@ export function createYjsWSS() {
           case MUX_SYNC:
             handleSync(client, docId, payload);
             break;
+          case MUX_SYNC_ENCRYPTED:
+            handleSync(client, docId, payload, true);
+            break;
           case MUX_AWARENESS:
             handleAwareness(client, docId, payload);
+            break;
+          case MUX_AWARENESS_ENCRYPTED:
+            handleAwareness(client, docId, payload, true);
             break;
         }
       } catch (err) {
