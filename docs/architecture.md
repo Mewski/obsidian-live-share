@@ -32,6 +32,7 @@ Each session uses two WebSocket channels:
 | Persistence | `persistence.ts` | LevelDB storage for room metadata |
 | Permissions | `permissions.ts` | Per-user permission store for read-only enforcement |
 | Auth | `github-auth.ts` | GitHub OAuth flow, JWT signing/verification |
+| Audit log | `audit-log.ts` | Append-only event log per room (join, leave, kick, permission changes) |
 | Util | `util.ts` | Timing-safe token comparison |
 | Entry | `index.ts` | HTTP/HTTPS server, WebSocket upgrade routing, graceful shutdown |
 
@@ -56,6 +57,17 @@ Each session uses two WebSocket channels:
 | Settings | `settings.ts` | Plugin settings UI with session actions |
 | Auth | `auth.ts` | GitHub OAuth token handling with protocol handler support |
 | Exclusion | `exclusion.ts` | File exclusion patterns from `.liveshare.json` |
+| Version history | `version-history.ts` | Manual and automatic file snapshots with restore |
+| Comments | `comments.ts` | Line-anchored comments synced via Yjs Y.Array |
+| Comment gutter | `comment-gutter.ts` | CM6 gutter extension showing comment indicators |
+| Comment modals | `comment-modal.ts` | Add, list, and thread comment modals |
+| Conflict decoration | `conflict-decoration.ts` | CM6 extension highlighting overlapping remote/local edits |
+| Canvas sync | `canvas-sync.ts` | Real-time `.canvas` file sync via Yjs Y.Map |
+| Explorer indicators | `explorer-indicators.ts` | Dynamic CSS injection for file permission icons in explorer |
+| Offline queue | `offline-queue.ts` | Buffers file operations while disconnected, replays on reconnect |
+| File permission modal | `file-permission-modal.ts` | Per-file permission assignment UI |
+| Audit modal | `audit-modal.ts` | Audit log viewer modal |
+| History modal | `history-modal.ts` | Version history browser and restore modal |
 | Types | `types.ts` | Shared type definitions and default settings |
 | Utils | `utils.ts` | Path normalization, line ending normalization, file type detection |
 
@@ -95,4 +107,13 @@ Each session uses two WebSocket channels:
 | `sync-request` | Guest -> Host | Request full file resync |
 | `present-start` | Host -> All | Host started presentation mode |
 | `present-stop` | Host -> All | Host stopped presentation mode |
+| `host-transfer-offer` | Host -> Target | Offer host role to a participant |
+| `host-transfer-accept` | Target -> Server | Accept host transfer (server validates pending offer) |
+| `host-transfer-decline` | Target -> Host | Decline host transfer |
+| `host-transfer-complete` | Server -> New Host | Confirmation that host role was transferred |
+| `host-changed` | Server -> All | Notification that the host changed |
+| `host-disconnected` | Server -> All | Notification that the host disconnected |
+| `set-file-permission` | Host -> Server | Set per-file permission override for a guest |
+| `file-permission-update` | Server -> Guest | Notification of per-file permission change |
+| `file-chunk-resume` | Receiver -> Sender | Request retransmission of missing chunks |
 | `ping` / `pong` | Client <-> Server | Latency measurement (30s interval) |

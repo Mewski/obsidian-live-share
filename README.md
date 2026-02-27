@@ -15,7 +15,8 @@ Real-time collaborative editing for [Obsidian](https://obsidian.md). Share your 
 - **Host-only controls**: Summon, kick, permission changes, presentation mode, and session end are host-only (enforced server-side)
 - **Guest approval**: Optionally require host approval with read-write, read-only, or deny
 - **Mid-session permission changes**: Host can toggle any guest between read-write and read-only at any time via the presence panel
-- **Read-only enforcement**: Read-only guests are blocked from editing server-side on both Yjs and control channels
+- **Per-file permissions**: Host can set individual files to read-only or read-write for specific guests, with lock icons in the file explorer
+- **Read-only enforcement**: Read-only guests are blocked from editing server-side on both Yjs and control channels, including per-file overrides
 - **Confirmation dialogs**: End session and kick actions ask for confirmation before proceeding
 - **Host disconnect notice**: Guests are notified when the host leaves the session
 - **Reload from host**: Guests can re-download all files from the host
@@ -27,6 +28,14 @@ Real-time collaborative editing for [Obsidian](https://obsidian.md). Share your 
 - **Join via link**: Open `obsidian://live-share?invite=...` links to join sessions directly
 - **Ribbon context menu**: Right-click the collaborators icon for quick access to session actions
 - **Session actions in settings**: Start, join, end, or leave sessions directly from the settings tab
+- **Conflict visualization**: Highlighted decorations in the editor when remote edits overlap local changes
+- **In-editor comments**: Add comments anchored to specific lines, with a gutter indicator showing which lines have comments
+- **Canvas collaboration**: Real-time sync of `.canvas` files via Yjs
+- **Version history**: Manual and automatic snapshots of file content with restore capability
+- **Host transfer**: Host can offer the host role to another participant (with server-side validation)
+- **Audit log**: Host can view a log of join/leave/kick/permission events for the session
+- **Offline queue**: File operations are buffered when disconnected and replayed on reconnect
+- **Resumable binary transfers**: Chunked file transfers can resume from where they left off after reconnection
 - **Fail-fast connections**: Connection drops immediately end the session and clean up all resources
 
 ## Quick Start
@@ -104,6 +113,13 @@ Open **Settings > Live Share** and set:
 | Summon a specific participant here | Pick a user and navigate them to your cursor | Host only |
 | Reload all files from host | Re-download all shared files | Guest only |
 | Toggle presentation mode | Auto-broadcast navigation to all participants | Host only |
+| Transfer host role | Offer host role to another participant | Host only |
+| Set file permissions | Set per-file read-only/read-write for a specific guest | Host only |
+| Show audit log | View join/leave/kick/permission events | Host only |
+| Add comment at cursor | Add a comment anchored to the current line | Anyone in session |
+| Show comments for this file | List all comments on the current file | Anyone in session |
+| Create snapshot | Save a labeled snapshot of the current file | Anyone in session |
+| Show version history | Browse and restore file snapshots | Anyone in session |
 | Log in with GitHub | Authenticate via GitHub OAuth | Anyone |
 | Log out | Clear stored authentication | Anyone |
 
@@ -150,13 +166,13 @@ See [Server Setup](docs/server.md) for TLS, OAuth, persistence, and deployment d
 # Server
 cd server
 npm run dev          # Dev server with auto-reload
-npm test             # 79 tests
+npm test             # 106 tests
 npm run lint         # Biome linter
 
 # Plugin
 cd plugin
 npm run dev          # Watch mode (esbuild)
-npm test             # 268 tests
+npm test             # 317 tests
 npm run lint         # Biome linter
 ```
 
@@ -186,7 +202,7 @@ See [Security](docs/security.md) for the full threat model.
 
 ## Known Limitations
 
-- **No offline merge**: File-level operations (create/delete/rename) don't have conflict resolution across separate sessions. Text content merges automatically via Yjs within a session.
+- **Limited offline support**: File operations are queued while disconnected and replayed on reconnect, but there is no cross-session conflict resolution. Text content merges automatically via Yjs within a session.
 - **Single host**: If the host disconnects, the session ends for all participants.
 - **E2E scope**: File content in control messages is end-to-end encrypted. Yjs sync data is relayed as opaque binary by the server (no server-side processing or persistence), but the data itself is not encrypted at the application layer. Use TLS (`wss://`) to encrypt all traffic in transit.
 

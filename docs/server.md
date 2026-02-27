@@ -75,6 +75,7 @@ When auth is disabled (default), anyone with a room token can connect.
 | `POST /rooms/:id/join` | Join | Join a room. Body: `{ "token": "..." }` |
 | `GET /rooms/:id` | Info | Get room name and creation time |
 | `DELETE /rooms/:id` | Delete | Delete a room. Header: `Authorization: Bearer <token>` |
+| `GET /rooms/:id/logs` | Audit | Fetch audit log entries. Auth: `Authorization: Bearer <token>` header (or `?token=` query param as fallback). Optional `?limit=N` (default 100, max 500). |
 | `GET /healthz` | Health | Server status, uptime, session/document/client counts |
 | `GET /auth/github` | Auth | Start GitHub OAuth flow |
 | `GET /auth/github/callback` | Auth | OAuth callback, returns JWT |

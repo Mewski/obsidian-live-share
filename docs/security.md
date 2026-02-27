@@ -68,6 +68,15 @@ Host-only operations enforced server-side:
 | Confirmation dialogs | Destructive actions (end session, kick) require user confirmation |
 | Display name sanitization | Empty/whitespace-only display names default to "Anonymous" |
 | Chunk validation | Chunked file assembly verifies all chunks arrived before writing to disk |
+| Chunk index bounds | Chunk data indices are validated against expected range to prevent sparse array attacks |
+| Chunk size validation | Zero and negative totalSize values are rejected at chunk-start |
+| Per-file permissions | Server enforces per-file permission overrides on file-op relay via `getEffectivePermission` |
+| Host transfer validation | Server tracks pending transfer offers and rejects accept messages from non-offered clients |
+| Audit log tokens | Audit log endpoint accepts tokens via Authorization header (not exposed in URL/logs) |
+| CSS injection prevention | Explorer indicator CSS escapes newlines, carriage returns, and form feeds in attribute selectors |
+| Offline queue coalescing | Rename operations update paths of previously queued ops to prevent stale-path replays |
+| Conflict decoration cleanup | ViewPlugin with destroy() lifecycle prevents interval leaks on editor deactivation |
+| Resource cleanup | Plugin onunload() destroys all dynamic resources (comments, explorer indicators, canvas sync) |
 | Shared folder sanitization | Leading `./\` and `..` sequences are stripped from the shared folder path to prevent directory traversal |
 | Display name trimming | Display names from JWT auth are trimmed; whitespace-only names fall back to "Anonymous" |
 | WebSocket send protection | All `ws.send()` calls are wrapped in try-catch to prevent a single failing socket from crashing the server |
@@ -88,6 +97,10 @@ Host-only operations enforced server-side:
 | Guest impersonating host | Server determines host via JWT or first-connected; `isHost` in messages is ignored |
 | Incomplete chunk injection | Chunk assembly validates all expected chunks are present |
 | Re-entrant session cleanup | Guard prevents double cleanup from concurrent kicked/session-end handlers |
+| Unauthorized host transfer | Server validates pending transfer offer before accepting; non-offered clients are rejected |
+| Sparse array memory abuse | Chunk data indices are bounds-checked against totalSize/CHUNK_SIZE |
+| Token leakage in logs | Audit log endpoint uses Authorization header instead of URL query parameters |
+| Per-file permission bypass | Server checks file-level permission overrides before relaying file-op messages |
 
 ## Recommendations
 

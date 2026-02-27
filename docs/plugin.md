@@ -60,6 +60,27 @@ All commands are accessible via the command palette (Ctrl/Cmd+P, then type "Live
 | **Summon a specific participant here** | Pick a user from a list and navigate them to your cursor. | Host only |
 | **Reload all files from host** | Re-download all shared files from the host's vault. | Guest only |
 | **Toggle presentation mode** | While active, every time you navigate to a different file, a focus request is automatically sent to all participants. | Host only |
+| **Transfer host role** | Offer the host role to another participant. They see a confirmation dialog; if accepted, the server validates the transfer and swaps roles. | Host only |
+| **Set file permissions** | Set per-file read-only or read-write permission for a specific guest on the current file. | Host only |
+| **Show audit log** | View a log of join, leave, kick, and permission-change events for the current session. | Host only |
+
+### Comments
+
+| Command | Description |
+|---------|-------------|
+| **Add comment at cursor** | Add a comment anchored to the current line. |
+| **Show comments for this file** | Open a list of all comments on the current file. Click a comment to jump to its line. |
+
+Comments are synced in real-time via Yjs. A gutter icon appears next to lines that have comments; clicking the icon opens the comment thread or creates a new comment.
+
+### Version History
+
+| Command | Description |
+|---------|-------------|
+| **Create snapshot** | Save a labeled snapshot of the current file's content. |
+| **Show version history** | Browse snapshots for the current file and restore a previous version. |
+
+Snapshots are also captured automatically in the background while a session is active.
 
 ### Authentication
 
@@ -118,6 +139,28 @@ When **Require approval** is enabled and a guest joins, the host sees a modal to
 When approval is disabled (default), all guests join with read-write access.
 
 The host can change a guest's permission at any time via the permission toggle button in the presence panel. The change takes effect immediately.
+
+### Per-File Permissions
+
+The host can set per-file permission overrides for individual guests via **Set file permissions**. This opens a modal showing all guests and their current permission for the active file. Per-file overrides take precedence over the guest's global permission.
+
+Files with permission overrides show indicator icons in the file explorer sidebar (lock icon for read-only files).
+
+## Host Transfer
+
+The host can transfer the host role to another participant via **Transfer host role**. The target receives a confirmation dialog. If accepted, the server validates that a transfer offer was actually pending before swapping roles. All participants are notified of the new host.
+
+## Conflict Visualization
+
+When a remote edit overlaps with a local edit you're currently making, the affected region is highlighted with a conflict decoration in the editor. These highlights fade after a few seconds.
+
+## Canvas Collaboration
+
+`.canvas` files (Obsidian Canvas) are synced in real-time via Yjs. Node positions, connections, and content are merged automatically. The host's canvas content is the initial source of truth; subsequent changes from any participant are synced bidirectionally.
+
+## Offline Queue
+
+When the connection drops, file operations (create, modify, delete, rename) are buffered locally. On reconnect, the queue is drained and all operations are sent to the server. The queue deduplicates operations: the latest modify for the same path wins, a delete cancels preceding operations for that path, and renames update the paths of previously queued operations.
 
 ## Host Disconnect
 
