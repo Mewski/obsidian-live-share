@@ -1,6 +1,6 @@
 import { type App, Modal, Setting, TextAreaComponent } from "obsidian";
 
-import type { Comment, CommentManager } from "./comments";
+import type { Comment, CommentManager } from "../files/comments";
 
 export class AddCommentModal extends Modal {
   private onSubmit: (text: string) => void;

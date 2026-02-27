@@ -1,6 +1,6 @@
 import { type App, Modal } from "obsidian";
 
-import type { JoinRequestMessage, Permission } from "./types";
+import type { JoinRequestMessage, Permission } from "../types";
 
 export class ApprovalModal extends Modal {
   private request: JoinRequestMessage;

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseInvite } from "../session";
+import { parseInvite } from "../session/session";
 
 function makeInvite(payload: Record<string, unknown>): string {
   return `obsliveshare:${btoa(JSON.stringify(payload))}`;

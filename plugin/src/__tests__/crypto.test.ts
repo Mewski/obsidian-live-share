@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { E2ECrypto } from "../crypto";
+import { E2ECrypto } from "../sync/crypto";
 
 describe("E2ECrypto", () => {
   it("is not enabled before init()", () => {

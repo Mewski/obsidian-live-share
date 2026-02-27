@@ -1,11 +1,11 @@
-import type { E2ECrypto } from "./crypto";
 import type {
   ControlMessage,
   ControlMessageMap,
   ControlMessageType,
   LiveShareSettings,
-} from "./types";
-import { toWsUrl } from "./utils";
+} from "../types";
+import { toWsUrl } from "../utils";
+import type { E2ECrypto } from "./crypto";
 
 export type { ControlMessage, ControlMessageType };
 

@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { ExclusionManager } from "../exclusion";
+import { ExclusionManager } from "../files/exclusion";
 
 describe("ExclusionManager", () => {
   let manager: ExclusionManager;

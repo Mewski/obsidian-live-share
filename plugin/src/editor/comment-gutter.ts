@@ -1,7 +1,7 @@
 import { type Extension, RangeSet, StateEffect, StateField } from "@codemirror/state";
 import { type EditorView, GutterMarker, gutter } from "@codemirror/view";
 
-import type { Comment } from "./comments";
+import type { Comment } from "../files/comments";
 
 interface LineComments {
   byLine: Map<number, Comment[]>;

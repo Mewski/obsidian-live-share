@@ -1,7 +1,7 @@
 import { TFile } from "obsidian";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import * as Y from "yjs";
-import { BackgroundSync } from "../background-sync";
+import { BackgroundSync } from "../files/background-sync";
 
 function mockFile(path: string) {
   const f = Object.create(TFile.prototype);

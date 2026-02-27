@@ -43,7 +43,7 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-const { ExplorerIndicators } = await import("../explorer-indicators");
+const { ExplorerIndicators } = await import("../ui/explorer-indicators");
 
 describe("ExplorerIndicators", () => {
   it("creates a style element on construction", () => {

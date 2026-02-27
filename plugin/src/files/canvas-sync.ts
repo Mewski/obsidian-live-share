@@ -1,9 +1,9 @@
 import { Notice, type Vault } from "obsidian";
 import * as Y from "yjs";
 
+import type { SyncManager } from "../sync/sync";
+import { VAULT_EVENT_SETTLE_MS, ensureFolder, getFileByPath, normalizePath } from "../utils";
 import type { FileOpsManager } from "./file-ops";
-import type { SyncManager } from "./sync";
-import { VAULT_EVENT_SETTLE_MS, ensureFolder, getFileByPath, normalizePath } from "./utils";
 
 const CANVAS_DOC_PREFIX = "__canvas__:";
 const DEBOUNCE_MS = 1000;
@@ -82,6 +82,7 @@ export class CanvasSync {
   private observers = new Map<string, () => void>();
   private writeTimers = new Map<string, ReturnType<typeof setTimeout>>();
   private recentDiskWrites = new Set<string>();
+  private recentLocalEdits = new Set<string>();
   private lastWrittenContent = new Map<string, string>();
 
   constructor(vault: Vault, syncManager: SyncManager, fileOpsManager: FileOpsManager) {
@@ -117,9 +118,11 @@ export class CanvasSync {
       if (file) {
         const content = await this.vault.read(file);
         const data = parseCanvas(content);
+        this.recentLocalEdits.add(path);
         docHandle.doc.transact(() => {
           this.applyCanvasToYMaps(nodesMap, edgesMap, data);
         });
+        this.recentLocalEdits.delete(path);
       }
     } else {
       if (nodesMap.size > 0 || edgesMap.size > 0) {
@@ -129,6 +132,7 @@ export class CanvasSync {
     }
 
     const observer = () => {
+      if (this.recentLocalEdits.has(path)) return;
       this.scheduleDiskWrite(path, nodesMap, edgesMap);
     };
     nodesMap.observeDeep(observer);
@@ -172,9 +176,11 @@ export class CanvasSync {
     const nodesMap = docHandle.doc.getMap<Y.Map<unknown>>("nodes");
     const edgesMap = docHandle.doc.getMap<Y.Map<unknown>>("edges");
 
+    this.recentLocalEdits.add(path);
     docHandle.doc.transact(() => {
       this.applyCanvasToYMaps(nodesMap, edgesMap, data);
     });
+    this.recentLocalEdits.delete(path);
   }
 
   isRecentDiskWrite(rawPath: string): boolean {
@@ -199,6 +205,7 @@ export class CanvasSync {
     }
     this.subscribedPaths.clear();
     this.recentDiskWrites.clear();
+    this.recentLocalEdits.clear();
     this.lastWrittenContent.clear();
   }
 

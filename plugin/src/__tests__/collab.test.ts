@@ -74,7 +74,7 @@ vi.mock("@codemirror/view", () => {
   };
 });
 
-const { CollabManager } = await import("../collab");
+const { CollabManager } = await import("../editor/collab");
 
 function createMockView() {
   return {

@@ -1,6 +1,6 @@
 import { MarkdownView, Notice, TFile } from "obsidian";
-import type LiveSharePlugin from "./main";
-import type { FocusRequestMessage, SummonMessage } from "./types";
+import type LiveSharePlugin from "../main";
+import type { FocusRequestMessage, SummonMessage } from "../types";
 
 export function showFocusNotification(
   plugin: LiveSharePlugin,

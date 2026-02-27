@@ -1,4 +1,4 @@
-import type { Permission } from "./types";
+import type { Permission } from "../types";
 
 const STYLE_ID = "live-share-explorer-indicators";
 

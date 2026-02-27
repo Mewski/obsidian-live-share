@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { ConnectionStateManager } from "../connection-state";
-import type { ConnectionEvent } from "../connection-state";
+import { ConnectionStateManager } from "../sync/connection-state";
+import type { ConnectionEvent } from "../sync/connection-state";
 
 describe("ConnectionStateManager", () => {
   let csm: ConnectionStateManager;

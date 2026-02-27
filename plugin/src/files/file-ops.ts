@@ -1,6 +1,6 @@
 import { Notice, type TAbstractFile, type TFile, type Vault } from "obsidian";
-import { OfflineQueue } from "./offline-queue";
-import type { FileOp } from "./types";
+import { OfflineQueue } from "../sync/offline-queue";
+import type { FileOp } from "../types";
 import {
   VAULT_EVENT_SETTLE_MS,
   arrayBufferToBase64,
@@ -10,7 +10,7 @@ import {
   isTextFile,
   normalizeLineEndings,
   normalizePath,
-} from "./utils";
+} from "../utils";
 
 const CHUNK_SIZE = 512 * 1024;
 const MAX_FILE_SIZE = 50 * 1024 * 1024;
@@ -211,6 +211,7 @@ export class FileOpsManager {
               await this.vault.trash(file, true);
             } catch {}
           }
+          this.pendingChunks.delete(op.path);
           break;
         }
         case "rename": {

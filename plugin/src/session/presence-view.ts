@@ -1,7 +1,7 @@
 import { ExtraButtonComponent, ItemView, setIcon } from "obsidian";
 
-import type { Permission } from "./types";
-import { HEX_COLOR_RE } from "./utils";
+import type { Permission } from "../types";
+import { HEX_COLOR_RE } from "../utils";
 
 export const PRESENCE_VIEW_TYPE = "live-share-presence";
 

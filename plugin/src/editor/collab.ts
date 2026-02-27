@@ -5,12 +5,12 @@ import { yCollab } from "y-codemirror.next";
 import type * as awarenessProtocol from "y-protocols/awareness";
 import * as Y from "yjs";
 
+import type { CommentManager } from "../files/comments";
+import type { SyncManager } from "../sync/sync";
+import type { Permission, SessionRole } from "../types";
+import { applyMinimalYTextUpdate, normalizeLineEndings } from "../utils";
 import { commentGutterExtension, updateCommentPositions } from "./comment-gutter";
-import type { CommentManager } from "./comments";
 import { conflictExtension } from "./conflict-decoration";
-import type { SyncManager } from "./sync";
-import type { Permission, SessionRole } from "./types";
-import { applyMinimalYTextUpdate, normalizeLineEndings } from "./utils";
 
 export interface CursorUser {
   name: string;
@@ -72,18 +72,25 @@ export class CollabManager {
     try {
       await syncManager.waitForSync(filePath);
     } catch {
+      if (this.activationGen !== gen) return;
       new Notice("Live Share: sync timed out");
       this.currentAwareness = null;
-      view.dispatch({ effects: this.compartment.reconfigure([]) });
+      try {
+        view.dispatch({ effects: this.compartment.reconfigure([]) });
+      } catch {}
       return;
     }
 
     if (this.activationGen !== gen) return;
+    // biome-ignore lint/suspicious/noExplicitAny: CM6 marks `destroyed` private
+    if ((view as any).destroyed) return;
 
     if (role !== "host" && docHandle.text.length === 0) {
       for (let i = 0; i < 10; i++) {
         await new Promise((resolve) => setTimeout(resolve, 100));
         if (this.activationGen !== gen) return;
+        // biome-ignore lint/suspicious/noExplicitAny: CM6 marks `destroyed` private
+        if ((view as any).destroyed) return;
         if (docHandle.text.length > 0) break;
       }
     }

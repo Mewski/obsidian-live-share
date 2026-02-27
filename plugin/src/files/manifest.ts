@@ -1,9 +1,8 @@
 import { Notice, type TFile, TFolder, type Vault } from "obsidian";
 import type * as Y from "yjs";
 
-import type { ExclusionManager } from "./exclusion";
-import type { DocHandle, SyncManager } from "./sync";
-import type { LiveShareSettings } from "./types";
+import type { DocHandle, SyncManager } from "../sync/sync";
+import type { LiveShareSettings } from "../types";
 import {
   VAULT_EVENT_SETTLE_MS,
   ensureFolder,
@@ -12,7 +11,8 @@ import {
   isTextFile,
   normalizeLineEndings,
   normalizePath,
-} from "./utils";
+} from "../utils";
+import type { ExclusionManager } from "./exclusion";
 
 export interface FileEntry {
   hash: string;

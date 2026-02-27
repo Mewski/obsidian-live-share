@@ -1,7 +1,7 @@
 import { Notice } from "obsidian";
-import type LiveSharePlugin from "./main";
-import { PromptModal } from "./modals";
-import { parseJwtPayload } from "./utils";
+import type LiveSharePlugin from "../main";
+import { PromptModal } from "../ui/modals";
+import { parseJwtPayload } from "../utils";
 
 export class AuthManager {
   private pendingModal: PromptModal | null = null;

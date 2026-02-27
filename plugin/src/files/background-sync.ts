@@ -1,10 +1,8 @@
 import { Notice, type Vault } from "obsidian";
 import type * as Y from "yjs";
 
-import type { FileOpsManager } from "./file-ops";
-import type { ManifestManager } from "./manifest";
-import type { SyncManager } from "./sync";
-import type { SessionRole } from "./types";
+import type { SyncManager } from "../sync/sync";
+import type { SessionRole } from "../types";
 import {
   VAULT_EVENT_SETTLE_MS,
   applyMinimalYTextUpdate,
@@ -13,7 +11,9 @@ import {
   isTextFile,
   normalizeLineEndings,
   normalizePath,
-} from "./utils";
+} from "../utils";
+import type { FileOpsManager } from "./file-ops";
+import type { ManifestManager } from "./manifest";
 
 const DEBOUNCE_MS = 1000;
 

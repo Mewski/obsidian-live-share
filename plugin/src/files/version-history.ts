@@ -1,7 +1,7 @@
 import * as Y from "yjs";
 
-import type { SyncManager } from "./sync";
-import { arrayBufferToBase64, base64ToArrayBuffer, normalizePath } from "./utils";
+import type { SyncManager } from "../sync/sync";
+import { arrayBufferToBase64, base64ToArrayBuffer, normalizePath } from "../utils";
 
 export interface SnapshotEntry {
   timestamp: number;

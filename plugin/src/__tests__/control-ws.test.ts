@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { ControlChannel, ControlMessage } from "../control-ws";
+import type { ControlChannel, ControlMessage } from "../sync/control-ws";
 import type { LiveShareSettings } from "../types";
 
 class MockWebSocket {
@@ -34,7 +34,7 @@ class MockWebSocket {
 
 vi.stubGlobal("WebSocket", MockWebSocket);
 
-const { ControlChannel: CC } = await import("../control-ws");
+const { ControlChannel: CC } = await import("../sync/control-ws");
 
 function createSettings(overrides?: Partial<LiveShareSettings>): LiveShareSettings {
   return {

@@ -1,7 +1,7 @@
 import { type App, Modal, Notice } from "obsidian";
 
+import type { SnapshotEntry } from "../files/version-history";
 import { ConfirmModal } from "./modals";
-import type { SnapshotEntry } from "./version-history";
 
 export class HistoryModal extends Modal {
   constructor(

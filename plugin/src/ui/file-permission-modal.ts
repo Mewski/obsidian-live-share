@@ -1,6 +1,6 @@
 import { type App, Modal, Setting } from "obsidian";
 
-import type { Permission } from "./types";
+import type { Permission } from "../types";
 
 export interface FilePermissionUser {
   userId: string;

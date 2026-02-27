@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { FileOpsManager } from "../file-ops";
+import { FileOpsManager } from "../files/file-ops";
 import type { FileOp } from "../types";
 
 function createMockVault() {

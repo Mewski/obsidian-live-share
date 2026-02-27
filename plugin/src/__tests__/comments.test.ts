@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import * as Y from "yjs";
-import { CommentManager } from "../comments";
+import { CommentManager } from "../files/comments";
 
 function createMockSyncManager() {
   const docs = new Map<string, { doc: Y.Doc; text: Y.Text; awareness: unknown }>();

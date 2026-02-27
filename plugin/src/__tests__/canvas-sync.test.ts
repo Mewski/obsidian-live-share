@@ -54,7 +54,7 @@ function createMockFileOps() {
 }
 
 // We need to import after setting up the vault mock
-const { CanvasSync } = await import("../canvas-sync");
+const { CanvasSync } = await import("../files/canvas-sync");
 
 describe("CanvasSync", () => {
   let vault: ReturnType<typeof createMockVault>;

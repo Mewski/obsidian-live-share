@@ -1,6 +1,6 @@
 import * as Y from "yjs";
 
-import type { SyncManager } from "./sync";
+import type { SyncManager } from "../sync/sync";
 
 export interface Comment {
   id: string;
@@ -65,11 +65,15 @@ export class CommentManager {
     const docHandle = this.syncManager.getDoc(commentDocId(filePath));
     if (!docHandle) return () => {};
     const arr = docHandle.doc.getArray<Y.Map<unknown>>("comments");
+    const prev = this.changeHandlers.get(filePath);
+    if (prev) arr.unobserve(prev);
     arr.observe(handler);
     this.changeHandlers.set(filePath, handler);
     return () => {
       arr.unobserve(handler);
-      this.changeHandlers.delete(filePath);
+      if (this.changeHandlers.get(filePath) === handler) {
+        this.changeHandlers.delete(filePath);
+      }
     };
   }
 

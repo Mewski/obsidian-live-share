@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { conflictExtension } from "../conflict-decoration";
+import { conflictExtension } from "../editor/conflict-decoration";
 
 describe("conflictExtension", () => {
   it("returns an array of extensions", () => {

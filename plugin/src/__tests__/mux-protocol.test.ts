@@ -8,7 +8,7 @@ import {
   MUX_UNSUBSCRIBE,
   decodeMuxMessage,
   encodeMuxMessage,
-} from "../mux-protocol";
+} from "../sync/mux-protocol";
 
 describe("mux-protocol constants", () => {
   it("has distinct message type values", () => {

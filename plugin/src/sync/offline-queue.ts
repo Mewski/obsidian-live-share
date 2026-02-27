@@ -1,5 +1,5 @@
-import type { FileOp } from "./types";
-import { normalizePath } from "./utils";
+import type { FileOp } from "../types";
+import { normalizePath } from "../utils";
 
 function getOpPath(op: FileOp): string | null {
   if ("path" in op) return normalizePath(op.path);
@@ -17,9 +17,7 @@ export class OfflineQueue {
       this.queue = this.queue.filter((prev) => getOpPath(prev) !== path);
     } else if (path && (op.type === "modify" || op.type === "create")) {
       const idx = this.queue.findIndex(
-        (prev) =>
-          getOpPath(prev) === path &&
-          (prev.type === "modify" || prev.type === "create"),
+        (prev) => getOpPath(prev) === path && (prev.type === "modify" || prev.type === "create"),
       );
       if (idx >= 0) {
         this.queue.splice(idx, 1);

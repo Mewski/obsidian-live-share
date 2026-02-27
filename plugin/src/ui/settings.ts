@@ -1,5 +1,5 @@
 import { type App, PluginSettingTab, SettingGroup } from "obsidian";
-import type LiveSharePlugin from "./main";
+import type LiveSharePlugin from "../main";
 
 export class LiveShareSettingTab extends PluginSettingTab {
   private plugin: LiveSharePlugin;

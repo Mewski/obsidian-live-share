@@ -1,6 +1,6 @@
 import { Notice } from "obsidian";
 
-import type LiveSharePlugin from "./main";
+import type LiveSharePlugin from "../main";
 
 interface InvitePayload {
   s: string;

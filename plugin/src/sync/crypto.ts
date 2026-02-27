@@ -1,4 +1,4 @@
-import { arrayBufferToBase64, base64ToArrayBuffer } from "./utils";
+import { arrayBufferToBase64, base64ToArrayBuffer } from "../utils";
 
 const SALT_BYTES = 16;
 const IV_BYTES = 12;

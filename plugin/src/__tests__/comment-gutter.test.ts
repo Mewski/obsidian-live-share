@@ -1,7 +1,7 @@
 import type { EditorView } from "@codemirror/view";
 import { describe, expect, it, vi } from "vitest";
 
-import type { Comment } from "../comments";
+import type { Comment } from "../files/comments";
 
 vi.mock("@codemirror/state", () => {
   const MockStateEffect = {
@@ -41,7 +41,7 @@ vi.mock("@codemirror/view", () => {
   };
 });
 
-const { commentGutterExtension, updateCommentPositions } = await import("../comment-gutter");
+const { commentGutterExtension, updateCommentPositions } = await import("../editor/comment-gutter");
 
 let nextId = 0;
 function createComment(overrides: Partial<Comment> & { anchorIndex: number }): Comment {

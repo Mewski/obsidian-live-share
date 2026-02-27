@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { OfflineQueue } from "../offline-queue";
+import { OfflineQueue } from "../sync/offline-queue";
 
 describe("OfflineQueue", () => {
   it("enqueues and drains operations in order", () => {

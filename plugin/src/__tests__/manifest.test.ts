@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import * as Y from "yjs";
-import { ExclusionManager } from "../exclusion";
-import { ManifestManager } from "../manifest";
+import { ExclusionManager } from "../files/exclusion";
+import { ManifestManager } from "../files/manifest";
 import type { LiveShareSettings } from "../types";
 
 function createSettings(overrides: Partial<LiveShareSettings> = {}): LiveShareSettings {

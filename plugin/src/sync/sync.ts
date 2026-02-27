@@ -4,6 +4,8 @@ import * as awarenessProtocol from "y-protocols/awareness";
 import * as syncProtocol from "y-protocols/sync";
 import * as Y from "yjs";
 
+import type { LiveShareSettings } from "../types";
+import { normalizePath, toWsUrl } from "../utils";
 import type { E2ECrypto } from "./crypto";
 import {
   MUX_AWARENESS,
@@ -17,8 +19,6 @@ import {
   decodeMuxMessage,
   encodeMuxMessage,
 } from "./mux-protocol";
-import type { LiveShareSettings } from "./types";
-import { normalizePath, toWsUrl } from "./utils";
 
 const SYNC_STEP2 = 1;
 const RECONNECT_BASE_MS = 100;
@@ -51,6 +51,7 @@ export class SyncManager {
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   private e2e: E2ECrypto | null = null;
   private sendQueue: Promise<void> = Promise.resolve();
+  private isDestroyed = false;
 
   constructor(settings: LiveShareSettings) {
     this.settings = settings;
@@ -88,6 +89,7 @@ export class SyncManager {
   }
 
   destroy(): void {
+    this.isDestroyed = true;
     this.disconnect();
   }
 
@@ -203,6 +205,7 @@ export class SyncManager {
   }
 
   private openWebSocket(): void {
+    if (this.isDestroyed) return;
     if (!this.settings.roomId || !this.settings.serverUrl) return;
 
     const wsUrl = toWsUrl(this.settings.serverUrl);
@@ -246,6 +249,7 @@ export class SyncManager {
   }
 
   private scheduleReconnect(): void {
+    if (this.isDestroyed) return;
     if (this.reconnectTimer) return;
     if (this.reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
       this.shouldConnect = false;
