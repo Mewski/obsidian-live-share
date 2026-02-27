@@ -14,11 +14,7 @@ import { registerVaultEvents } from "./files/vault-events";
 import { AuthManager } from "./session/auth";
 import { registerCommands } from "./session/commands";
 import { PresenceManager } from "./session/presence-manager";
-import {
-  PRESENCE_VIEW_TYPE,
-  type PresenceUser,
-  PresenceView,
-} from "./session/presence-view";
+import { PRESENCE_VIEW_TYPE, type PresenceUser, PresenceView } from "./session/presence-view";
 import { SessionManager } from "./session/session";
 import { ConnectionStateManager } from "./sync/connection-state";
 import { registerControlHandlers } from "./sync/control-handlers";
@@ -75,10 +71,8 @@ export default class LiveSharePlugin extends Plugin {
     this.controlChannel?.send({ type: "sync-request", path });
   };
 
-  private mutePathEvents = (path: string) =>
-    this.fileOpsManager.mutePathEvents(path);
-  private unmutePathEvents = (path: string) =>
-    this.fileOpsManager.unmutePathEvents(path);
+  private mutePathEvents = (path: string) => this.fileOpsManager.mutePathEvents(path);
+  private unmutePathEvents = (path: string) => this.fileOpsManager.unmutePathEvents(path);
 
   private registerManifestChangeHandler() {
     this.manifestManager.setManifestChangeHandler(async (added, removed) => {
@@ -98,10 +92,7 @@ export default class LiveSharePlugin extends Plugin {
               this.fileOpsManager.mutePathEvents(localOld);
               this.fileOpsManager.mutePathEvents(localNew);
               try {
-                const parentDir = localNew.substring(
-                  0,
-                  localNew.lastIndexOf("/"),
-                );
+                const parentDir = localNew.substring(0, localNew.lastIndexOf("/"));
                 if (parentDir) await ensureFolder(this.app.vault, parentDir);
                 await this.app.vault.rename(oldFile, localNew);
               } finally {
@@ -134,9 +125,7 @@ export default class LiveSharePlugin extends Plugin {
       }
 
       const actuallyAdded = added.filter((path) => !renamedNewPaths.has(path));
-      const actuallyRemoved = removed.filter(
-        (path) => !renamedOldPaths.has(path),
-      );
+      const actuallyRemoved = removed.filter((path) => !renamedOldPaths.has(path));
 
       if (actuallyAdded.length > 0) {
         const syncedCount = await this.manifestManager.syncFromManifest(
@@ -145,8 +134,7 @@ export default class LiveSharePlugin extends Plugin {
           this.requestBinaryFile,
           { skipText: true },
         );
-        if (syncedCount > 0)
-          this.notify(`Live Share: synced ${syncedCount} file(s)`);
+        if (syncedCount > 0) this.notify(`Live Share: synced ${syncedCount} file(s)`);
         for (const path of actuallyAdded) {
           if (isTextFile(path)) {
             await this.backgroundSync.onFileAdded(path);
@@ -177,8 +165,7 @@ export default class LiveSharePlugin extends Plugin {
 
     if (this.settings.excludePatterns.length === 0) {
       try {
-        const configFile =
-          this.app.vault.getAbstractFileByPath(".liveshare.json");
+        const configFile = this.app.vault.getAbstractFileByPath(".liveshare.json");
         if (configFile && configFile instanceof TFile) {
           const content = await this.app.vault.read(configFile);
           const config = JSON.parse(content);
@@ -211,16 +198,12 @@ export default class LiveSharePlugin extends Plugin {
       this.settings.debugLogPath,
       this.settings.debugLogging,
     );
-    this.connectionStateUnsub = this.connectionState.onChange(() =>
-      this.updateStatusBar(),
-    );
+    this.connectionStateUnsub = this.connectionState.onChange(() => this.updateStatusBar());
 
     this.registerEditorExtension(this.collabManager.getBaseExtension());
 
     this.statusBarEl = this.addStatusBarItem();
-    this.statusBarEl.addEventListener("click", () =>
-      this.activatePresenceView(),
-    );
+    this.statusBarEl.addEventListener("click", () => this.activatePresenceView());
     this.statusBarEl.addClass("live-share-status-bar");
     this.updateStatusBar();
 
@@ -228,9 +211,7 @@ export default class LiveSharePlugin extends Plugin {
 
     this.registerView(PRESENCE_VIEW_TYPE, (leaf) => {
       const view = new PresenceView(leaf);
-      view.setFollowHandler((userId) =>
-        this.presenceManager?.followUser(userId),
-      );
+      view.setFollowHandler((userId) => this.presenceManager?.followUser(userId));
       view.setKickHandler((userId) => this.kickUser(userId));
       view.setSummonHandler((userId) => this.summonUser(userId));
       view.setPermissionHandler((userId) => this.setUserPermission(userId));
@@ -245,9 +226,7 @@ export default class LiveSharePlugin extends Plugin {
       this.showRibbonMenu(event);
     };
     ribbonEl.addEventListener("contextmenu", ribbonCtxHandler);
-    this.register(() =>
-      ribbonEl.removeEventListener("contextmenu", ribbonCtxHandler),
-    );
+    this.register(() => ribbonEl.removeEventListener("contextmenu", ribbonCtxHandler));
 
     registerVaultEvents(this);
     this.addSettingTab(new LiveShareSettingTab(this.app, this));
@@ -348,10 +327,7 @@ export default class LiveSharePlugin extends Plugin {
     await this.saveData(this.settings);
     this.syncManager.updateSettings(this.settings);
     this.manifestManager.updateSettings(this.settings);
-    this.logger.updateSettings(
-      this.settings.debugLogging,
-      this.settings.debugLogPath,
-    );
+    this.logger.updateSettings(this.settings.debugLogging, this.settings.debugLogPath);
     this.exclusionManager.setPatterns(this.settings.excludePatterns);
   }
 
@@ -381,10 +357,7 @@ export default class LiveSharePlugin extends Plugin {
         try {
           await this.app.vault.trash(file, true);
         } finally {
-          setTimeout(
-            () => this.fileOpsManager.unmutePathEvents(file.path),
-            VAULT_EVENT_SETTLE_MS,
-          );
+          setTimeout(() => this.fileOpsManager.unmutePathEvents(file.path), VAULT_EVENT_SETTLE_MS);
         }
       }
     }
@@ -470,9 +443,7 @@ export default class LiveSharePlugin extends Plugin {
         this.registerManifestChangeHandler();
         this.onActiveFileChange();
         this.logger.log("session", `joined, room=${this.settings.roomId}`);
-        this.notify(
-          `Live Share: joined session, synced ${syncedCount} file(s)`,
-        );
+        this.notify(`Live Share: joined session, synced ${syncedCount} file(s)`);
       } catch {
         this.logger.error("session", "failed to join session");
         await this.abortSession("Live Share: failed to join session");
@@ -500,13 +471,8 @@ export default class LiveSharePlugin extends Plugin {
         await this.backgroundSync.startAll("guest");
         this.registerManifestChangeHandler();
         this.onActiveFileChange();
-        this.logger.log(
-          "session",
-          `joined via link, room=${this.settings.roomId}`,
-        );
-        this.notify(
-          `Live Share: joined session, synced ${syncedCount} file(s)`,
-        );
+        this.logger.log("session", `joined via link, room=${this.settings.roomId}`);
+        this.notify(`Live Share: joined session, synced ${syncedCount} file(s)`);
       } catch {
         this.logger.error("session", "failed to join via link");
         await this.abortSession("Live Share: failed to join session");
@@ -536,9 +502,7 @@ export default class LiveSharePlugin extends Plugin {
 
       this.cleanupSession();
       this.notify(
-        this.settings.role === "host"
-          ? "Live Share: session ended"
-          : "Live Share: left session",
+        this.settings.role === "host" ? "Live Share: session ended" : "Live Share: left session",
       );
     } finally {
       await this.sessionManager.endSession();
@@ -594,9 +558,7 @@ export default class LiveSharePlugin extends Plugin {
       } else if (controlState === "auth-required") {
         this.fileOpsManager.setOnline(false);
         this.connectionState.transition({ type: "auth-expired" });
-        new Notice(
-          "Live Share: authentication required - sign in via settings",
-        );
+        new Notice("Live Share: authentication required - sign in via settings");
         this.endSession();
       } else {
         this.fileOpsManager.setOnline(false);
@@ -612,11 +574,7 @@ export default class LiveSharePlugin extends Plugin {
     this.controlChannel.connect();
 
     this.explorerIndicators = new ExplorerIndicators();
-    this.canvasSync = new CanvasSync(
-      this.app.vault,
-      this.syncManager,
-      this.fileOpsManager,
-    );
+    this.canvasSync = new CanvasSync(this.app.vault, this.syncManager, this.fileOpsManager);
     const entries = this.manifestManager.getEntries();
     const role = this.settings.role === "host" ? "host" : "guest";
     for (const [path] of entries) {
@@ -649,12 +607,9 @@ export default class LiveSharePlugin extends Plugin {
       getRemoteUsers: () => this.remoteUsers,
       notify: (msg) => this.notify(msg),
       openFileAndScroll: async (filePath, scrollTop) => {
-        const currentView =
-          this.app.workspace.getActiveViewOfType(MarkdownView);
+        const currentView = this.app.workspace.getActiveViewOfType(MarkdownView);
         if (currentView?.file?.path !== toLocalPath(filePath)) {
-          const file = this.app.vault.getAbstractFileByPath(
-            toLocalPath(filePath),
-          );
+          const file = this.app.vault.getAbstractFileByPath(toLocalPath(filePath));
           if (file instanceof TFile) {
             await this.app.workspace.getLeaf().openFile(file);
             this.onActiveFileChange();
@@ -685,9 +640,7 @@ export default class LiveSharePlugin extends Plugin {
 
     const filePath = file?.path ?? null;
     const sharedPath =
-      filePath &&
-      this.manifestManager.isSharedPath(filePath) &&
-      isTextFile(filePath)
+      filePath && this.manifestManager.isSharedPath(filePath) && isTextFile(filePath)
         ? toCanonicalPath(normalizePath(filePath))
         : null;
     this.backgroundSync.setActiveFile(sharedPath);
@@ -718,8 +671,7 @@ export default class LiveSharePlugin extends Plugin {
       this.presenceManager?.debouncedBroadcastPresence();
     };
     scrollDOM.addEventListener("scroll", scrollHandler);
-    this.currentScrollListener = () =>
-      scrollDOM.removeEventListener("scroll", scrollHandler);
+    this.currentScrollListener = () => scrollDOM.removeEventListener("scroll", scrollHandler);
   }
 
   private removeScrollListener() {
@@ -747,12 +699,8 @@ export default class LiveSharePlugin extends Plugin {
         const users = count > 0 ? ` (${count + 1})` : "";
         const latency = this.controlChannel?.getLatency();
         const latencyStr = latency ? ` ${latency}ms` : "";
-        const presentingLabel = this.presenceManager?.getIsPresenting()
-          ? " [presenting]"
-          : "";
-        this.statusBarEl.setText(
-          `Live Share: ${role}${users}${latencyStr}${presentingLabel}`,
-        );
+        const presentingLabel = this.presenceManager?.getIsPresenting() ? " [presenting]" : "";
+        this.statusBarEl.setText(`Live Share: ${role}${users}${latencyStr}${presentingLabel}`);
         break;
       }
       case "error":
@@ -815,9 +763,7 @@ export default class LiveSharePlugin extends Plugin {
             .setIcon("log-out")
             .setWarning(true)
             .onClick(async () => {
-              const confirmed = await this.confirm(
-                "Are you sure you want to leave the session?",
-              );
+              const confirmed = await this.confirm("Are you sure you want to leave the session?");
               if (confirmed) this.endSession();
             }),
         );
@@ -883,8 +829,7 @@ export default class LiveSharePlugin extends Plugin {
     const user = this.remoteUsers.get(userId);
     if (!user) return;
     const currentPermission = user.permission ?? "read-write";
-    const newPermission =
-      currentPermission === "read-write" ? "read-only" : "read-write";
+    const newPermission = currentPermission === "read-write" ? "read-only" : "read-write";
     this.controlChannel.send({
       type: "set-permission",
       userId,
@@ -896,19 +841,13 @@ export default class LiveSharePlugin extends Plugin {
   }
 
   async fetchAuditLog() {
-    if (
-      !this.settings.serverUrl ||
-      !this.settings.roomId ||
-      !this.settings.token
-    )
-      return;
+    if (!this.settings.serverUrl || !this.settings.roomId || !this.settings.token) return;
     try {
       const url = `${this.settings.serverUrl}/rooms/${this.settings.roomId}/logs?limit=100`;
       const headers: Record<string, string> = {
         Authorization: `Bearer ${this.settings.token}`,
       };
-      if (this.settings.serverPassword)
-        headers["X-Server-Password"] = this.settings.serverPassword;
+      if (this.settings.serverPassword) headers["X-Server-Password"] = this.settings.serverPassword;
       const res = await fetch(url, { headers });
       if (!res.ok) {
         new Notice("Live Share: failed to fetch audit log");
@@ -929,8 +868,7 @@ export default class LiveSharePlugin extends Plugin {
       this.unmutePathEvents,
       this.requestBinaryFile,
     );
-    if (syncedCount > 0)
-      this.notify(`Live Share: reloaded ${syncedCount} file(s) from host`);
+    if (syncedCount > 0) this.notify(`Live Share: reloaded ${syncedCount} file(s) from host`);
   }
 
   summonUser(userId: string) {

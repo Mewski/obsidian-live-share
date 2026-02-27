@@ -27,10 +27,7 @@ function createMockVault() {
 }
 
 function createMockSyncManager() {
-  const docs = new Map<
-    string,
-    { doc: Y.Doc; text: Y.Text; awareness: unknown }
-  >();
+  const docs = new Map<string, { doc: Y.Doc; text: Y.Text; awareness: unknown }>();
   return {
     getDoc(docId: string) {
       if (!docs.has(docId)) {
@@ -69,11 +66,7 @@ describe("CanvasSync", () => {
     vault = createMockVault();
     syncManager = createMockSyncManager();
     fileOps = createMockFileOps();
-    canvasSync = new CanvasSync(
-      vault as any,
-      syncManager as any,
-      fileOps as any,
-    );
+    canvasSync = new CanvasSync(vault as any, syncManager as any, fileOps as any);
   });
 
   it("subscribe as host populates Y.Map from file content", async () => {
@@ -136,9 +129,7 @@ describe("CanvasSync", () => {
     canvasSync.unsubscribe("test.canvas");
 
     expect(canvasSync.isSubscribed("test.canvas")).toBe(false);
-    expect(syncManager.releaseDoc).toHaveBeenCalledWith(
-      "__canvas__:test.canvas",
-    );
+    expect(syncManager.releaseDoc).toHaveBeenCalledWith("__canvas__:test.canvas");
   });
 
   it("handleLocalModify updates Y.Map from disk content", async () => {

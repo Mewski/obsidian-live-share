@@ -6,18 +6,11 @@ function permissionKey(roomId: string, userId: string): string {
   return `${roomId}:${userId}`;
 }
 
-export function setPermission(
-  roomId: string,
-  userId: string,
-  permission: Permission,
-): void {
+export function setPermission(roomId: string, userId: string, permission: Permission): void {
   permissions.set(permissionKey(roomId, userId), permission);
 }
 
-export function getPermission(
-  roomId: string,
-  userId: string,
-): Permission | undefined {
+export function getPermission(roomId: string, userId: string): Permission | undefined {
   return permissions.get(permissionKey(roomId, userId));
 }
 

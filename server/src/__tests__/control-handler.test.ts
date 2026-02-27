@@ -14,9 +14,7 @@ let server: Server<typeof IncomingMessage, typeof ServerResponse>;
 let port: number;
 let openSockets: WebSocket[] = [];
 
-function listen(
-  s: Server<typeof IncomingMessage, typeof ServerResponse>,
-): Promise<number> {
+function listen(s: Server<typeof IncomingMessage, typeof ServerResponse>): Promise<number> {
   return new Promise((resolve) => {
     s.listen(0, () => {
       const addr = s.address();
@@ -58,11 +56,7 @@ function connectControl(
   });
 }
 
-function waitForMessages(
-  messages: string[],
-  count: number,
-  timeoutMs = 3000,
-): Promise<void> {
+function waitForMessages(messages: string[], count: number, timeoutMs = 3000): Promise<void> {
   if (messages.length >= count) return Promise.resolve();
   return new Promise((resolve, reject) => {
     const start = Date.now();
@@ -93,10 +87,7 @@ beforeEach(async () => {
 
 afterEach(async () => {
   for (const ws of openSockets) {
-    if (
-      ws.readyState === WebSocket.OPEN ||
-      ws.readyState === WebSocket.CONNECTING
-    ) {
+    if (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING) {
       ws.close();
     }
   }
@@ -916,9 +907,7 @@ describe("Control WebSocket handler", () => {
     });
 
     await delay(300);
-    const offerMsg = host.messages.find(
-      (m) => JSON.parse(m).type === "host-transfer-offer",
-    );
+    const offerMsg = host.messages.find((m) => JSON.parse(m).type === "host-transfer-offer");
     expect(offerMsg).toBeUndefined();
   });
 
@@ -1090,9 +1079,7 @@ describe("Control WebSocket handler", () => {
     expect(joinReq.userId).toBe("guest-1");
 
     await delay(200);
-    const earlyResponse = guest2.messages.find(
-      (m) => JSON.parse(m).type === "join-response",
-    );
+    const earlyResponse = guest2.messages.find((m) => JSON.parse(m).type === "join-response");
     expect(earlyResponse).toBeUndefined();
 
     sendJSON(host.ws, {
@@ -1176,9 +1163,7 @@ describe("Control WebSocket handler", () => {
     expect(autoApproval.approved).toBe(true);
 
     await delay(200);
-    const hostJoinReq = host.messages.find(
-      (m) => JSON.parse(m).type === "join-request",
-    );
+    const hostJoinReq = host.messages.find((m) => JSON.parse(m).type === "join-request");
     expect(hostJoinReq).toBeUndefined();
   });
 
@@ -1225,9 +1210,7 @@ describe("Control WebSocket handler", () => {
       op: { type: "create", path: "data.lock", content: "blocked" },
     });
     await delay(300);
-    const guestFileOps = host.messages.filter(
-      (m) => JSON.parse(m).type === "file-op",
-    );
+    const guestFileOps = host.messages.filter((m) => JSON.parse(m).type === "file-op");
     expect(guestFileOps.length).toBe(0);
 
     sendJSON(guest.ws, {

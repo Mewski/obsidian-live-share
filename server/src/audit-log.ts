@@ -15,10 +15,7 @@ export function initAuditLog(dbPath = "./data/audit"): void {
   db = new Level(dbPath, { valueEncoding: "buffer" });
 }
 
-export async function appendLog(
-  roomId: string,
-  entry: AuditEntry,
-): Promise<void> {
+export async function appendLog(roomId: string, entry: AuditEntry): Promise<void> {
   if (!db) return;
   const key = `${roomId}:${entry.timestamp}:${nanoid(6)}`;
   try {
@@ -28,10 +25,7 @@ export async function appendLog(
   }
 }
 
-export async function getLogs(
-  roomId: string,
-  limit = 100,
-): Promise<AuditEntry[]> {
+export async function getLogs(roomId: string, limit = 100): Promise<AuditEntry[]> {
   if (!db) return [];
   const entries: AuditEntry[] = [];
   try {
@@ -43,9 +37,7 @@ export async function getLogs(
       limit,
     })) {
       try {
-        entries.push(
-          JSON.parse((value as unknown as Buffer).toString("utf-8")),
-        );
+        entries.push(JSON.parse((value as unknown as Buffer).toString("utf-8")));
       } catch {}
     }
   } catch (err) {

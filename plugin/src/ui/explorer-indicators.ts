@@ -13,9 +13,7 @@ export class ExplorerIndicators {
   private readonly styleEl: HTMLStyleElement;
 
   constructor() {
-    const existing = document.getElementById(
-      STYLE_ID,
-    ) as HTMLStyleElement | null;
+    const existing = document.getElementById(STYLE_ID) as HTMLStyleElement | null;
     this.styleEl = existing ?? document.createElement("style");
     this.styleEl.id = STYLE_ID;
     if (!existing) document.head.appendChild(this.styleEl);
