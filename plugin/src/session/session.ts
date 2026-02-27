@@ -38,11 +38,16 @@ export class SessionManager {
           requireApproval: settings.requireApproval,
           readOnlyPatterns: settings.readOnlyPatterns,
         }),
+        throw: false,
       });
+      if (createResponse.status >= 400) {
+        const errMsg = createResponse.json?.error ?? "unknown error";
+        new Notice(`Live share: ${errMsg}`);
+        return false;
+      }
       roomData = createResponse.json;
-    } catch (err) {
-      const msg = err instanceof Error && err.message ? err.message : "cannot reach server";
-      new Notice(`Live share: ${msg}`);
+    } catch {
+      new Notice("Live share: cannot reach server");
       return false;
     }
 
@@ -73,15 +78,20 @@ export class SessionManager {
     if (serverPassword) joinHeaders["X-Server-Password"] = serverPassword;
 
     try {
-      await requestUrl({
+      const joinResponse = await requestUrl({
         url: `${baseUrl}/rooms/${parsedInvite.r}/join`,
         method: "POST",
         headers: joinHeaders,
         body: JSON.stringify({ token: parsedInvite.t }),
+        throw: false,
       });
-    } catch (err) {
-      const msg = err instanceof Error && err.message ? err.message : "cannot reach server";
-      new Notice(`Live share: ${msg}`);
+      if (joinResponse.status >= 400) {
+        const errMsg = joinResponse.json?.error ?? "unknown error";
+        new Notice(`Live share: ${errMsg}`);
+        return false;
+      }
+    } catch {
+      new Notice("Live share: cannot reach server");
       return false;
     }
 
