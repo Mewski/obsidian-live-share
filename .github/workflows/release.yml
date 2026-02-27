@@ -31,7 +31,7 @@ jobs:
       - name: Package
         run: |
           mkdir live-share
-          cp main.js manifest.json styles.css live-share/
+          cp main.js ../manifest.json styles.css live-share/
           zip -r live-share.zip live-share
 
       - name: Create release
@@ -48,4 +48,4 @@ jobs:
             --generate-notes \
             $prerelease \
             --repo="$GITHUB_REPOSITORY" \
-            main.js manifest.json styles.css live-share.zip
+            main.js ../manifest.json styles.css live-share.zip
