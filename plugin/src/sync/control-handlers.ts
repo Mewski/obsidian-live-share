@@ -5,7 +5,7 @@ import type { ControlMessage, FileOp } from "../types";
 import { ApprovalModal } from "../ui/approval-modal";
 import { showFocusNotification } from "../ui/focus-notification";
 import { ConfirmModal } from "../ui/modals";
-import { isTextFile, toLocalPath } from "../utils";
+import { isTextFile, normalizePath, toLocalPath } from "../utils";
 
 const CHUNK_TO_CONTROL = {
   "chunk-start": "file-chunk-start",
@@ -268,9 +268,10 @@ export function registerControlHandlers(plugin: LiveSharePlugin): void {
   });
 
   channel.on("file-permission-update", (msg) => {
-    plugin.filePermissions.set(msg.filePath, msg.permission);
+    const filePath = normalizePath(msg.filePath);
+    plugin.filePermissions.set(filePath, msg.permission);
     plugin.explorerIndicators?.update(plugin.filePermissions);
     plugin.onActiveFileChange();
-    plugin.notify(`Live Share: ${msg.filePath} set to ${msg.permission}`);
+    plugin.notify(`Live Share: ${filePath} set to ${msg.permission}`);
   });
 }

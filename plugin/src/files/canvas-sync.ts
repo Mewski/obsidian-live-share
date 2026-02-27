@@ -117,6 +117,9 @@ export class CanvasSync {
       return;
     }
 
+    if (!this.subscribedPaths.has(path)) return;
+    if (this.observers.has(path)) return;
+
     const nodesMap = docHandle.doc.getMap<Y.Map<unknown>>("nodes");
     const edgesMap = docHandle.doc.getMap<Y.Map<unknown>>("edges");
 

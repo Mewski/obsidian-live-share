@@ -266,20 +266,21 @@ export function createControlWSS(options?: ControlWSSOptions) {
             }
           }
         } else if (room.kickedUserIds.has(client.userId)) {
+          const host = getHostClient(room);
+          if (!host) {
+            sendTo(ws, { type: "join-response", approved: false });
+            return;
+          }
           room.kickedUserIds.delete(client.userId);
           client.isApproved = false;
           room.pendingApprovals.set(client.userId, ws);
-
-          const host = getHostClient(room);
-          if (host) {
-            sendTo(host.ws, {
-              type: "join-request",
-              userId: client.userId,
-              displayName: client.displayName,
-              avatarUrl: msg.avatarUrl || "",
-              verified: !!client.verifiedUserId,
-            });
-          }
+          sendTo(host.ws, {
+            type: "join-request",
+            userId: client.userId,
+            displayName: client.displayName,
+            avatarUrl: msg.avatarUrl || "",
+            verified: !!client.verifiedUserId,
+          });
         } else {
           client.isApproved = true;
           setPermission(roomId, client.userId, client.permission);

@@ -3,7 +3,7 @@ import { MarkdownView } from "obsidian";
 import type LiveSharePlugin from "../main";
 import { FilePermissionModal, type FilePermissionUser } from "../ui/file-permission-modal";
 import { UserPickerModal } from "../ui/modals";
-import { toCanonicalPath } from "../utils";
+import { normalizePath, toCanonicalPath } from "../utils";
 
 export function registerCommands(plugin: LiveSharePlugin): void {
   plugin.addCommand({
@@ -81,7 +81,7 @@ export function registerCommands(plugin: LiveSharePlugin): void {
         type: "focus-request",
         fromUserId: plugin.settings.githubUserId || plugin.settings.clientId,
         fromDisplayName: plugin.settings.displayName,
-        filePath: toCanonicalPath(filePath),
+        filePath: toCanonicalPath(normalizePath(filePath)),
         line: cursor.line,
         ch: cursor.ch,
       });
@@ -103,7 +103,7 @@ export function registerCommands(plugin: LiveSharePlugin): void {
         fromUserId: plugin.settings.githubUserId || plugin.settings.clientId,
         fromDisplayName: plugin.settings.displayName,
         targetUserId: "__all__",
-        filePath: toCanonicalPath(activeView.file.path),
+        filePath: toCanonicalPath(normalizePath(activeView.file.path)),
         line: cursor.line,
         ch: cursor.ch,
       });
@@ -181,7 +181,7 @@ export function registerCommands(plugin: LiveSharePlugin): void {
       if (!activeView?.file) return false;
       if (plugin.remoteUsers.size === 0) return false;
       if (checking) return true;
-      const filePath = toCanonicalPath(activeView.file.path);
+      const filePath = toCanonicalPath(normalizePath(activeView.file.path));
       const users: FilePermissionUser[] = [];
       for (const [userId, user] of plugin.remoteUsers) {
         users.push({

@@ -351,7 +351,7 @@ export default class LiveSharePlugin extends Plugin {
       .getFiles()
       .filter((file) => this.manifestManager.isSharedPath(file.path));
     for (const file of localFiles) {
-      if (!manifestPaths.has(normalizePath(file.path))) {
+      if (!manifestPaths.has(toCanonicalPath(normalizePath(file.path)))) {
         this.fileOpsManager.mutePathEvents(file.path);
         try {
           await this.app.vault.trash(file, true);
@@ -884,7 +884,7 @@ export default class LiveSharePlugin extends Plugin {
       fromUserId: this.userId,
       fromDisplayName: this.settings.displayName,
       targetUserId: userId,
-      filePath,
+      filePath: toCanonicalPath(normalizePath(filePath)),
       line: cursor?.line ?? 0,
       ch: cursor?.ch ?? 0,
     });

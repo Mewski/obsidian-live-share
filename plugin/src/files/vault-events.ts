@@ -73,7 +73,8 @@ export function registerVaultEvents(plugin: LiveSharePlugin): void {
 
       renamedPaths.add(oldPath);
 
-      pendingRename = (async () => {
+      const prev = pendingRename ?? Promise.resolve();
+      const task = prev.then(async () => {
         plugin.fileOpsManager.onFileRename(file, oldPath);
         plugin.backgroundSync.cancelSubscribe(oldPath);
         await plugin.backgroundSync.onFileRenamed(oldPath, file.path);
@@ -84,8 +85,9 @@ export function registerVaultEvents(plugin: LiveSharePlugin): void {
         if (activeFile && (activeFile.path === file.path || activeFile.path === oldPath)) {
           plugin.onActiveFileChange();
         }
-      })().finally(() => {
-        pendingRename = null;
+      });
+      pendingRename = task.finally(() => {
+        if (pendingRename === task) pendingRename = null;
         renamedPaths.delete(oldPath);
       });
     }),
