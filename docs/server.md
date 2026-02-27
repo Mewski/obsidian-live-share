@@ -14,10 +14,10 @@ npm run build
 npm start
 ```
 
-The server starts on port `4321` by default. Verify it's running:
+The server starts on port `3000` by default. Verify it's running:
 
 ```bash
-curl http://localhost:4321/healthz
+curl http://localhost:3000/healthz
 # {"ok":true,"uptime":1.0,"sessions":0,"documents":0,"clients":0}
 ```
 
@@ -34,7 +34,7 @@ npm run format       # Auto-fix formatting
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `PORT` | `4321` | Server port (validated: 1-65535) |
+| `PORT` | `3000` | Server port (validated: 1-65535) |
 | `SERVER_PASSWORD` | — | Require this password for all REST and WebSocket connections |
 | `TLS_CERT` | — | Path to TLS certificate (enables HTTPS/WSS) |
 | `TLS_KEY` | — | Path to TLS private key |

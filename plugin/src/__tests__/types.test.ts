@@ -4,7 +4,7 @@ import type { FileOp } from "../types";
 
 describe("types", () => {
   it("DEFAULT_SETTINGS has expected shape", () => {
-    expect(DEFAULT_SETTINGS.serverUrl).toBe("http://localhost:4321");
+    expect(DEFAULT_SETTINGS.serverUrl).toBe("http://localhost:3000");
     expect(DEFAULT_SETTINGS.roomId).toBe("");
     expect(DEFAULT_SETTINGS.token).toBe("");
     expect(DEFAULT_SETTINGS.displayName).toBe("Anonymous");

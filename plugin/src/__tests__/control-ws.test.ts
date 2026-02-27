@@ -38,7 +38,7 @@ const { ControlChannel: CC } = await import("../sync/control-ws");
 
 function createSettings(overrides?: Partial<LiveShareSettings>): LiveShareSettings {
   return {
-    serverUrl: "http://localhost:4321",
+    serverUrl: "http://localhost:3000",
     roomId: "test-room",
     token: "tok123",
     jwt: "",

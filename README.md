@@ -10,7 +10,7 @@ Real-time collaborative editing for [Obsidian](https://obsidian.md). Share your 
 cd server && npm install && npm run build && npm start
 ```
 
-Runs on `http://localhost:4321`. Verify: `curl http://localhost:4321/healthz`
+Runs on `http://localhost:3000`. Verify: `curl http://localhost:3000/healthz`
 
 ### 2. Install the Plugin
 
@@ -83,7 +83,7 @@ Open **Settings > Live Share** and set your **Server URL**, **Display name**, an
 
 | Setting | Default | Description |
 |---------|---------|-------------|
-| Server URL | `http://localhost:4321` | Your Live Share server address |
+| Server URL | `http://localhost:3000` | Your Live Share server address |
 | Server password | — | Optional server password |
 | Display name | `Anonymous` | Your name shown to collaborators |
 | Cursor color | `#7c3aed` | Your cursor color in the editor |
@@ -99,7 +99,7 @@ Open **Settings > Live Share** and set your **Server URL**, **Display name**, an
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `PORT` | `4321` | Server port |
+| `PORT` | `3000` | Server port |
 | `SERVER_PASSWORD` | — | Restrict access to authorized clients |
 | `TLS_CERT` / `TLS_KEY` | — | Enable HTTPS/WSS |
 | `REQUIRE_GITHUB_AUTH` | `false` | Require GitHub OAuth |

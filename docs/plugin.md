@@ -30,7 +30,7 @@ Open **Settings > Live Share**:
 
 | Setting | Default | Description |
 |---------|---------|-------------|
-| Server URL | `http://localhost:4321` | URL of your Live Share server |
+| Server URL | `http://localhost:3000` | URL of your Live Share server |
 | Server password | — | Optional password if the server requires one |
 
 ### Identity

@@ -2,11 +2,11 @@ services:
   server:
     build: .
     ports:
-      - "${PORT:-4321}:4321"
+      - "${PORT:-3000}:3000"
     volumes:
       - server-data:/app/data
     environment:
-      - PORT=4321
+      - PORT=3000
       - SERVER_PASSWORD=${SERVER_PASSWORD:-}
       - REQUIRE_GITHUB_AUTH=${REQUIRE_GITHUB_AUTH:-false}
       - GITHUB_CLIENT_ID=${GITHUB_CLIENT_ID:-}

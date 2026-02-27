@@ -24,7 +24,7 @@ export class LiveShareSettingTab extends PluginSettingTab {
           .setDesc("The Live Share server to connect to")
           .addText((text) => {
             text
-              .setPlaceholder("http://localhost:4321")
+              .setPlaceholder("http://localhost:3000")
               .setValue(settings.serverUrl)
               .onChange(async (value) => {
                 settings.serverUrl = value;

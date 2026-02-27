@@ -9,13 +9,13 @@ describe("parseInvite", () => {
   it("parses a valid invite with an http URL", () => {
     const result = parseInvite(
       makeInvite({
-        s: "http://localhost:4321",
+        s: "http://localhost:3000",
         r: "room-abc",
         t: "tok-123",
       }),
     );
     expect(result).toEqual({
-      s: "http://localhost:4321",
+      s: "http://localhost:3000",
       r: "room-abc",
       t: "tok-123",
     });
@@ -149,7 +149,7 @@ describe("parseInvite", () => {
 
   it("trims whitespace from invite string", () => {
     const invite = makeInvite({
-      s: "http://localhost:4321",
+      s: "http://localhost:3000",
       r: "room",
       t: "tok",
     });

@@ -15,10 +15,10 @@ COPY --from=build /app/dist ./dist
 RUN mkdir -p /app/data && chown node:node /app/data
 USER node
 
-ENV PORT=4321
-EXPOSE 4321
+ENV PORT=3000
+EXPOSE 3000
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-  CMD wget -qO- http://localhost:4321/healthz || exit 1
+  CMD wget -qO- http://localhost:3000/healthz || exit 1
 
 CMD ["node", "dist/index.js"]

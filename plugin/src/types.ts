@@ -27,7 +27,7 @@ export interface LiveShareSettings {
 }
 
 export const DEFAULT_SETTINGS: LiveShareSettings = {
-  serverUrl: "http://localhost:4321",
+  serverUrl: "http://localhost:3000",
   roomId: "",
   token: "",
   jwt: "",

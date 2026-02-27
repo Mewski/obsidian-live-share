@@ -208,7 +208,7 @@ if (isMain) {
         shutdown = appSetup.shutdown;
       }
 
-      const port = Number.parseInt(process.env.PORT || "4321");
+      const port = Number.parseInt(process.env.PORT || "3000");
       if (!Number.isFinite(port) || port < 1 || port > 65535) {
         console.error(`[server] invalid PORT: ${process.env.PORT}`);
         process.exit(1);

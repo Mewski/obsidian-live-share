@@ -42,7 +42,7 @@ describe("normalizePath", () => {
 
 describe("toWsUrl", () => {
   it("converts http to ws", () => {
-    expect(toWsUrl("http://localhost:4321")).toBe("ws://localhost:4321");
+    expect(toWsUrl("http://localhost:3000")).toBe("ws://localhost:3000");
   });
 
   it("converts https to wss", () => {
@@ -54,7 +54,7 @@ describe("toWsUrl", () => {
   });
 
   it("handles http with port", () => {
-    expect(toWsUrl("http://192.168.1.1:4321")).toBe("ws://192.168.1.1:4321");
+    expect(toWsUrl("http://192.168.1.1:3000")).toBe("ws://192.168.1.1:3000");
   });
 });
 
