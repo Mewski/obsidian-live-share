@@ -50,8 +50,11 @@ Open **Settings > Live Share** and set your **Server URL**, **Display name**, an
 - **Presence panel** — See who's connected, what file they're viewing, follow/summon/kick users
 - **Permissions** — Host can set guests to read-write or read-only (enforced server-side), with per-file overrides
 - **Guest approval** — Optionally require host approval before guests can join
+- **Kick protection** — Kicked users must be re-approved by the host to rejoin, even when approval is not required
 - **Host transfer** — Hand off the host role to another participant
+- **Presentation mode** — Auto-broadcast your navigation to all participants
 - **Canvas collaboration** — Real-time sync of `.canvas` files
+- **Cross-platform support** — Windows filename character mapping for seamless sync between platforms
 - **Offline queue** — File operations are buffered when disconnected and replayed on reconnect
 - **Auto-reconnect** — Optionally rejoin the previous session on startup
 
@@ -61,17 +64,36 @@ Open **Settings > Live Share** and set your **Server URL**, **Display name**, an
 |---------|-------------|--------|
 | Start session | Create a room and start hosting | Anyone |
 | Join session | Join via invite link | Anyone |
-| End session | End or leave the session | Anyone in session |
+| End session | End the session for all participants | Host |
+| Leave session | Leave the session | Guest |
 | Copy invite link | Copy invite to clipboard | Anyone in session |
 | Show collaborators panel | Open the presence sidebar | Anyone |
 | Focus participants here | Send a "look here" notification | Anyone in session |
-| Summon all / specific participant | Navigate users to your cursor | Host |
+| Summon all participants here | Navigate all users to your cursor | Host |
+| Summon a specific participant | Navigate one user to your cursor | Host |
 | Reload all files from host | Re-download shared files | Guest |
 | Toggle presentation mode | Auto-broadcast navigation | Host |
 | Transfer host role | Offer host role to another user | Host |
 | Set file permissions | Per-file read-only/read-write | Host |
 | Show audit log | View session event log | Host |
-| Log in / Log out | GitHub OAuth authentication | Anyone |
+| Log in with GitHub | GitHub OAuth authentication | Anyone |
+| Log out | Clear stored authentication | Anyone |
+
+## Settings
+
+| Setting | Default | Description |
+|---------|---------|-------------|
+| Server URL | `http://localhost:4321` | Your Live Share server address |
+| Server password | — | Optional server password |
+| Display name | `Anonymous` | Your name shown to collaborators |
+| Cursor color | `#7c3aed` | Your cursor color in the editor |
+| Shared folder | — | Subfolder to share (empty = whole vault) |
+| Require approval | `false` | Require host approval for guests |
+| Approval timeout | `60` | Auto-deny join requests after N seconds (0 = disabled) |
+| Notifications | `true` | Toggle non-critical status notices |
+| Auto-reconnect | `true` | Rejoin previous session on startup |
+| Debug logging | `false` | Write debug logs to a vault file |
+| Excluded patterns | — | Glob patterns for files to exclude from sync |
 
 ## Server Configuration
 
@@ -88,15 +110,11 @@ Open **Settings > Live Share** and set your **Server URL**, **Display name**, an
 
 ## File Exclusion
 
-Create `.liveshare.json` in your vault root:
+Exclude files from sync by adding glob patterns in **Settings > Live Share > Excluded patterns**.
 
-```json
-{
-  "exclude": ["drafts/**", "*.tmp", "private/**"]
-}
-```
+Default excludes: `.obsidian/**`, `.trash/**`.
 
-Default excludes: `.obsidian/**`, `.liveshare.json`, `.trash/**`.
+Example patterns: `drafts/**`, `*.tmp`, `private/**`.
 
 ## How It Works
 
@@ -115,13 +133,15 @@ The host's vault is the source of truth. Text files sync character-by-character 
 - Path traversal protection, rate limiting, payload size limits
 - Use TLS (`wss://`) to encrypt all traffic including Yjs sync data
 
+See [docs/security.md](docs/security.md) for the full threat model.
+
 ## Development
 
 ```bash
-# Server: 106 tests
+# Server: 108 tests
 cd server && npm run dev && npm test && npm run lint
 
-# Plugin: 300 tests
+# Plugin: 310 tests
 cd plugin && npm run dev && npm test && npm run lint
 ```
 

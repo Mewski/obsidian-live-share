@@ -27,7 +27,7 @@ Each session uses two WebSocket channels:
 |-----------|------|----------------|
 | REST API | `rooms.ts` | Room CRUD, join validation, token auth |
 | Yjs handler | `ws-handler.ts` | Stateless message relay, read-only enforcement |
-| Control handler | `control-handler.ts` | Message routing, host determination, rate limiting, permission enforcement |
+| Control handler | `control-handler.ts` | Message routing, host determination, rate limiting, permission enforcement, kick tracking |
 | Persistence | `persistence.ts` | LevelDB storage for room metadata |
 | Permissions | `permissions.ts` | Per-user permission store |
 | Auth | `github-auth.ts` | GitHub OAuth flow, JWT signing/verification |
@@ -43,7 +43,7 @@ Each session uses two WebSocket channels:
 | `editor/` | CM6 | CollabManager (yCollab integration), conflict decoration |
 | `files/` | File sync | BackgroundSync (Yjs observers + disk writes), FileOpsManager (remote ops), ManifestManager, CanvasSync, ExclusionManager |
 | `session/` | Session | SessionManager, PresenceManager, PresenceView, AuthManager, command registration |
-| `ui/` | Modals | Settings, approval modal, audit modal, file permission modal, focus notification, explorer indicators |
+| `ui/` | Modals | Settings, approval modal, audit modal, file permission modal, ignore modal, focus notification, explorer indicators |
 
 ## Key Design Decisions
 
@@ -53,24 +53,31 @@ Each session uses two WebSocket channels:
 - **Server-side host determination**: JWT-verified identity preferred; fallback: first connected client.
 - **Minimal Y.Text updates**: Only the differing portion is replaced (prefix/suffix preserved) to avoid CRDT artifacts.
 - **Background sync**: Non-active text files sync via Y.Text observers with debounced disk writes. The active file syncs through yCollab in the editor.
+- **Cross-platform paths**: Canonical ASCII paths on the wire, fullwidth Unicode substitution for Windows-forbidden characters at the filesystem boundary.
+- **Kick protection**: The server tracks kicked user IDs per room. Kicked users must be re-approved by the host on rejoin, even when `requireApproval` is false.
 
 ## Control Message Types
 
 | Type | Direction | Description |
 |------|-----------|-------------|
 | `file-op` | Bidirectional | File create/modify/delete/rename |
-| `file-chunk-*` | Bidirectional | Chunked binary file transfer (start/data/end/resume) |
+| `file-chunk-start` | Bidirectional | Begin chunked file transfer |
+| `file-chunk-data` | Bidirectional | Chunk payload |
+| `file-chunk-end` | Bidirectional | End chunked file transfer |
+| `file-chunk-resume` | Bidirectional | Resume interrupted transfer |
 | `presence-update` | Client -> All | Current file, scroll, cursor |
 | `presence-leave` | Server -> All | User disconnected |
 | `focus-request` | Client -> All | "Look here" notification |
 | `summon` | Host -> Target(s) | Navigate user to host's cursor |
-| `join-request/response` | Guest <-> Host | Approval flow |
+| `join-request` / `join-response` | Guest <-> Host | Approval flow |
 | `kick` / `kicked` | Host -> Server -> Guest | Remove participant |
-| `set-permission` / `permission-update` | Host -> Server -> Guest | Permission changes |
+| `set-permission` / `permission-update` | Host -> Server -> Guest | Global permission changes |
+| `set-file-permission` / `file-permission-update` | Host -> Server -> Guest | Per-file permission changes |
 | `session-end` | Host -> All | Session ended |
 | `sync-request` | Guest -> Host | Request file resync |
-| `present-start/stop` | Host -> All | Presentation mode |
-| `host-transfer-*` | Various | Host role transfer flow |
+| `present-start` / `present-stop` | Host -> All | Presentation mode toggle |
+| `host-transfer-offer` | Host -> Target | Offer host role |
+| `host-transfer-accept` / `host-transfer-decline` | Target -> Host | Accept/decline host transfer |
 | `host-changed` | Server -> All | New host notification |
-| `set-file-permission` / `file-permission-update` | Host -> Server -> Guest | Per-file permission |
+| `host-disconnected` | Server -> All | Host disconnected notification |
 | `ping` / `pong` | Client <-> Server | Latency measurement |

@@ -39,6 +39,7 @@ When enabled, all WebSocket connections require a valid JWT (7-day expiry). The 
 | Summon, kick, session-end from non-host | Dropped |
 | Per-file permission overrides | Checked before relaying file-ops |
 | Host transfer | Validated against pending offer |
+| Kicked user rejoin | Forced through host approval flow |
 
 ## Defenses
 
@@ -56,6 +57,8 @@ When enabled, all WebSocket connections require a valid JWT (7-day expiry). The 
 | CSS injection prevention | Explorer indicator CSS escapes special characters |
 | Offline queue coalescing | Renames update paths of previously queued ops |
 | File deletion safety | Uses Obsidian's trash (recoverable) |
+| Kick protection | Kicked users cannot bypass approval on rejoin |
+| Cross-platform path safety | Canonical paths on wire, local-only filesystem transformations |
 
 ## Threat Model
 
@@ -69,11 +72,13 @@ When enabled, all WebSocket connections require a valid JWT (7-day expiry). The 
 | Unauthorized edits | Server-side read-only enforcement |
 | Guest impersonating host | Server determines host via JWT or first-connected |
 | Unauthorized host transfer | Server validates pending offer |
+| Kicked user rejoining | Server forces approval flow regardless of room settings |
+| Windows filename attacks | Transparent fullwidth character mapping at filesystem boundary |
 
 ## Recommendations
 
 - Enable TLS (`wss://`) to encrypt all traffic
 - Self-host the server for full control
 - Enable GitHub OAuth for authenticated sessions
-- Use `.liveshare.json` to exclude sensitive files
+- Use file exclusion patterns in settings to exclude sensitive files
 - Share invite links through a secure channel
