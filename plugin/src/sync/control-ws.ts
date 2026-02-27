@@ -67,7 +67,7 @@ export class ControlChannel {
   private openWebSocket(): void {
     if (this.isDestroyed || !this.shouldConnect) return;
     const wsUrl = toWsUrl(this.settings.serverUrl);
-    let url = `${wsUrl}/control/${this.settings.roomId}?token=${encodeURIComponent(this.settings.token)}`;
+    let url = `${wsUrl}/control/${encodeURIComponent(this.settings.roomId)}?token=${encodeURIComponent(this.settings.token)}`;
     if (this.settings.jwt) url += `&jwt=${encodeURIComponent(this.settings.jwt)}`;
     if (this.settings.serverPassword)
       url += `&password=${encodeURIComponent(this.settings.serverPassword)}`;

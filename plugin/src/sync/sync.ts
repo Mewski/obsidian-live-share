@@ -215,7 +215,7 @@ export class SyncManager {
     const userId = this.settings.githubUserId || this.settings.clientId;
     if (userId) params.set("userId", userId);
 
-    const url = `${wsUrl}/ws-mux/${this.settings.roomId}?${params.toString()}`;
+    const url = `${wsUrl}/ws-mux/${encodeURIComponent(this.settings.roomId)}?${params.toString()}`;
     const ws = new WebSocket(url);
     ws.binaryType = "arraybuffer";
     this.ws = ws;
