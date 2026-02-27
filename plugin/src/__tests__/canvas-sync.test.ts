@@ -53,7 +53,6 @@ function createMockFileOps() {
   };
 }
 
-// We need to import after setting up the vault mock
 const { CanvasSync } = await import("../files/canvas-sync");
 
 describe("CanvasSync", () => {
@@ -105,7 +104,6 @@ describe("CanvasSync", () => {
   });
 
   it("subscribe as guest writes Y.Map content to disk when data exists", async () => {
-    // Pre-populate the Y.Map
     const docHandle = syncManager.getDoc("__canvas__:test.canvas");
     const nodesMap = docHandle.doc.getMap<Y.Map<unknown>>("nodes");
     const node = new Y.Map<unknown>();
@@ -116,7 +114,6 @@ describe("CanvasSync", () => {
 
     await canvasSync.subscribe("test.canvas", "guest");
 
-    // Should have written to disk
     expect(vault.adapter.write).toHaveBeenCalled();
     const writtenContent = vault.adapter.write.mock.calls[0][1] as string;
     const parsed = JSON.parse(writtenContent);
@@ -144,7 +141,6 @@ describe("CanvasSync", () => {
     vault._files.set("test.canvas", '{"nodes":[],"edges":[]}');
     await canvasSync.subscribe("test.canvas", "host");
 
-    // Simulate local modification
     vault._files.set(
       "test.canvas",
       JSON.stringify({
@@ -195,7 +191,6 @@ describe("CanvasSync", () => {
     const docHandle = syncManager.getDoc("__canvas__:test.canvas");
     const nodesMap = docHandle.doc.getMap<Y.Map<unknown>>("nodes");
 
-    // Simulate two concurrent updates
     docHandle.doc.transact(() => {
       const n1 = nodesMap.get("n1")!;
       n1.set("x", 50);
@@ -206,7 +201,6 @@ describe("CanvasSync", () => {
       n2.set("y", 200);
     });
 
-    // Both changes should be present
     const n1 = nodesMap.get("n1") as Y.Map<unknown>;
     const n2 = nodesMap.get("n2") as Y.Map<unknown>;
     expect(n1.get("x")).toBe(50);

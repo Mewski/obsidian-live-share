@@ -938,7 +938,6 @@ describe("Control WebSocket handler", () => {
       userId: "guest-1",
     });
 
-    // Wait for guest to receive join-response + offer
     await delay(300);
     guest.messages.length = 0;
     host.messages.length = 0;
@@ -1172,7 +1171,7 @@ describe("Control WebSocket handler", () => {
     expect(approval.approved).toBe(true);
   });
 
-  it("kicked user approval is one-time — second rejoin auto-approves", async () => {
+  it("kicked user approval is one-time - second rejoin auto-approves", async () => {
     const room = await createRoom("ctrl-kick-onetime");
 
     const host = await connectControl(room.id, room.token);

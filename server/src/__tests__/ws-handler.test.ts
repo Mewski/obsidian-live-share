@@ -243,7 +243,6 @@ describe("Mux WebSocket relay", () => {
     await new Promise((r) => setTimeout(r, 100));
     const msgCountBefore = clientB.messages.length;
 
-    // Client A sends a sync message
     const docA = new Y.Doc();
     docA.getText("content").insert(0, "hello from A");
     const update = Y.encodeStateAsUpdate(docA);
@@ -251,11 +250,9 @@ describe("Mux WebSocket relay", () => {
 
     await waitForMessages(clientB.messages, msgCountBefore + 1);
 
-    // Client B should receive the relayed sync message
     const syncMsgs = findMessages(clientB.messages, docId, MUX_SYNC);
     expect(syncMsgs.length).toBeGreaterThan(0);
 
-    // Apply to client B's doc
     const docB = new Y.Doc();
     for (const msg of syncMsgs) {
       const decoder = decoding.createDecoder(msg.payload);
@@ -284,7 +281,6 @@ describe("Mux WebSocket relay", () => {
     sendUpdate(client.ws, docId, Y.encodeStateAsUpdate(doc));
 
     await new Promise((r) => setTimeout(r, 300));
-    // Only SUBSCRIBED should be in messages, no echo
     expect(client.messages.length).toBe(msgCountBefore);
 
     doc.destroy();
@@ -305,7 +301,6 @@ describe("Mux WebSocket relay", () => {
     await new Promise((r) => setTimeout(r, 100));
     const msgCountBefore = clientB.messages.length;
 
-    // Send awareness from A
     const awarenessPayload = new Uint8Array([1, 2, 3, 4]);
     clientA.ws.send(encodeMuxMessage(docId, MUX_AWARENESS, awarenessPayload));
 
@@ -331,17 +326,14 @@ describe("Mux WebSocket relay", () => {
     subscribe(clientB.ws, docId);
     await waitForMessages(clientB.messages, 1);
 
-    // Wait for SYNC_REQUEST to arrive at clientA and settle
     await new Promise((r) => setTimeout(r, 200));
     const msgCountBefore = clientA.messages.length;
 
-    // Read-only client tries to send an update (SyncStep2/Update)
     const roDoc = new Y.Doc();
     roDoc.getText("content").insert(0, "read-only attempt");
     sendUpdate(clientB.ws, docId, Y.encodeStateAsUpdate(roDoc));
 
     await new Promise((r) => setTimeout(r, 500));
-    // Host should NOT receive the update
     expect(clientA.messages.length).toBe(msgCountBefore);
 
     roDoc.destroy();
@@ -361,16 +353,13 @@ describe("Mux WebSocket relay", () => {
     subscribe(clientB.ws, docId);
     await waitForMessages(clientB.messages, 1);
 
-    // Wait for SYNC_REQUEST to settle
     await new Promise((r) => setTimeout(r, 200));
     const msgCountBefore = clientA.messages.length;
 
-    // Read-only sends SyncStep1 — this should be allowed (it's a read request)
     const roDoc = new Y.Doc();
     sendSyncStep1(clientB.ws, docId, roDoc);
 
     await new Promise((r) => setTimeout(r, 300));
-    // Host should receive the SyncStep1
     expect(clientA.messages.length).toBeGreaterThan(msgCountBefore);
 
     roDoc.destroy();
@@ -393,7 +382,6 @@ describe("Mux WebSocket relay", () => {
 
     await new Promise((r) => setTimeout(r, 200));
 
-    // Verify read-write works
     const rwDoc = new Y.Doc();
     rwDoc.getText("content").insert(0, "rw-allowed");
     const msgCountBefore = clientA.messages.length;
@@ -401,7 +389,6 @@ describe("Mux WebSocket relay", () => {
     await new Promise((r) => setTimeout(r, 500));
     expect(clientA.messages.length).toBeGreaterThan(msgCountBefore);
 
-    // Change permission to read-only via control channel
     setPermission(room.id, userId, "read-only");
 
     const ctrlHost = await new Promise<WebSocket>((resolve, reject) => {
@@ -433,7 +420,6 @@ describe("Mux WebSocket relay", () => {
     );
     await new Promise((r) => setTimeout(r, 200));
 
-    // Now read-only update should be blocked
     const roDoc = new Y.Doc();
     roDoc.getText("content").insert(0, "should-be-blocked");
     const msgCountAfter = clientA.messages.length;

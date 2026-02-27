@@ -553,7 +553,7 @@ export default class LiveSharePlugin extends Plugin {
       } else if (controlState === "auth-required") {
         this.fileOpsManager.setOnline(false);
         this.connectionState.transition({ type: "auth-expired" });
-        new Notice("Live Share: authentication required — sign in via settings");
+        new Notice("Live Share: authentication required - sign in via settings");
         this.endSession();
       } else {
         this.fileOpsManager.setOnline(false);

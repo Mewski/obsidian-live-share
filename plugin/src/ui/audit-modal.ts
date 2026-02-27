@@ -34,7 +34,7 @@ export class AuditLogModal extends Modal {
       const name = entry.displayName || entry.userId;
       const detail = entry.details ? ` (${entry.details})` : "";
       item.createEl("span", {
-        text: `${time} — ${entry.event}: ${name}${detail}`,
+        text: `${time} - ${entry.event}: ${name}${detail}`,
       });
     }
   }
