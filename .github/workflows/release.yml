@@ -39,8 +39,13 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           tag="${GITHUB_REF#refs/tags/}"
+          prerelease=""
+          if echo "$tag" | grep -q "beta"; then
+            prerelease="--prerelease"
+          fi
           gh release create "$tag" \
             --title="$tag" \
             --generate-notes \
+            $prerelease \
             --repo="$GITHUB_REPOSITORY" \
             main.js manifest.json styles.css live-share.zip
