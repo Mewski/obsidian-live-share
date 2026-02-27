@@ -63,12 +63,18 @@ export function createLevelPersistence(dbPath = "./data/yjs-docs"): Persistence 
 }
 
 export const noopPersistence: Persistence = {
-  async loadRooms() {
-    return [];
+  loadRooms() {
+    return Promise.resolve([]);
   },
-  async saveRoom() {},
-  async deleteRoom() {},
-  async close() {},
+  saveRoom() {
+    return Promise.resolve();
+  },
+  deleteRoom() {
+    return Promise.resolve();
+  },
+  close() {
+    return Promise.resolve();
+  },
 };
 
 let defaultPersistence: Persistence | null = null;

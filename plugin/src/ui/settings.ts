@@ -135,9 +135,8 @@ export class LiveShareSettingTab extends PluginSettingTab {
             button
               .setButtonText("End session")
               .setWarning()
-              .onClick(async () => {
-                await this.plugin.endSession();
-                this.display();
+              .onClick(() => {
+                void this.plugin.endSession().then(() => this.display());
               }),
           );
         } else {
@@ -145,9 +144,8 @@ export class LiveShareSettingTab extends PluginSettingTab {
             button
               .setButtonText("Leave session")
               .setWarning()
-              .onClick(async () => {
-                await this.plugin.endSession();
-                this.display();
+              .onClick(() => {
+                void this.plugin.endSession().then(() => this.display());
               }),
           );
         }

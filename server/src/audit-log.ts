@@ -38,7 +38,9 @@ export async function getLogs(roomId: string, limit = 100): Promise<AuditEntry[]
     })) {
       try {
         entries.push(JSON.parse((value as unknown as Buffer).toString("utf-8")));
-      } catch {}
+      } catch {
+        // Skip malformed entries
+      }
     }
   } catch (err) {
     console.error("[audit] failed to read logs:", err);

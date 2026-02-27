@@ -99,7 +99,9 @@ export function createControlWSS(options?: ControlWSSOptions) {
   function safeSend(ws: WebSocket, data: string) {
     try {
       if (ws.readyState === WebSocket.OPEN) ws.send(data);
-    } catch {}
+    } catch {
+      // Send may fail if socket is closing
+    }
   }
 
   function broadcast(room: ControlRoom, data: Buffer | string, exclude?: WebSocket) {

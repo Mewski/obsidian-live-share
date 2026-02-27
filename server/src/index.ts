@@ -168,7 +168,7 @@ export function createApp(
   );
 
   async function shutdown() {
-    console.info("[server] shutting down gracefully...");
+    console.debug("[server] shutting down gracefully...");
     clearInterval(reaperInterval);
     control.closeAll();
     yjs.closeAll();
@@ -214,7 +214,7 @@ if (isMain) {
         process.exit(1);
       }
       server.listen(port, () => {
-        console.info(`[server] listening on :${port}`);
+        console.debug(`[server] listening on :${port}`);
       });
 
       let isShuttingDown = false;

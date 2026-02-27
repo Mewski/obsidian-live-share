@@ -31,7 +31,7 @@ async function hashBuffer(buf: ArrayBuffer): Promise<string> {
 }
 
 function hashContent(content: string): Promise<string> {
-  return hashBuffer(new TextEncoder().encode(content).buffer as ArrayBuffer);
+  return hashBuffer(new TextEncoder().encode(content).buffer);
 }
 
 export class ManifestManager {

@@ -144,7 +144,9 @@ export function createAuthRouter(): Router {
         ) {
           safeAvatar = avatarUrl.href.replace(/&/g, "&amp;").replace(/"/g, "&quot;");
         }
-      } catch {}
+      } catch {
+        // Invalid avatar URL, skip
+      }
       res.send(`<!DOCTYPE html>
 <html><head>
 <meta charset="utf-8">

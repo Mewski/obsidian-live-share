@@ -53,7 +53,9 @@ export function createYjsWSS() {
   function safeSend(ws: WebSocket, data: Uint8Array | string) {
     try {
       if (ws.readyState === WebSocket.OPEN) ws.send(data);
-    } catch {}
+    } catch {
+      // Send may fail if socket is closing
+    }
   }
 
   function getOrCreateRoom(roomId: string): RoomState {
