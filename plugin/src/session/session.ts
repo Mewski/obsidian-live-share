@@ -35,6 +35,7 @@ export class SessionManager {
         body: JSON.stringify({
           hostUserId: settings.githubUserId || settings.clientId,
           requireApproval: settings.requireApproval,
+          readOnlyPatterns: settings.readOnlyPatterns,
         }),
       });
     } catch {

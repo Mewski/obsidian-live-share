@@ -20,10 +20,9 @@
     "jsonwebtoken": "^9.0.3",
     "level": "^8.0.1",
     "lib0": "^0.2.97",
+    "minimatch": "^10.2.4",
     "nanoid": "^5.0.0",
-    "ws": "^8.18.0",
-    "y-protocols": "^1.0.6",
-    "yjs": "^13.6.0"
+    "ws": "^8.18.0"
   },
   "devDependencies": {
     "@biomejs/biome": "^1.9.0",
@@ -33,6 +32,8 @@
     "@types/ws": "^8.5.0",
     "tsx": "^4.0.0",
     "typescript": "^5.5.0",
-    "vitest": "^4.0.18"
+    "vitest": "^4.0.18",
+    "y-protocols": "^1.0.6",
+    "yjs": "^13.6.0"
   }
 }

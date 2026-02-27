@@ -58,6 +58,7 @@ function createSettings(overrides?: Partial<LiveShareSettings>): LiveShareSettin
     debugLogPath: "live-share-debug.md",
     autoReconnect: true,
     excludePatterns: [],
+    readOnlyPatterns: [],
     approvalTimeoutSeconds: 60,
     ...overrides,
   };

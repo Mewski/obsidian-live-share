@@ -1,11 +1,17 @@
 import { MarkdownView, Notice, TFile } from "obsidian";
+import { minimatch } from "minimatch";
 
 import type LiveSharePlugin from "../main";
 import type { ControlMessage, FileOp } from "../types";
 import { ApprovalModal } from "../ui/approval-modal";
 import { showFocusNotification } from "../ui/focus-notification";
 import { ConfirmModal } from "../ui/modals";
-import { isTextFile, normalizePath, toLocalPath } from "../utils";
+import {
+  isTextFile,
+  normalizePath,
+  toCanonicalPath,
+  toLocalPath,
+} from "../utils";
 
 const CHUNK_TO_CONTROL = {
   "chunk-start": "file-chunk-start",
@@ -15,7 +21,10 @@ const CHUNK_TO_CONTROL = {
 } as const;
 
 const CONTROL_TO_CHUNK = Object.fromEntries(
-  Object.entries(CHUNK_TO_CONTROL).map(([chunkType, controlType]) => [controlType, chunkType]),
+  Object.entries(CHUNK_TO_CONTROL).map(([chunkType, controlType]) => [
+    controlType,
+    chunkType,
+  ]),
 ) as Record<
   (typeof CHUNK_TO_CONTROL)[keyof typeof CHUNK_TO_CONTROL],
   keyof typeof CHUNK_TO_CONTROL
@@ -26,7 +35,11 @@ export function registerControlHandlers(plugin: LiveSharePlugin): void {
   if (!channel) return;
 
   plugin.fileOpsManager.setSender((op) => {
-    if (op.type === "chunk-start" || op.type === "chunk-data" || op.type === "chunk-end") {
+    if (
+      op.type === "chunk-start" ||
+      op.type === "chunk-data" ||
+      op.type === "chunk-end"
+    ) {
       channel.send({
         ...op,
         type: CHUNK_TO_CONTROL[op.type],
@@ -46,16 +59,20 @@ export function registerControlHandlers(plugin: LiveSharePlugin): void {
     if (paths.length === 0) return;
     const isRename = op.type === "rename";
     if (isRename) {
-      if (!paths.some((path) => plugin.manifestManager.isSharedPath(path))) return;
+      if (!paths.some((path) => plugin.manifestManager.isSharedPath(path)))
+        return;
     } else {
-      if (paths.some((path) => !plugin.manifestManager.isSharedPath(path))) return;
+      if (paths.some((path) => !plugin.manifestManager.isSharedPath(path)))
+        return;
     }
     plugin.fileOpsManager
       .applyRemoteOp(op)
       .then(async () => {
         if (plugin.settings.role !== "host") return;
         if (op.type === "create" && "path" in op) {
-          const file = plugin.app.vault.getAbstractFileByPath(toLocalPath(op.path));
+          const file = plugin.app.vault.getAbstractFileByPath(
+            toLocalPath(op.path),
+          );
           if (file instanceof TFile) {
             const content = isTextFile(file.path)
               ? await plugin.app.vault.read(file)
@@ -65,8 +82,14 @@ export function registerControlHandlers(plugin: LiveSharePlugin): void {
               await plugin.backgroundSync.onFileAdded(file.path);
             }
           }
-        } else if (op.type === "modify" && "path" in op && !isTextFile(op.path)) {
-          const file = plugin.app.vault.getAbstractFileByPath(toLocalPath(op.path));
+        } else if (
+          op.type === "modify" &&
+          "path" in op &&
+          !isTextFile(op.path)
+        ) {
+          const file = plugin.app.vault.getAbstractFileByPath(
+            toLocalPath(op.path),
+          );
           if (file instanceof TFile) {
             const content = await plugin.app.vault.readBinary(file);
             await plugin.manifestManager.updateFile(file, content);
@@ -80,9 +103,16 @@ export function registerControlHandlers(plugin: LiveSharePlugin): void {
             newPath: string;
           };
           if (isTextFile(renameOp.newPath)) {
-            await plugin.backgroundSync.onFileRenamed(renameOp.oldPath, renameOp.newPath);
+            await plugin.backgroundSync.onFileRenamed(
+              renameOp.oldPath,
+              renameOp.newPath,
+            );
           }
-          plugin.manifestManager.renameFile(renameOp.oldPath, renameOp.newPath, plugin.syncManager);
+          plugin.manifestManager.renameFile(
+            renameOp.oldPath,
+            renameOp.newPath,
+            plugin.syncManager,
+          );
         }
       })
       .catch((err) => {
@@ -104,7 +134,11 @@ export function registerControlHandlers(plugin: LiveSharePlugin): void {
           type: CONTROL_TO_CHUNK[chunkType],
         } as FileOp)
         .catch((err) => {
-          plugin.logger.error("file-op", `failed to apply remote ${chunkType}`, err);
+          plugin.logger.error(
+            "file-op",
+            `failed to apply remote ${chunkType}`,
+            err,
+          );
         });
     });
   }
@@ -148,6 +182,14 @@ export function registerControlHandlers(plugin: LiveSharePlugin): void {
     if (msg.permission) {
       plugin.settings.permission = msg.permission;
     }
+    if (msg.readOnlyPatterns) {
+      plugin.remoteReadOnlyPatterns = msg.readOnlyPatterns;
+      const readOnlyPaths = plugin.app.vault
+        .getFiles()
+        .map((f) => toCanonicalPath(normalizePath(f.path)))
+        .filter((p) => msg.readOnlyPatterns!.some((pat) => minimatch(p, pat)));
+      plugin.explorerIndicators?.update(readOnlyPaths);
+    }
     plugin.fileOpsManager.setOnline(true);
     plugin.presenceManager?.broadcastPresence();
   });
@@ -155,7 +197,9 @@ export function registerControlHandlers(plugin: LiveSharePlugin): void {
   channel.on("permission-update", async (msg) => {
     plugin.settings.permission = msg.permission;
     plugin.onActiveFileChange();
-    plugin.notify(`Live Share: your permission was changed to ${msg.permission}`);
+    plugin.notify(
+      `Live Share: your permission was changed to ${msg.permission}`,
+    );
   });
 
   channel.on("focus-request", (msg) => {
@@ -163,7 +207,9 @@ export function registerControlHandlers(plugin: LiveSharePlugin): void {
   });
 
   channel.on("summon", async (msg) => {
-    const file = plugin.app.vault.getAbstractFileByPath(toLocalPath(msg.filePath));
+    const file = plugin.app.vault.getAbstractFileByPath(
+      toLocalPath(msg.filePath),
+    );
     if (file instanceof TFile) {
       await plugin.app.workspace.getLeaf().openFile(file);
       const view = plugin.app.workspace.getActiveViewOfType(MarkdownView);
@@ -194,7 +240,9 @@ export function registerControlHandlers(plugin: LiveSharePlugin): void {
   channel.on("sync-request", async (msg) => {
     if (plugin.settings.role !== "host") return;
     if (msg.path && plugin.manifestManager.isSharedPath(msg.path)) {
-      const file = plugin.app.vault.getAbstractFileByPath(toLocalPath(msg.path));
+      const file = plugin.app.vault.getAbstractFileByPath(
+        toLocalPath(msg.path),
+      );
       if (file instanceof TFile) {
         plugin.fileOpsManager.onFileCreate(file);
       }
@@ -235,6 +283,7 @@ export function registerControlHandlers(plugin: LiveSharePlugin): void {
     plugin.settings.role = "host";
     plugin.settings.permission = "read-write";
     await plugin.saveSettings();
+    await plugin.backgroundSync.startAll("host");
     await plugin.manifestManager.publishManifest({ purge: false });
     plugin.presenceManager?.broadcastPresence();
     plugin.updateStatusBar();
@@ -244,7 +293,9 @@ export function registerControlHandlers(plugin: LiveSharePlugin): void {
   });
 
   channel.on("host-transfer-decline", (msg) => {
-    plugin.notify(`Live Share: ${msg.displayName ?? msg.userId} declined host transfer`);
+    plugin.notify(
+      `Live Share: ${msg.displayName ?? msg.userId} declined host transfer`,
+    );
   });
 
   channel.on("host-disconnected", () => {
@@ -259,6 +310,7 @@ export function registerControlHandlers(plugin: LiveSharePlugin): void {
         plugin.presenceManager.togglePresent();
       }
       await plugin.saveSettings();
+      await plugin.backgroundSync.startAll("guest");
     }
     for (const [userId, user] of plugin.remoteUsers) {
       user.isHost = userId === msg.userId;
@@ -269,13 +321,5 @@ export function registerControlHandlers(plugin: LiveSharePlugin): void {
     plugin.refreshPresenceView();
     plugin.notify(`Live Share: ${msg.displayName} is now the host`);
     plugin.logger.log("session", `host changed to ${msg.userId}`);
-  });
-
-  channel.on("file-permission-update", (msg) => {
-    const filePath = normalizePath(msg.filePath);
-    plugin.filePermissions.set(filePath, msg.permission);
-    plugin.explorerIndicators?.update(plugin.filePermissions);
-    plugin.onActiveFileChange();
-    plugin.notify(`Live Share: ${filePath} set to ${msg.permission}`);
   });
 }

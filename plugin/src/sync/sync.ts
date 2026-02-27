@@ -38,10 +38,16 @@ export class SyncManager {
   private awarenessMap = new Map<string, awarenessProtocol.Awareness>();
   private synced = new Map<string, boolean>();
   private syncListeners = new Map<string, Set<SyncListener>>();
-  private updateHandlers = new Map<string, (update: Uint8Array, origin: unknown) => void>();
+  private updateHandlers = new Map<
+    string,
+    (update: Uint8Array, origin: unknown) => void
+  >();
   private awarenessHandlers = new Map<
     string,
-    (changes: { added: number[]; updated: number[]; removed: number[] }, origin: unknown) => void
+    (
+      changes: { added: number[]; updated: number[]; removed: number[] },
+      origin: unknown,
+    ) => void
   >();
   private settings: LiveShareSettings;
   private isConnected = false;
@@ -130,9 +136,15 @@ export class SyncManager {
       origin: unknown,
     ) => {
       if (origin === "remote") return;
-      const changedClients = changes.added.concat(changes.updated, changes.removed);
+      const changedClients = changes.added.concat(
+        changes.updated,
+        changes.removed,
+      );
       if (changedClients.length === 0) return;
-      const awarenessUpdate = awarenessProtocol.encodeAwarenessUpdate(awareness, changedClients);
+      const awarenessUpdate = awarenessProtocol.encodeAwarenessUpdate(
+        awareness,
+        changedClients,
+      );
       this.sendMux(filePath, MUX_AWARENESS, awarenessUpdate);
     };
     awareness.on("update", awarenessHandler);
@@ -153,7 +165,11 @@ export class SyncManager {
     const awarenessHandler = this.awarenessHandlers.get(filePath);
     if (awareness && awarenessHandler) {
       awareness.off("update", awarenessHandler);
-      awarenessProtocol.removeAwarenessStates(awareness, [awareness.doc.clientID], null);
+      awarenessProtocol.removeAwarenessStates(
+        awareness,
+        [awareness.doc.clientID],
+        null,
+      );
       awareness.destroy();
     }
     this.awarenessMap.delete(filePath);
@@ -211,7 +227,8 @@ export class SyncManager {
     const wsUrl = toWsUrl(this.settings.serverUrl);
     const params = new URLSearchParams({ token: this.settings.token });
     if (this.settings.jwt) params.set("jwt", this.settings.jwt);
-    if (this.settings.serverPassword) params.set("password", this.settings.serverPassword);
+    if (this.settings.serverPassword)
+      params.set("password", this.settings.serverPassword);
     const userId = this.settings.githubUserId || this.settings.clientId;
     if (userId) params.set("userId", userId);
 
@@ -255,7 +272,10 @@ export class SyncManager {
       this.shouldConnect = false;
       return;
     }
-    const delay = Math.min(RECONNECT_BASE_MS * 2 ** this.reconnectAttempts, RECONNECT_MAX_MS);
+    const delay = Math.min(
+      RECONNECT_BASE_MS * 2 ** this.reconnectAttempts,
+      RECONNECT_MAX_MS,
+    );
     this.reconnectAttempts++;
     this.reconnectTimer = setTimeout(() => {
       this.reconnectTimer = null;
@@ -343,7 +363,10 @@ export class SyncManager {
     awarenessProtocol.applyAwarenessUpdate(awareness, payload, "remote");
   }
 
-  private async handleSyncEncrypted(docId: string, payload: Uint8Array): Promise<void> {
+  private async handleSyncEncrypted(
+    docId: string,
+    payload: Uint8Array,
+  ): Promise<void> {
     if (!this.e2e?.enabled || payload.length <= 1) {
       this.handleSync(docId, payload);
       return;
@@ -358,7 +381,10 @@ export class SyncManager {
     } catch {}
   }
 
-  private async handleAwarenessEncrypted(docId: string, payload: Uint8Array): Promise<void> {
+  private async handleAwarenessEncrypted(
+    docId: string,
+    payload: Uint8Array,
+  ): Promise<void> {
     if (!this.e2e?.enabled) {
       this.handleAwareness(docId, payload);
       return;
@@ -391,9 +417,13 @@ export class SyncManager {
     }
 
     if (msgType === MUX_SYNC) {
-      this.sendQueue = this.sendQueue.then(() => this.sendEncryptedSync(docId, payload));
+      this.sendQueue = this.sendQueue.then(() =>
+        this.sendEncryptedSync(docId, payload),
+      );
     } else if (msgType === MUX_AWARENESS) {
-      this.sendQueue = this.sendQueue.then(() => this.sendEncryptedAwareness(docId, payload));
+      this.sendQueue = this.sendQueue.then(() =>
+        this.sendEncryptedAwareness(docId, payload),
+      );
     } else {
       if (this.ws?.readyState === WebSocket.OPEN) {
         this.ws.send(encodeMuxMessage(docId, msgType, payload));
@@ -401,7 +431,10 @@ export class SyncManager {
     }
   }
 
-  private async sendEncryptedSync(docId: string, payload: Uint8Array): Promise<void> {
+  private async sendEncryptedSync(
+    docId: string,
+    payload: Uint8Array,
+  ): Promise<void> {
     if (!this.e2e || this.ws?.readyState !== WebSocket.OPEN) return;
     try {
       const syncType = payload[0];
@@ -414,23 +447,24 @@ export class SyncManager {
         this.ws.send(encodeMuxMessage(docId, MUX_SYNC_ENCRYPTED, result));
       }
     } catch {
-      if (this.ws?.readyState === WebSocket.OPEN) {
-        this.ws.send(encodeMuxMessage(docId, MUX_SYNC, payload));
-      }
+      // Do not fall back to unencrypted — drop the message to preserve E2E guarantee
     }
   }
 
-  private async sendEncryptedAwareness(docId: string, payload: Uint8Array): Promise<void> {
+  private async sendEncryptedAwareness(
+    docId: string,
+    payload: Uint8Array,
+  ): Promise<void> {
     if (!this.e2e || this.ws?.readyState !== WebSocket.OPEN) return;
     try {
       const encrypted = await this.e2e.encrypt(payload);
       if (this.ws?.readyState === WebSocket.OPEN) {
-        this.ws.send(encodeMuxMessage(docId, MUX_AWARENESS_ENCRYPTED, encrypted));
+        this.ws.send(
+          encodeMuxMessage(docId, MUX_AWARENESS_ENCRYPTED, encrypted),
+        );
       }
     } catch {
-      if (this.ws?.readyState === WebSocket.OPEN) {
-        this.ws.send(encodeMuxMessage(docId, MUX_AWARENESS, payload));
-      }
+      // Do not fall back to unencrypted — drop the message to preserve E2E guarantee
     }
   }
 

@@ -23,6 +23,7 @@ export interface LiveShareSettings {
   debugLogPath: string;
   autoReconnect: boolean;
   excludePatterns: string[];
+  readOnlyPatterns: string[];
   approvalTimeoutSeconds: number;
 }
 
@@ -47,6 +48,7 @@ export const DEFAULT_SETTINGS: LiveShareSettings = {
   debugLogPath: "live-share-debug.md",
   autoReconnect: true,
   excludePatterns: [],
+  readOnlyPatterns: [],
   approvalTimeoutSeconds: 60,
 };
 
@@ -185,6 +187,7 @@ export interface JoinResponseMessage {
   userId?: string;
   approved: boolean;
   permission?: Permission;
+  readOnlyPatterns?: string[];
 }
 
 export interface KickMessage {
@@ -255,19 +258,6 @@ export interface PongMessage {
   timestamp?: number;
 }
 
-export interface SetFilePermissionMessage {
-  type: "set-file-permission";
-  userId: string;
-  filePath: string;
-  permission: Permission;
-}
-
-export interface FilePermissionUpdateMessage {
-  type: "file-permission-update";
-  filePath: string;
-  permission: Permission;
-}
-
 export interface HostTransferOfferMessage {
   type: "host-transfer-offer";
   userId: string;
@@ -323,8 +313,6 @@ export type ControlMessage =
   | SessionEndMessage
   | PingMessage
   | PongMessage
-  | SetFilePermissionMessage
-  | FilePermissionUpdateMessage
   | HostTransferOfferMessage
   | HostTransferAcceptMessage
   | HostTransferDeclineMessage
@@ -362,6 +350,4 @@ export interface ControlMessageMap {
   "host-transfer-complete": HostTransferCompleteMessage;
   "host-disconnected": HostDisconnectedMessage;
   "host-changed": HostChangedMessage;
-  "set-file-permission": SetFilePermissionMessage;
-  "file-permission-update": FilePermissionUpdateMessage;
 }

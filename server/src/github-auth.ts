@@ -24,13 +24,13 @@ const JWT_SECRET = process.env.JWT_SECRET || "change-me-in-production";
 if (!process.env.JWT_SECRET) {
   if (process.env.REQUIRE_GITHUB_AUTH === "true") {
     console.error(
-      "[config] REQUIRE_GITHUB_AUTH is true but JWT_SECRET is not set. " +
+      "[auth] REQUIRE_GITHUB_AUTH is true but JWT_SECRET is not set. " +
         "Set JWT_SECRET to a strong random value",
     );
     process.exit(1);
   } else {
     console.warn(
-      "[config] JWT_SECRET is not set, using insecure default. " +
+      "[auth] JWT_SECRET is not set, using insecure default. " +
         "Set JWT_SECRET to a strong random value in production",
     );
   }
@@ -67,18 +67,21 @@ export function createAuthRouter(): Router {
 
       let tokenResponse: Response;
       try {
-        tokenResponse = await fetch("https://github.com/login/oauth/access_token", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Accept: "application/json",
+        tokenResponse = await fetch(
+          "https://github.com/login/oauth/access_token",
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Accept: "application/json",
+            },
+            body: JSON.stringify({
+              client_id: GITHUB_CLIENT_ID,
+              client_secret: GITHUB_CLIENT_SECRET,
+              code,
+            }),
           },
-          body: JSON.stringify({
-            client_id: GITHUB_CLIENT_ID,
-            client_secret: GITHUB_CLIENT_SECRET,
-            code,
-          }),
-        });
+        );
       } catch {
         res.status(502).send("Failed to contact GitHub");
         return;
@@ -142,7 +145,9 @@ export function createAuthRouter(): Router {
           avatarUrl.protocol === "https:" &&
           avatarUrl.hostname.endsWith("githubusercontent.com")
         ) {
-          safeAvatar = avatarUrl.href.replace(/&/g, "&amp;").replace(/"/g, "&quot;");
+          safeAvatar = avatarUrl.href
+            .replace(/&/g, "&amp;")
+            .replace(/"/g, "&quot;");
         }
       } catch {}
       res.send(`<!DOCTYPE html>

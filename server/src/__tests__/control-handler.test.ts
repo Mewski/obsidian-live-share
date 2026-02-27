@@ -14,7 +14,9 @@ let server: Server<typeof IncomingMessage, typeof ServerResponse>;
 let port: number;
 let openSockets: WebSocket[] = [];
 
-function listen(s: Server<typeof IncomingMessage, typeof ServerResponse>): Promise<number> {
+function listen(
+  s: Server<typeof IncomingMessage, typeof ServerResponse>,
+): Promise<number> {
   return new Promise((resolve) => {
     s.listen(0, () => {
       const addr = s.address();
@@ -56,7 +58,11 @@ function connectControl(
   });
 }
 
-function waitForMessages(messages: string[], count: number, timeoutMs = 3000): Promise<void> {
+function waitForMessages(
+  messages: string[],
+  count: number,
+  timeoutMs = 3000,
+): Promise<void> {
   if (messages.length >= count) return Promise.resolve();
   return new Promise((resolve, reject) => {
     const start = Date.now();
@@ -87,7 +93,10 @@ beforeEach(async () => {
 
 afterEach(async () => {
   for (const ws of openSockets) {
-    if (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING) {
+    if (
+      ws.readyState === WebSocket.OPEN ||
+      ws.readyState === WebSocket.CONNECTING
+    ) {
       ws.close();
     }
   }
@@ -907,7 +916,9 @@ describe("Control WebSocket handler", () => {
     });
 
     await delay(300);
-    const offerMsg = host.messages.find((m) => JSON.parse(m).type === "host-transfer-offer");
+    const offerMsg = host.messages.find(
+      (m) => JSON.parse(m).type === "host-transfer-offer",
+    );
     expect(offerMsg).toBeUndefined();
   });
 
@@ -1033,82 +1044,6 @@ describe("Control WebSocket handler", () => {
     expect(hostDisconnected).toBeDefined();
   });
 
-  it("set-file-permission from host sends file-permission-update to target", async () => {
-    const room = await createRoom("ctrl-file-perm");
-
-    const host = await connectControl(room.id, room.token);
-    const guest = await connectControl(room.id, room.token);
-
-    await delay(100);
-
-    sendJSON(host.ws, {
-      type: "presence-update",
-      userId: "host-1",
-      displayName: "Host",
-      isHost: true,
-    });
-    sendJSON(guest.ws, {
-      type: "presence-update",
-      userId: "guest-1",
-      displayName: "Guest",
-    });
-
-    await delay(100);
-    guest.messages.length = 0;
-    host.messages.length = 0;
-
-    sendJSON(host.ws, {
-      type: "set-file-permission",
-      userId: "guest-1",
-      filePath: "secret.md",
-      permission: "read-only",
-    });
-
-    await waitForMessages(guest.messages, 1);
-    const permMsg = JSON.parse(guest.messages[0]);
-    expect(permMsg.type).toBe("file-permission-update");
-    expect(permMsg.filePath).toBe("secret.md");
-    expect(permMsg.permission).toBe("read-only");
-
-    await delay(200);
-    expect(host.messages.length).toBe(0);
-  });
-
-  it("non-host cannot send set-file-permission", async () => {
-    const room = await createRoom("ctrl-file-perm-nonhost");
-
-    const host = await connectControl(room.id, room.token);
-    const guest = await connectControl(room.id, room.token);
-
-    await delay(100);
-
-    sendJSON(host.ws, {
-      type: "presence-update",
-      userId: "host-1",
-      displayName: "Host",
-      isHost: true,
-    });
-    sendJSON(guest.ws, {
-      type: "presence-update",
-      userId: "guest-1",
-      displayName: "Guest",
-    });
-
-    await delay(100);
-    host.messages.length = 0;
-
-    sendJSON(guest.ws, {
-      type: "set-file-permission",
-      userId: "host-1",
-      filePath: "secret.md",
-      permission: "read-only",
-    });
-
-    await delay(300);
-    const permMsg = host.messages.find((m) => JSON.parse(m).type === "file-permission-update");
-    expect(permMsg).toBeUndefined();
-  });
-
   it("kicked user must be re-approved on rejoin (no requireApproval)", async () => {
     const room = await createRoom("ctrl-kick-rejoin");
 
@@ -1155,7 +1090,9 @@ describe("Control WebSocket handler", () => {
     expect(joinReq.userId).toBe("guest-1");
 
     await delay(200);
-    const earlyResponse = guest2.messages.find((m) => JSON.parse(m).type === "join-response");
+    const earlyResponse = guest2.messages.find(
+      (m) => JSON.parse(m).type === "join-response",
+    );
     expect(earlyResponse).toBeUndefined();
 
     sendJSON(host.ws, {
@@ -1239,7 +1176,110 @@ describe("Control WebSocket handler", () => {
     expect(autoApproval.approved).toBe(true);
 
     await delay(200);
-    const hostJoinReq = host.messages.find((m) => JSON.parse(m).type === "join-request");
+    const hostJoinReq = host.messages.find(
+      (m) => JSON.parse(m).type === "join-request",
+    );
     expect(hostJoinReq).toBeUndefined();
+  });
+
+  it("readOnlyPatterns blocks guest writes to matching files", async () => {
+    const res = await fetch(`http://localhost:${port}/rooms`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name: "ctrl-ro-patterns",
+        readOnlyPatterns: ["secret/**", "*.lock"],
+      }),
+    });
+    const room = (await res.json()) as RoomInfo;
+
+    const host = await connectControl(room.id, room.token);
+    await delay(50);
+    sendJSON(host.ws, {
+      type: "join-request",
+      userId: "host-1",
+      displayName: "Host",
+    });
+    await waitForMessages(host.messages, 1);
+
+    const guest = await connectControl(room.id, room.token);
+    await delay(50);
+    sendJSON(guest.ws, {
+      type: "join-request",
+      userId: "guest-1",
+      displayName: "Guest",
+    });
+    await waitForMessages(guest.messages, 1);
+    const joinResp = JSON.parse(guest.messages[0]);
+    expect(joinResp.approved).toBe(true);
+    expect(joinResp.readOnlyPatterns).toEqual(["secret/**", "*.lock"]);
+
+    host.messages.length = 0;
+
+    sendJSON(guest.ws, {
+      type: "file-op",
+      op: { type: "create", path: "secret/notes.md", content: "blocked" },
+    });
+    sendJSON(guest.ws, {
+      type: "file-op",
+      op: { type: "create", path: "data.lock", content: "blocked" },
+    });
+    await delay(300);
+    const guestFileOps = host.messages.filter(
+      (m) => JSON.parse(m).type === "file-op",
+    );
+    expect(guestFileOps.length).toBe(0);
+
+    sendJSON(guest.ws, {
+      type: "file-op",
+      op: { type: "create", path: "allowed.md", content: "ok" },
+    });
+    await waitForMessages(host.messages, 1);
+    const allowed = JSON.parse(host.messages[0]);
+    expect(allowed.type).toBe("file-op");
+  });
+
+  it("readOnlyPatterns does not block host writes", async () => {
+    const res = await fetch(`http://localhost:${port}/rooms`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name: "ctrl-ro-host",
+        readOnlyPatterns: ["secret/**"],
+      }),
+    });
+    const room = (await res.json()) as RoomInfo;
+
+    const host = await connectControl(room.id, room.token);
+    await delay(50);
+    sendJSON(host.ws, {
+      type: "join-request",
+      userId: "host-1",
+      displayName: "Host",
+    });
+    await waitForMessages(host.messages, 1);
+
+    const guest = await connectControl(room.id, room.token);
+    await delay(50);
+    sendJSON(guest.ws, {
+      type: "join-request",
+      userId: "guest-1",
+      displayName: "Guest",
+    });
+    await waitForMessages(guest.messages, 1);
+
+    guest.messages.length = 0;
+
+    sendJSON(host.ws, {
+      type: "file-op",
+      op: {
+        type: "create",
+        path: "secret/notes.md",
+        content: "host can write",
+      },
+    });
+    await waitForMessages(guest.messages, 1);
+    const fileOp = JSON.parse(guest.messages[0]);
+    expect(fileOp.type).toBe("file-op");
   });
 });

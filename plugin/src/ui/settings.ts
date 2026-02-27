@@ -306,5 +306,45 @@ export class LiveShareSettingTab extends PluginSettingTab {
         );
       });
     }
+
+    advanced.addSetting((setting) => {
+      setting
+        .setName("Read-only patterns")
+        .setDesc("Glob patterns for files that guests cannot edit.");
+      setting.addButton((button) =>
+        button
+          .setButtonText("Add pattern")
+          .setCta()
+          .onClick(async () => {
+            const value = await this.plugin.promptText(
+              "Glob pattern, e.g. journal/** or README.md",
+            );
+            if (value) {
+              const trimmed = value.trim();
+              if (trimmed && !settings.readOnlyPatterns.includes(trimmed)) {
+                settings.readOnlyPatterns.push(trimmed);
+                await this.plugin.saveSettings();
+                this.display();
+              }
+            }
+          }),
+      );
+    });
+
+    for (const pattern of settings.readOnlyPatterns) {
+      advanced.addSetting((setting) => {
+        setting.setName(pattern);
+        setting.addExtraButton((button) =>
+          button
+            .setIcon("cross")
+            .setTooltip("Remove this pattern")
+            .onClick(async () => {
+              settings.readOnlyPatterns = settings.readOnlyPatterns.filter((p) => p !== pattern);
+              await this.plugin.saveSettings();
+              this.display();
+            }),
+        );
+      });
+    }
   }
 }

@@ -9,6 +9,7 @@ export interface Room {
   lastActivityAt: number;
   hostUserId?: string;
   requireApproval?: boolean;
+  readOnlyPatterns?: string[];
   defaultPermission?: Permission;
 }
 

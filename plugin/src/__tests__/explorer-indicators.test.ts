@@ -1,5 +1,4 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { Permission } from "../types";
 
 interface MockStyleElement {
   id: string;
@@ -55,8 +54,7 @@ describe("ExplorerIndicators", () => {
 
   it("generates CSS for read-only files", () => {
     const indicators = new ExplorerIndicators();
-    const perms = new Map<string, Permission>([["secret.md", "read-only"]]);
-    indicators.update(perms);
+    indicators.update(["secret.md"]);
 
     const styleEl = [...headChildren][0];
     expect(styleEl.textContent).toContain("secret.md");
@@ -66,11 +64,7 @@ describe("ExplorerIndicators", () => {
 
   it("handles multiple files", () => {
     const indicators = new ExplorerIndicators();
-    const perms = new Map<string, Permission>([
-      ["a.md", "read-only"],
-      ["b.md", "read-only"],
-    ]);
-    indicators.update(perms);
+    indicators.update(["a.md", "b.md"]);
 
     const styleEl = [...headChildren][0];
     expect(styleEl.textContent).toContain("a.md");
@@ -78,20 +72,10 @@ describe("ExplorerIndicators", () => {
     indicators.destroy();
   });
 
-  it("does not generate CSS for read-write files", () => {
+  it("clears CSS when updated with empty array", () => {
     const indicators = new ExplorerIndicators();
-    const perms = new Map<string, Permission>([["normal.md", "read-write"]]);
-    indicators.update(perms);
-
-    const styleEl = [...headChildren][0];
-    expect(styleEl.textContent).toBe("");
-    indicators.destroy();
-  });
-
-  it("clears CSS when updated with empty map", () => {
-    const indicators = new ExplorerIndicators();
-    indicators.update(new Map<string, Permission>([["a.md", "read-only"]]));
-    indicators.update(new Map());
+    indicators.update(["a.md"]);
+    indicators.update([]);
 
     const styleEl = [...headChildren][0];
     expect(styleEl.textContent).toBe("");
@@ -107,8 +91,7 @@ describe("ExplorerIndicators", () => {
 
   it("handles paths with special characters", () => {
     const indicators = new ExplorerIndicators();
-    const perms = new Map<string, Permission>([['folder/file "name".md', "read-only"]]);
-    indicators.update(perms);
+    indicators.update(['folder/file "name".md']);
 
     const styleEl = [...headChildren][0];
     expect(styleEl.textContent).toContain('\\"name\\"');

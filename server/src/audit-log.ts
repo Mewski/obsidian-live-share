@@ -15,7 +15,10 @@ export function initAuditLog(dbPath = "./data/audit"): void {
   db = new Level(dbPath, { valueEncoding: "buffer" });
 }
 
-export async function appendLog(roomId: string, entry: AuditEntry): Promise<void> {
+export async function appendLog(
+  roomId: string,
+  entry: AuditEntry,
+): Promise<void> {
   if (!db) return;
   const key = `${roomId}:${entry.timestamp}:${nanoid(6)}`;
   try {
@@ -25,11 +28,14 @@ export async function appendLog(roomId: string, entry: AuditEntry): Promise<void
   }
 }
 
-export async function getLogs(roomId: string, limit = 100): Promise<AuditEntry[]> {
+export async function getLogs(
+  roomId: string,
+  limit = 100,
+): Promise<AuditEntry[]> {
   if (!db) return [];
   const entries: AuditEntry[] = [];
   try {
-    for await (const [key, value] of db.iterator<string, Buffer>({
+    for await (const [, value] of db.iterator<string, Buffer>({
       gte: `${roomId}:`,
       lte: `${roomId}:\xff`,
       keyEncoding: "utf8",
@@ -37,7 +43,9 @@ export async function getLogs(roomId: string, limit = 100): Promise<AuditEntry[]
       limit,
     })) {
       try {
-        entries.push(JSON.parse((value as unknown as Buffer).toString("utf-8")));
+        entries.push(
+          JSON.parse((value as unknown as Buffer).toString("utf-8")),
+        );
       } catch {}
     }
   } catch (err) {

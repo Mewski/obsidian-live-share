@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { Router } from "express";
 import { nanoid } from "nanoid";
 
+import { clearLogs } from "./audit-log.js";
 import { clearRoomPermissions } from "./permissions.js";
 import { type Persistence, type Room, noopPersistence } from "./persistence.js";
 import { safeTokenCompare } from "./util.js";
@@ -58,6 +59,9 @@ export async function removeRoom(id: string) {
   } catch (err) {
     console.error(`[rooms] failed to delete room ${id}:`, err);
   }
+  clearLogs(id).catch((err) => {
+    console.error(`[rooms] failed to clear audit logs for ${id}:`, err);
+  });
 }
 
 export async function reapStaleRooms() {
@@ -81,19 +85,38 @@ const CONTROL_CHARS = /[\x00-\x1f\x7f]/;
 
 roomRouter.post("/", async (req, res) => {
   const rawName = req.body.name;
-  const name = typeof rawName === "string" && rawName.length > 0 ? rawName : `session-${nanoid(6)}`;
+  const name =
+    typeof rawName === "string" && rawName.length > 0
+      ? rawName
+      : `session-${nanoid(6)}`;
   if (name.length > 100 || CONTROL_CHARS.test(name)) {
     res.status(400).json({ error: "invalid name" });
     return;
   }
 
-  const hostUserId = typeof req.body.hostUserId === "string" ? req.body.hostUserId : undefined;
-  if (hostUserId && (hostUserId.length > 128 || CONTROL_CHARS.test(hostUserId))) {
+  const hostUserId =
+    typeof req.body.hostUserId === "string" ? req.body.hostUserId : undefined;
+  if (
+    hostUserId &&
+    (hostUserId.length > 128 || CONTROL_CHARS.test(hostUserId))
+  ) {
     res.status(400).json({ error: "invalid hostUserId" });
     return;
   }
 
   const requireApproval = req.body.requireApproval === true;
+  const MAX_PATTERNS = 50;
+  const MAX_PATTERN_LENGTH = 200;
+  const readOnlyPatterns = Array.isArray(req.body.readOnlyPatterns)
+    ? (req.body.readOnlyPatterns as unknown[])
+        .filter(
+          (p): p is string =>
+            typeof p === "string" &&
+            p.length <= MAX_PATTERN_LENGTH &&
+            !CONTROL_CHARS.test(p),
+        )
+        .slice(0, MAX_PATTERNS)
+    : [];
 
   const now = Date.now();
   const room: Room = {
@@ -104,6 +127,8 @@ roomRouter.post("/", async (req, res) => {
     lastActivityAt: now,
     hostUserId,
     requireApproval,
+    readOnlyPatterns:
+      readOnlyPatterns.length > 0 ? readOnlyPatterns : undefined,
   };
   rooms.set(room.id, room);
   await persistence.saveRoom(room);

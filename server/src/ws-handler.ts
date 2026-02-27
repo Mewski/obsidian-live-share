@@ -3,6 +3,7 @@ import * as decoding from "lib0/decoding";
 import * as encoding from "lib0/encoding";
 import { WebSocket, WebSocketServer } from "ws";
 
+import { verifyJWT } from "./github-auth.js";
 import {
   MUX_AWARENESS,
   MUX_AWARENESS_ENCRYPTED,
@@ -15,7 +16,7 @@ import {
   decodeMuxMessage,
   encodeMuxMessage,
 } from "./mux-protocol.js";
-import { getEffectivePermission, getPermission } from "./permissions.js";
+import { getPermission } from "./permissions.js";
 import type { Permission } from "./persistence.js";
 
 const SYNC_STEP2 = 1;
@@ -37,7 +38,8 @@ interface RoomState {
 
 function toUint8Array(raw: Buffer | ArrayBuffer | Buffer[]): Uint8Array {
   if (raw instanceof ArrayBuffer) return new Uint8Array(raw);
-  if (Buffer.isBuffer(raw)) return new Uint8Array(raw.buffer, raw.byteOffset, raw.byteLength);
+  if (Buffer.isBuffer(raw))
+    return new Uint8Array(raw.buffer, raw.byteOffset, raw.byteLength);
   const buf = Buffer.concat(raw as Buffer[]);
   return new Uint8Array(buf.buffer, buf.byteOffset, buf.byteLength);
 }
@@ -101,7 +103,11 @@ export function createYjsWSS() {
 
     const peerCountEncoder = encoding.createEncoder();
     encoding.writeVarUint(peerCountEncoder, peerCount);
-    const msg = encodeMuxMessage(docId, MUX_SUBSCRIBED, encoding.toUint8Array(peerCountEncoder));
+    const msg = encodeMuxMessage(
+      docId,
+      MUX_SUBSCRIBED,
+      encoding.toUint8Array(peerCountEncoder),
+    );
     safeSend(client.ws, msg);
 
     if (peerCount > 0) {
@@ -117,7 +123,12 @@ export function createYjsWSS() {
     removeClientFromRoom(client, roomId);
   }
 
-  function handleSync(client: MuxClient, docId: string, payload: Uint8Array, encrypted = false) {
+  function handleSync(
+    client: MuxClient,
+    docId: string,
+    payload: Uint8Array,
+    encrypted = false,
+  ) {
     const roomId = `${client.baseRoomId}:${docId}`;
     const state = roomStates.get(roomId);
     if (!state || !state.clients.has(client)) return;
@@ -125,7 +136,7 @@ export function createYjsWSS() {
     const isReadOnly =
       state.readOnlyClients.has(client) ||
       (client.userId &&
-        getEffectivePermission(client.baseRoomId, client.userId, docId) === "read-only");
+        getPermission(client.baseRoomId, client.userId) === "read-only");
     if (isReadOnly && payload.length > 0) {
       const decoder = decoding.createDecoder(payload);
       const syncType = decoding.peekVarUint(decoder);
@@ -211,55 +222,67 @@ export function createYjsWSS() {
     }
   }
 
-  muxWss.on("connection", (ws: WebSocket, req: IncomingMessage, baseRoomId: string) => {
-    const reqUrl = new URL(req.url || "", `http://${req.headers.host}`);
-    const userId = reqUrl.searchParams.get("userId");
+  muxWss.on(
+    "connection",
+    (ws: WebSocket, req: IncomingMessage, baseRoomId: string) => {
+      const reqUrl = new URL(req.url || "", `http://${req.headers.host}`);
 
-    const client: MuxClient = {
-      ws,
-      subscribedRooms: new Set(),
-      userId,
-      baseRoomId,
-    };
-
-    ws.on("error", (err) => {
-      console.error(`[yjs-mux] ws error for room ${baseRoomId}:`, err.message);
-      ws.close();
-    });
-
-    ws.on("message", (raw: Buffer | ArrayBuffer | Buffer[]) => {
-      const data = toUint8Array(raw);
-      try {
-        const { docId, msgType, payload } = decodeMuxMessage(data);
-        switch (msgType) {
-          case MUX_SUBSCRIBE:
-            handleSubscribe(client, docId);
-            break;
-          case MUX_UNSUBSCRIBE:
-            handleUnsubscribe(client, docId);
-            break;
-          case MUX_SYNC:
-            handleSync(client, docId, payload);
-            break;
-          case MUX_SYNC_ENCRYPTED:
-            handleSync(client, docId, payload, true);
-            break;
-          case MUX_AWARENESS:
-            handleAwareness(client, docId, payload);
-            break;
-          case MUX_AWARENESS_ENCRYPTED:
-            handleAwareness(client, docId, payload, true);
-            break;
-        }
-      } catch (err) {
-        console.error("[yjs-mux] failed to handle message:", err);
+      let userId = reqUrl.searchParams.get("userId");
+      const jwtToken = reqUrl.searchParams.get("jwt");
+      if (jwtToken) {
+        const payload = verifyJWT(jwtToken);
+        if (payload) userId = payload.sub;
       }
-    });
 
-    ws.on("close", () => {
-      removeClientFromAllRooms(client);
-    });
-  });
+      const client: MuxClient = {
+        ws,
+        subscribedRooms: new Set(),
+        userId,
+        baseRoomId,
+      };
+
+      ws.on("error", (err) => {
+        console.error(
+          `[yjs-mux] ws error for room ${baseRoomId}:`,
+          err.message,
+        );
+        ws.close();
+      });
+
+      ws.on("message", (raw: Buffer | ArrayBuffer | Buffer[]) => {
+        const data = toUint8Array(raw);
+        try {
+          const { docId, msgType, payload } = decodeMuxMessage(data);
+          switch (msgType) {
+            case MUX_SUBSCRIBE:
+              handleSubscribe(client, docId);
+              break;
+            case MUX_UNSUBSCRIBE:
+              handleUnsubscribe(client, docId);
+              break;
+            case MUX_SYNC:
+              handleSync(client, docId, payload);
+              break;
+            case MUX_SYNC_ENCRYPTED:
+              handleSync(client, docId, payload, true);
+              break;
+            case MUX_AWARENESS:
+              handleAwareness(client, docId, payload);
+              break;
+            case MUX_AWARENESS_ENCRYPTED:
+              handleAwareness(client, docId, payload, true);
+              break;
+          }
+        } catch (err) {
+          console.error("[yjs-mux] failed to handle message:", err);
+        }
+      });
+
+      ws.on("close", () => {
+        removeClientFromAllRooms(client);
+      });
+    },
+  );
 
   function closeAll() {
     for (const state of roomStates.values()) {
@@ -288,7 +311,11 @@ export function createYjsWSS() {
     };
   }
 
-  function updatePermission(baseRoomId: string, userId: string, permission: Permission) {
+  function updatePermission(
+    baseRoomId: string,
+    userId: string,
+    permission: Permission,
+  ) {
     for (const [fullRoomId, state] of roomStates) {
       if (!fullRoomId.startsWith(`${baseRoomId}:`)) continue;
       for (const client of state.clients) {
