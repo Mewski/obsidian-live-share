@@ -98,27 +98,43 @@ export function createApp(
     if (SERVER_PASSWORD) {
       const provided = url.searchParams.get("password");
       if (!provided || !safeTokenCompare(provided, SERVER_PASSWORD)) {
+        socket.write(
+          "HTTP/1.1 403 Forbidden\r\nContent-Type: text/plain\r\nConnection: close\r\n\r\nInvalid server password",
+        );
         socket.destroy();
         return;
       }
     }
 
-    function authenticateUpgrade(url: URL, roomId: string): boolean {
+    function authenticateUpgrade(
+      url: URL,
+      roomId: string,
+    ): { ok: true } | { ok: false; code: number; reason: string } {
       const room = getRoom(roomId);
       const token = url.searchParams.get("token");
-      if (!room || !token || !safeTokenCompare(token, room.token)) return false;
+      if (!room || !token || !safeTokenCompare(token, room.token))
+        return { ok: false, code: 403, reason: "Invalid room or token" };
       if (REQUIRE_GITHUB_AUTH) {
         const jwtToken = url.searchParams.get("jwt");
-        if (!jwtToken || !verifyJWT(jwtToken)) return false;
+        if (!jwtToken || !verifyJWT(jwtToken))
+          return { ok: false, code: 401, reason: "Authentication required" };
       }
-      return true;
+      return { ok: true };
+    }
+
+    function rejectUpgrade(socket: import("stream").Duplex, code: number, reason: string) {
+      socket.write(
+        `HTTP/1.1 ${code} ${reason}\r\nContent-Type: text/plain\r\nConnection: close\r\n\r\n${reason}`,
+      );
+      socket.destroy();
     }
 
     const muxMatch = url.pathname.match(/^\/ws-mux\/(.+)$/);
     if (muxMatch) {
       const baseRoomId = muxMatch[1];
-      if (!authenticateUpgrade(url, baseRoomId)) {
-        socket.destroy();
+      const auth = authenticateUpgrade(url, baseRoomId);
+      if (!auth.ok) {
+        rejectUpgrade(socket, auth.code, auth.reason);
         return;
       }
       yjs.muxWss.handleUpgrade(req, socket, head, (ws) => {
@@ -130,8 +146,9 @@ export function createApp(
     const ctrlMatch = url.pathname.match(/^\/control\/(.+)$/);
     if (ctrlMatch) {
       const roomId = ctrlMatch[1];
-      if (!authenticateUpgrade(url, roomId)) {
-        socket.destroy();
+      const auth = authenticateUpgrade(url, roomId);
+      if (!auth.ok) {
+        rejectUpgrade(socket, auth.code, auth.reason);
         return;
       }
       control.wss.handleUpgrade(req, socket, head, (ws) => {

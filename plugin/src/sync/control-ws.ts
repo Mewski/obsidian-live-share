@@ -24,8 +24,9 @@ export class ControlChannel {
   private isDestroyed = false;
   private e2e: E2ECrypto | null = null;
   private stateChangeCallback:
-    | ((state: "connected" | "reconnecting" | "disconnected") => void)
+    | ((state: "connected" | "reconnecting" | "disconnected" | "auth-required") => void)
     | null = null;
+  private everConnected = false;
   private errorCallback: ((context: string, err: unknown) => void) | null = null;
 
   private latencyMs = 0;
@@ -41,7 +42,9 @@ export class ControlChannel {
     this.e2e = e2e ?? null;
   }
 
-  onStateChange(callback: (state: "connected" | "reconnecting" | "disconnected") => void) {
+  onStateChange(
+    callback: (state: "connected" | "reconnecting" | "disconnected" | "auth-required") => void,
+  ) {
     this.stateChangeCallback = callback;
   }
 
@@ -57,6 +60,7 @@ export class ControlChannel {
     if (this.isDestroyed) return;
     this.shouldConnect = true;
     this.reconnectAttempts = 0;
+    this.everConnected = false;
     this.openWebSocket();
   }
 
@@ -72,6 +76,7 @@ export class ControlChannel {
 
     this.ws.onopen = () => {
       this.reconnectAttempts = 0;
+      this.everConnected = true;
       this.stateChangeCallback?.("connected");
       this.startPing();
     };
@@ -106,6 +111,11 @@ export class ControlChannel {
       this.stopPing();
       this.ws = null;
       if (this.isDestroyed) return;
+      if (!this.everConnected && this.reconnectAttempts === 0) {
+        this.shouldConnect = false;
+        this.stateChangeCallback?.("auth-required");
+        return;
+      }
       if (this.shouldConnect) {
         this.stateChangeCallback?.("reconnecting");
         this.scheduleReconnect();

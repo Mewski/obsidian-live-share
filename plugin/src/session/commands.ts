@@ -1,7 +1,6 @@
 import { MarkdownView, Notice } from "obsidian";
 
 import type LiveSharePlugin from "../main";
-import { AddCommentModal, CommentListModal } from "../ui/comment-modal";
 import { FilePermissionModal, type FilePermissionUser } from "../ui/file-permission-modal";
 import { HistoryModal } from "../ui/history-modal";
 import { UserPickerModal } from "../ui/modals";
@@ -234,41 +233,6 @@ export function registerCommands(plugin: LiveSharePlugin): void {
           filePath: fp,
           permission,
         });
-      }).open();
-    },
-  });
-
-  plugin.addCommand({
-    id: "add-comment",
-    name: "Add comment at cursor",
-    editorCallback: (editor, view) => {
-      if (!plugin.commentManager || !view.file) return;
-      const filePath = view.file.path;
-      const cursor = editor.getCursor();
-      new AddCommentModal(plugin.app, (text) => {
-        plugin.commentManager?.addComment(filePath, cursor.line, text);
-        plugin.notify("Live Share: comment added");
-      }).open();
-    },
-  });
-
-  plugin.addCommand({
-    id: "show-comments",
-    name: "Show comments for this file",
-    editorCallback: (_editor, view) => {
-      if (!plugin.commentManager || !view.file) return;
-      new CommentListModal(plugin.app, view.file.path, plugin.commentManager, (line) => {
-        const mdView = plugin.app.workspace.getActiveViewOfType(MarkdownView);
-        if (mdView) {
-          mdView.editor.setCursor({ line, ch: 0 });
-          mdView.editor.scrollIntoView(
-            {
-              from: { line, ch: 0 },
-              to: { line, ch: 0 },
-            },
-            true,
-          );
-        }
       }).open();
     },
   });

@@ -5,7 +5,7 @@ import { DebugLogger } from "./debug-logger";
 import { CollabManager } from "./editor/collab";
 import { BackgroundSync } from "./files/background-sync";
 import { CanvasSync } from "./files/canvas-sync";
-import { CommentManager } from "./files/comments";
+
 import { ExclusionManager } from "./files/exclusion";
 import { FileOpsManager } from "./files/file-ops";
 import { ManifestManager } from "./files/manifest";
@@ -24,7 +24,7 @@ import { SyncManager } from "./sync/sync";
 import { DEFAULT_SETTINGS, type LiveShareSettings, type Permission } from "./types";
 
 import { AuditLogModal } from "./ui/audit-modal";
-import { AddCommentModal, CommentThreadModal } from "./ui/comment-modal";
+
 import { ExplorerIndicators } from "./ui/explorer-indicators";
 import { ConfirmModal, PromptModal } from "./ui/modals";
 import { LiveShareSettingTab } from "./ui/settings";
@@ -54,7 +54,7 @@ export default class LiveSharePlugin extends Plugin {
   connectionState!: ConnectionStateManager;
   logger!: DebugLogger;
   versionHistory!: VersionHistoryManager;
-  commentManager: CommentManager | null = null;
+
   canvasSync: CanvasSync | null = null;
   explorerIndicators: ExplorerIndicators | null = null;
   controlChannel: ControlChannel | null = null;
@@ -274,8 +274,6 @@ export default class LiveSharePlugin extends Plugin {
     this.logger.destroy();
     this.controlChannel?.destroy();
     this.controlChannel = null;
-    this.commentManager?.destroy();
-    this.commentManager = null;
     this.explorerIndicators?.destroy();
     this.explorerIndicators = null;
     this.canvasSync?.destroy();
@@ -371,8 +369,6 @@ export default class LiveSharePlugin extends Plugin {
   cleanupSession() {
     this.versionHistory.stopAutoCapture();
     this.saveVersionHistory();
-    this.commentManager?.destroy();
-    this.commentManager = null;
     this.explorerIndicators?.destroy();
     this.explorerIndicators = null;
     this.canvasSync?.destroy();
@@ -560,6 +556,11 @@ export default class LiveSharePlugin extends Plugin {
       } else if (controlState === "reconnecting") {
         this.connectionState.transition({ type: "reconnecting" });
         this.fileOpsManager.setOnline(false);
+      } else if (controlState === "auth-required") {
+        this.fileOpsManager.setOnline(false);
+        this.connectionState.transition({ type: "auth-expired" });
+        new Notice("Live Share: authentication required — sign in via settings");
+        this.endSession();
       } else {
         this.fileOpsManager.setOnline(false);
         this.connectionState.transition({ type: "disconnect" });
@@ -576,18 +577,12 @@ export default class LiveSharePlugin extends Plugin {
 
     this.versionHistory.startAutoCapture();
     this.explorerIndicators = new ExplorerIndicators();
-    this.commentManager = new CommentManager(
-      this.syncManager,
-      this.userId,
-      this.settings.displayName,
-    );
     this.canvasSync = new CanvasSync(this.app.vault, this.syncManager, this.fileOpsManager);
     const entries = this.manifestManager.getEntries();
     const role = this.settings.role === "host" ? "host" : "guest";
     for (const [path] of entries) {
       if (isTextFile(path)) {
         this.versionHistory.trackFile(path);
-        this.commentManager.subscribeFile(path);
         if (path.endsWith(".canvas")) {
           this.canvasSync.subscribe(path, role);
         }
@@ -667,21 +662,6 @@ export default class LiveSharePlugin extends Plugin {
         name: this.settings.displayName,
         color: this.settings.cursorColor,
         colorLight: `${this.settings.cursorColor}33`,
-      },
-      this.commentManager,
-      (line: number) => {
-        if (!this.commentManager || !sharedPath) return;
-        const comments = this.commentManager
-          .getComments(sharedPath)
-          .filter((c) => !c.resolved && c.anchorIndex === line);
-        if (comments.length > 0) {
-          new CommentThreadModal(this.app, sharedPath, comments[0], this.commentManager).open();
-        } else {
-          new AddCommentModal(this.app, (text) => {
-            this.commentManager?.addComment(sharedPath, line, text);
-            this.notify("Live Share: comment added");
-          }).open();
-        }
       },
     );
 
