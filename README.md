@@ -2,102 +2,58 @@
 
 Real-time collaborative editing for [Obsidian](https://obsidian.md). Share your vault with others and edit together with live cursors, file sync, presence tracking, and end-to-end encryption.
 
-## Features
-
-- **Real-time collaborative editing**: Yjs CRDT-powered character-level sync with automatic conflict resolution
-- **Live cursors and selections**: See collaborators' cursors and selections in the editor
-- **File sync**: Creates, deletes, renames, and binary files are synced automatically
-- **End-to-end encryption**: File content is encrypted client-side with AES-256-GCM (PBKDF2 key derivation)
-- **Presence panel**: See who's connected, what file they're viewing, and their cursor position
-- **Follow mode**: Follow a user's navigation and scroll position; auto-unfollows on interaction
-- **Presentation mode**: Host broadcasts navigation to all participants automatically
-- **Focus and summon**: Request attention or navigate specific participants to your location
-- **Host-only controls**: Summon, kick, permission changes, presentation mode, and session end are host-only (enforced server-side)
-- **Guest approval**: Optionally require host approval with read-write, read-only, or deny
-- **Mid-session permission changes**: Host can toggle any guest between read-write and read-only at any time via the presence panel
-- **Per-file permissions**: Host can set individual files to read-only or read-write for specific guests, with lock icons in the file explorer
-- **Read-only enforcement**: Read-only guests are blocked from editing server-side on both Yjs and control channels, including per-file overrides
-- **Confirmation dialogs**: End session and kick actions ask for confirmation before proceeding
-- **Host disconnect notice**: Guests are notified when the host leaves the session
-- **Reload from host**: Guests can re-download all files from the host
-- **File exclusion**: Configure `.liveshare.json` to exclude files from sharing
-- **Latency monitoring**: Ping/pong latency shown in the status bar
-- **Notification control**: Toggle non-critical status notices on or off in settings
-- **Debug logging**: Optional timestamped debug log written to a file in your vault
-- **Auto-reconnect**: Optionally rejoin the previous session automatically when Obsidian starts
-- **Join via link**: Open `obsidian://live-share?invite=...` links to join sessions directly
-- **Ribbon context menu**: Right-click the collaborators icon for quick access to session actions
-- **Session actions in settings**: Start, join, end, or leave sessions directly from the settings tab
-- **Conflict visualization**: Highlighted decorations in the editor when remote edits overlap local changes
-- **In-editor comments**: Add comments anchored to specific lines, with a gutter indicator showing which lines have comments
-- **Canvas collaboration**: Real-time sync of `.canvas` files via Yjs
-- **Version history**: Manual and automatic snapshots of file content with restore capability
-- **Host transfer**: Host can offer the host role to another participant (with server-side validation)
-- **Audit log**: Host can view a log of join/leave/kick/permission events for the session
-- **Offline queue**: File operations are buffered when disconnected and replayed on reconnect
-- **Resumable binary transfers**: Chunked file transfers can resume from where they left off after reconnection
-- **Fail-fast connections**: Connection drops immediately end the session and clean up all resources
-
 ## Quick Start
-
-### Prerequisites
-
-- Node.js 18+ and npm
-- Obsidian 1.11.0+
 
 ### 1. Start the Server
 
 ```bash
-cd server
-npm install
-npm run build
-npm start
+cd server && npm install && npm run build && npm start
 ```
 
-The server starts on `http://localhost:4321`. Verify with `curl http://localhost:4321/healthz`.
+Runs on `http://localhost:4321`. Verify: `curl http://localhost:4321/healthz`
 
 ### 2. Install the Plugin
 
+Build from source:
+
 ```bash
-cd plugin
-npm install
-npm run build
+cd plugin && npm install && npm run build
 ```
 
-Copy the built files into your vault:
+Copy into your vault:
 
 ```bash
 mkdir -p /path/to/vault/.obsidian/plugins/obsidian-live-share
-cp plugin/main.js plugin/manifest.json plugin/styles.css \
+cp plugin/main.js plugin/styles.css manifest.json \
    /path/to/vault/.obsidian/plugins/obsidian-live-share/
 ```
 
-Open Obsidian, go to **Settings > Community Plugins**, and enable **Live Share**.
+Or install via [BRAT](https://github.com/TfTHacker/obsidian42-brat) for automatic updates.
+
+Enable **Live Share** in **Settings > Community Plugins**.
 
 ### 3. Configure
 
-Open **Settings > Live Share** and set:
+Open **Settings > Live Share** and set your **Server URL**, **Display name**, and **Shared folder** (leave empty for the whole vault).
 
-- **Server URL**: `http://localhost:4321` (or your deployed server URL)
-- **Display name**: Your name shown to collaborators (defaults to "Anonymous" if blank)
-- **Cursor color**: Pick your cursor color using the color picker
-- **Shared folder**: Subfolder to share (leave empty for the whole vault)
-- **Require approval**: Require host approval for guests to join (off by default)
-- **Notifications**: Toggle non-critical status notices (on by default)
-- **Auto-reconnect**: Automatically rejoin the previous session on startup (on by default)
-- **Debug logging**: Write timestamped debug logs to a file in your vault (off by default)
+### 4. Collaborate
 
-### 4. Start Collaborating
+**Host**: Run `Live Share: Start session` from the command palette. An invite link is copied to your clipboard.
 
-**Host:**
-1. Open the command palette and run **Live Share: Start session**
-2. An invite link is automatically copied to your clipboard
-3. Share the invite link with collaborators
+**Guest**: Run `Live Share: Join session` and paste the invite link. Files sync automatically.
 
-**Guest:**
-1. Open the command palette and run **Live Share: Join session**
-2. Paste the invite link
-3. Files sync automatically from the host
+## Features
+
+- **Real-time editing** — Yjs CRDT-powered character-level sync with live cursors and selections
+- **File sync** — Creates, deletes, renames, and binary files sync automatically
+- **End-to-end encryption** — AES-256-GCM with PBKDF2 key derivation; passphrase never leaves the invite link
+- **Presence panel** — See who's connected, what file they're viewing, follow/summon/kick users
+- **Permissions** — Host can set guests to read-write or read-only (enforced server-side), with per-file overrides
+- **Guest approval** — Optionally require host approval before guests can join
+- **Host transfer** — Hand off the host role to another participant
+- **Canvas collaboration** — Real-time sync of `.canvas` files
+- **Offline queue** — File operations are buffered when disconnected and replayed on reconnect
+- **Auto-reconnect** — Optionally rejoin the previous session on startup
 
 ## Commands
 
@@ -105,23 +61,30 @@ Open **Settings > Live Share** and set:
 |---------|-------------|--------|
 | Start session | Create a room and start hosting | Anyone |
 | Join session | Join via invite link | Anyone |
-| End session | Disconnect from the session (asks for confirmation) | Host broadcasts end to all |
-| Copy invite link | Copy invite link to clipboard | Anyone in session |
+| End session | End or leave the session | Anyone in session |
+| Copy invite link | Copy invite to clipboard | Anyone in session |
 | Show collaborators panel | Open the presence sidebar | Anyone |
-| Focus participants here | Send "look here" request to all | Anyone |
-| Summon all participants here | Navigate all participants to your cursor | Host only |
-| Summon a specific participant here | Pick a user and navigate them to your cursor | Host only |
-| Reload all files from host | Re-download all shared files | Guest only |
-| Toggle presentation mode | Auto-broadcast navigation to all participants | Host only |
-| Transfer host role | Offer host role to another participant | Host only |
-| Set file permissions | Set per-file read-only/read-write for a specific guest | Host only |
-| Show audit log | View join/leave/kick/permission events | Host only |
-| Add comment at cursor | Add a comment anchored to the current line | Anyone in session |
-| Show comments for this file | List all comments on the current file | Anyone in session |
-| Create snapshot | Save a labeled snapshot of the current file | Anyone in session |
-| Show version history | Browse and restore file snapshots | Anyone in session |
-| Log in with GitHub | Authenticate via GitHub OAuth | Anyone |
-| Log out | Clear stored authentication | Anyone |
+| Focus participants here | Send a "look here" notification | Anyone in session |
+| Summon all / specific participant | Navigate users to your cursor | Host |
+| Reload all files from host | Re-download shared files | Guest |
+| Toggle presentation mode | Auto-broadcast navigation | Host |
+| Transfer host role | Offer host role to another user | Host |
+| Set file permissions | Per-file read-only/read-write | Host |
+| Show audit log | View session event log | Host |
+| Log in / Log out | GitHub OAuth authentication | Anyone |
+
+## Server Configuration
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `PORT` | `4321` | Server port |
+| `SERVER_PASSWORD` | — | Restrict access to authorized clients |
+| `TLS_CERT` / `TLS_KEY` | — | Enable HTTPS/WSS |
+| `REQUIRE_GITHUB_AUTH` | `false` | Require GitHub OAuth |
+| `GITHUB_CLIENT_ID` | — | GitHub OAuth client ID |
+| `GITHUB_CLIENT_SECRET` | — | GitHub OAuth client secret |
+| `JWT_SECRET` | — | JWT signing secret (required with auth) |
+| `CORS_ORIGIN` | `*` | Allowed CORS origins |
 
 ## File Exclusion
 
@@ -137,74 +100,36 @@ Default excludes: `.obsidian/**`, `.liveshare.json`, `.trash/**`.
 
 ## How It Works
 
-Obsidian Live Share uses a stateless relay server and two WebSocket channels per session:
+The system uses a stateless relay server and two WebSocket channels:
 
-- **Yjs sync** (`/ws-mux/:roomId`): Multiplexed binary channel carrying Yjs CRDT updates and cursor awareness for all shared files. The server forwards messages between peers without maintaining any document state. Read-only enforcement is handled by peeking at sync message types.
-- **Control** (`/control/:roomId`): JSON messages for file operations, presence, follow/summon, session lifecycle, and ping/pong latency measurement.
+- **Yjs sync** (`/ws-mux/:roomId`) — Multiplexed binary channel for Yjs CRDT updates and cursor awareness per file
+- **Control** (`/control/:roomId`) — JSON messages for file operations, presence, permissions, and session lifecycle
 
-The host's local vault is the single source of truth. Text files sync character-by-character via Yjs. Binary files (images, PDFs, etc.) are transferred as base64 via the control channel with automatic chunking for files up to 50 MB.
+The host's vault is the source of truth. Text files sync character-by-character via Yjs. Binary files transfer as base64 with automatic chunking (up to 50 MB).
 
-## Server Configuration
+## Security
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `PORT` | `4321` | Server port (1-65535) |
-| `SERVER_PASSWORD` | - | Require this password for all REST and WebSocket connections |
-| `TLS_CERT` | - | Path to TLS certificate (enables HTTPS/WSS) |
-| `TLS_KEY` | - | Path to TLS private key |
-| `REQUIRE_GITHUB_AUTH` | `false` | Require GitHub OAuth for all connections |
-| `GITHUB_CLIENT_ID` | - | GitHub OAuth app client ID |
-| `GITHUB_CLIENT_SECRET` | - | GitHub OAuth app client secret |
-| `JWT_SECRET` | - | Secret for signing JWTs (required when auth is enabled) |
-| `CORS_ORIGIN` | `*` | Allowed CORS origin(s) |
-
-See [Server Setup](docs/server.md) for TLS, OAuth, persistence, and deployment details.
+- E2E encryption (AES-256-GCM, PBKDF2 100k iterations) for file content in control messages
+- Timing-safe token comparison on all auth checks
+- Server-side enforcement of read-only permissions and host-only operations
+- Path traversal protection, rate limiting, payload size limits
+- Use TLS (`wss://`) to encrypt all traffic including Yjs sync data
 
 ## Development
 
 ```bash
-# Server
-cd server
-npm run dev          # Dev server with auto-reload
-npm test             # 106 tests
-npm run lint         # Biome linter
+# Server: 106 tests
+cd server && npm run dev && npm test && npm run lint
 
-# Plugin
-cd plugin
-npm run dev          # Watch mode (esbuild)
-npm test             # 317 tests
-npm run lint         # Biome linter
+# Plugin: 300 tests
+cd plugin && npm run dev && npm test && npm run lint
 ```
-
-## Security
-
-- **E2E encryption**: AES-256-GCM with PBKDF2 (100k iterations). Passphrase is in the invite link, never sent to the server.
-- **Timing-safe token comparison** on all room token checks
-- **Path traversal protection**: `..`, `.`, and absolute paths are rejected
-- **Server-side enforcement**: read-only permissions, host-only summon/kick/set-permission/session-end, message type whitelist
-- **Rate limiting**: REST (30 req/min), WebSocket (100 msg/10s), auth (10 req/min)
-- **Payload limits**: Yjs 10 MB, control 2 MB
-
-See [Security](docs/security.md) for the full threat model.
-
-## Documentation
-
-- [Architecture](docs/architecture.md): System design, protocols, and data flow
-- [Server Setup](docs/server.md): Installation, configuration, and deployment
-- [Plugin Usage](docs/plugin.md): Commands, features, and configuration
-- [Security](docs/security.md): Encryption, authentication, and threat model
 
 ## Disclosures
 
-**Network use.** This plugin requires a relay server to function. All real-time sync, file transfer, and presence data is sent over WebSocket connections to a server URL you configure in settings (default: `localhost:4321`). You can self-host the included server or use a shared instance. File content can optionally be end-to-end encrypted (AES-256-GCM) so the server cannot read it; see the [Security](#security) section. GitHub avatar images are loaded over HTTPS when GitHub authentication is used.
+**Network use.** This plugin requires a relay server. All sync, file transfer, and presence data is sent over WebSocket connections to a server URL you configure. You can self-host the included server. File content can be end-to-end encrypted so the server cannot read it.
 
-**Optional account.** GitHub OAuth login is available but not required. Without it, the plugin generates a local anonymous ID. When enabled, the server must be configured with GitHub OAuth credentials, and authentication is handled via your browser. The resulting JWT token is stored locally in plugin settings.
-
-## Known Limitations
-
-- **Limited offline support**: File operations are queued while disconnected and replayed on reconnect, but there is no cross-session conflict resolution. Text content merges automatically via Yjs within a session.
-- **Single host**: If the host disconnects, the session ends for all participants.
-- **E2E scope**: File content in control messages is end-to-end encrypted. Yjs sync data is relayed as opaque binary by the server (no server-side processing or persistence), but the data itself is not encrypted at the application layer. Use TLS (`wss://`) to encrypt all traffic in transit.
+**Optional account.** GitHub OAuth login is available but not required. Without it, a local anonymous ID is generated.
 
 ## License
 

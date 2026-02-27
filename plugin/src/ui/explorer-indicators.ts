@@ -6,9 +6,9 @@ function escapeCssString(str: string): string {
   return str
     .replace(/\\/g, "\\\\")
     .replace(/"/g, '\\"')
-    .replace(/\n/g, "\\a ")
-    .replace(/\r/g, "\\d ")
-    .replace(/\f/g, "\\c ");
+    .replace(/\n/g, "\\00000a")
+    .replace(/\r/g, "\\00000d")
+    .replace(/\f/g, "\\00000c");
 }
 
 export class ExplorerIndicators {

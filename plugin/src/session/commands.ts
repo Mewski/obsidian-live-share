@@ -2,7 +2,6 @@ import { MarkdownView, Notice } from "obsidian";
 
 import type LiveSharePlugin from "../main";
 import { FilePermissionModal, type FilePermissionUser } from "../ui/file-permission-modal";
-import { HistoryModal } from "../ui/history-modal";
 import { UserPickerModal } from "../ui/modals";
 
 export function registerCommands(plugin: LiveSharePlugin): void {
@@ -159,42 +158,6 @@ export function registerCommands(plugin: LiveSharePlugin): void {
         const user = plugin.remoteUsers.get(userId);
         plugin.notify(`Live Share: offered host role to ${user?.displayName ?? userId}`);
       }).open();
-    },
-  });
-
-  plugin.addCommand({
-    id: "show-version-history",
-    name: "Show version history",
-    editorCallback: (_editor, view) => {
-      if (!view.file) return;
-      const filePath = view.file.path;
-      const snapshots = plugin.versionHistory.getSnapshots(filePath);
-      new HistoryModal(
-        plugin.app,
-        filePath,
-        snapshots,
-        (index) => plugin.versionHistory.restoreSnapshot(filePath, index),
-        (index) => {
-          plugin.versionHistory.applySnapshot(filePath, index);
-          plugin.saveVersionHistory();
-        },
-      ).open();
-    },
-  });
-
-  plugin.addCommand({
-    id: "create-snapshot",
-    name: "Create snapshot",
-    editorCallback: async (_editor, view) => {
-      if (!view.file) return;
-      const label = await plugin.promptText("Snapshot label (optional)");
-      try {
-        plugin.versionHistory.captureSnapshot(view.file.path, label || undefined);
-        await plugin.saveVersionHistory();
-        plugin.notify("Live Share: snapshot created");
-      } catch {
-        new Notice("Live Share: failed to create snapshot");
-      }
     },
   });
 

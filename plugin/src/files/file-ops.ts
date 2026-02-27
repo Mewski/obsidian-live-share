@@ -440,12 +440,11 @@ export class FileOpsManager {
     if (content.length > CHUNK_SIZE) {
       this.sendChunked(path, content, binary);
     } else {
-      this.emitOp({
-        type: "create",
-        path,
-        content,
-        binary: binary || undefined,
-      });
+      this.emitOp(
+        binary
+          ? { type: "create", path, content, binary: true }
+          : { type: "create", path, content },
+      );
     }
   }
 
@@ -460,13 +459,17 @@ export class FileOpsManager {
       totalChunks,
       lastActivity: Date.now(),
     });
-    this.emitOp({
-      type: "chunk-start",
-      path,
-      totalSize: content.length,
-      binary: binary || undefined,
-      transferId,
-    });
+    this.emitOp(
+      binary
+        ? {
+            type: "chunk-start",
+            path,
+            totalSize: content.length,
+            binary: true,
+            transferId,
+          }
+        : { type: "chunk-start", path, totalSize: content.length, transferId },
+    );
     for (let i = 0; i < totalChunks; i++) {
       const chunk = content.slice(i * CHUNK_SIZE, (i + 1) * CHUNK_SIZE);
       this.emitOp({

@@ -4,8 +4,11 @@ import type LiveSharePlugin from "../main";
 import { isTextFile } from "../utils";
 
 export function registerVaultEvents(plugin: LiveSharePlugin): void {
+  let pendingRename: Promise<void> | null = null;
+
   plugin.registerEvent(
-    plugin.app.workspace.on("active-leaf-change", () => {
+    plugin.app.workspace.on("active-leaf-change", async () => {
+      if (pendingRename) await pendingRename;
       plugin.onActiveFileChange();
       plugin.presenceManager?.debouncedBroadcastPresence();
     }),
@@ -24,7 +27,6 @@ export function registerVaultEvents(plugin: LiveSharePlugin): void {
               : await plugin.app.vault.readBinary(file);
             if (isTextFile(file.path)) {
               await plugin.backgroundSync.onFileAdded(file.path);
-              plugin.versionHistory.trackFile(file.path);
             }
             await plugin.manifestManager.updateFile(file, content);
           } catch {
@@ -38,20 +40,20 @@ export function registerVaultEvents(plugin: LiveSharePlugin): void {
   );
 
   plugin.registerEvent(
-    plugin.app.vault.on("delete", (file: TAbstractFile) => {
+    plugin.app.vault.on("delete", async (file: TAbstractFile) => {
+      if (pendingRename) await pendingRename;
       if (!plugin.manifestManager.isSharedPath(file.path)) return;
       if (plugin.fileOpsManager.isPathMuted(file.path)) return;
       plugin.fileOpsManager.onFileDelete(file);
       if (plugin.settings.role === "host") {
         plugin.backgroundSync.onFileRemoved(file.path);
-        plugin.versionHistory.untrackFile(file.path);
         plugin.manifestManager.removeFile(file.path);
       }
     }),
   );
 
   plugin.registerEvent(
-    plugin.app.vault.on("rename", async (file: TAbstractFile, oldPath: string) => {
+    plugin.app.vault.on("rename", (file: TAbstractFile, oldPath: string) => {
       if (
         !plugin.manifestManager.isSharedPath(file.path) &&
         !plugin.manifestManager.isSharedPath(oldPath)
@@ -62,19 +64,20 @@ export function registerVaultEvents(plugin: LiveSharePlugin): void {
         plugin.fileOpsManager.isPathMuted(oldPath)
       )
         return;
-      plugin.fileOpsManager.onFileRename(file, oldPath);
-      await plugin.backgroundSync.onFileRenamed(oldPath, file.path);
-      plugin.versionHistory.untrackFile(oldPath);
-      if (isTextFile(file.path)) {
-        plugin.versionHistory.trackFile(file.path);
-      }
-      if (plugin.settings.role === "host") {
-        plugin.manifestManager.renameFile(oldPath, file.path, plugin.syncManager);
-      }
-      const activeFile = plugin.app.workspace.getActiveViewOfType(MarkdownView)?.file;
-      if (activeFile && (activeFile.path === file.path || activeFile.path === oldPath)) {
-        plugin.onActiveFileChange();
-      }
+
+      pendingRename = (async () => {
+        plugin.fileOpsManager.onFileRename(file, oldPath);
+        await plugin.backgroundSync.onFileRenamed(oldPath, file.path);
+        if (plugin.settings.role === "host") {
+          plugin.manifestManager.renameFile(oldPath, file.path, plugin.syncManager);
+        }
+        const activeFile = plugin.app.workspace.getActiveViewOfType(MarkdownView)?.file;
+        if (activeFile && (activeFile.path === file.path || activeFile.path === oldPath)) {
+          plugin.onActiveFileChange();
+        }
+      })().finally(() => {
+        pendingRename = null;
+      });
     }),
   );
 

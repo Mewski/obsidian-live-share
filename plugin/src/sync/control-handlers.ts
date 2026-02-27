@@ -251,10 +251,17 @@ export function registerControlHandlers(plugin: LiveSharePlugin): void {
     plugin.logger.log("session", "host disconnected");
   });
 
-  cc.on("host-changed", (msg) => {
+  cc.on("host-changed", async (msg) => {
+    if (plugin.settings.role === "host") {
+      plugin.settings.role = "guest";
+      await plugin.saveSettings();
+    }
     for (const [userId, user] of plugin.remoteUsers) {
       user.isHost = userId === msg.userId;
     }
+    plugin.presenceManager?.broadcastPresence();
+    plugin.onActiveFileChange();
+    plugin.updateStatusBar();
     plugin.refreshPresenceView();
     plugin.notify(`Live Share: ${msg.displayName} is now the host`);
     plugin.logger.log("session", `host changed to ${msg.userId}`);

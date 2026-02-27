@@ -10,7 +10,6 @@ import { ExclusionManager } from "./files/exclusion";
 import { FileOpsManager } from "./files/file-ops";
 import { ManifestManager } from "./files/manifest";
 import { registerVaultEvents } from "./files/vault-events";
-import { VersionHistoryManager } from "./files/version-history";
 import { AuthManager } from "./session/auth";
 import { registerCommands } from "./session/commands";
 import { PresenceManager } from "./session/presence-manager";
@@ -53,7 +52,6 @@ export default class LiveSharePlugin extends Plugin {
   backgroundSync!: BackgroundSync;
   connectionState!: ConnectionStateManager;
   logger!: DebugLogger;
-  versionHistory!: VersionHistoryManager;
 
   canvasSync: CanvasSync | null = null;
   explorerIndicators: ExplorerIndicators | null = null;
@@ -195,12 +193,6 @@ export default class LiveSharePlugin extends Plugin {
       this.settings.debugLogPath,
       this.settings.debugLogging,
     );
-    this.versionHistory = new VersionHistoryManager(
-      this.syncManager,
-      this.userId,
-      this.settings.displayName,
-    );
-    this.loadVersionHistory();
     this.connectionStateUnsub = this.connectionState.onChange(() => this.updateStatusBar());
 
     this.registerEditorExtension(this.collabManager.getBaseExtension());
@@ -367,8 +359,6 @@ export default class LiveSharePlugin extends Plugin {
   }
 
   cleanupSession() {
-    this.versionHistory.stopAutoCapture();
-    this.saveVersionHistory();
     this.explorerIndicators?.destroy();
     this.explorerIndicators = null;
     this.canvasSync?.destroy();
@@ -571,21 +561,16 @@ export default class LiveSharePlugin extends Plugin {
       }
     });
 
+    registerControlHandlers(this);
     this.controlChannel.connect();
 
-    registerControlHandlers(this);
-
-    this.versionHistory.startAutoCapture();
     this.explorerIndicators = new ExplorerIndicators();
     this.canvasSync = new CanvasSync(this.app.vault, this.syncManager, this.fileOpsManager);
     const entries = this.manifestManager.getEntries();
     const role = this.settings.role === "host" ? "host" : "guest";
     for (const [path] of entries) {
-      if (isTextFile(path)) {
-        this.versionHistory.trackFile(path);
-        if (path.endsWith(".canvas")) {
-          this.canvasSync.subscribe(path, role);
-        }
+      if (isTextFile(path) && path.endsWith(".canvas")) {
+        this.canvasSync.subscribe(path, role);
       }
     }
 
@@ -844,9 +829,11 @@ export default class LiveSharePlugin extends Plugin {
     if (!this.settings.serverUrl || !this.settings.roomId || !this.settings.token) return;
     try {
       const url = `${this.settings.serverUrl}/rooms/${this.settings.roomId}/logs?limit=100`;
-      const res = await fetch(url, {
-        headers: { Authorization: `Bearer ${this.settings.token}` },
-      });
+      const headers: Record<string, string> = {
+        Authorization: `Bearer ${this.settings.token}`,
+      };
+      if (this.settings.serverPassword) headers["X-Server-Password"] = this.settings.serverPassword;
+      const res = await fetch(url, { headers });
       if (!res.ok) {
         new Notice("Live Share: failed to fetch audit log");
         return;
@@ -905,25 +892,5 @@ export default class LiveSharePlugin extends Plugin {
       const modal = new ConfirmModal(this.app, message, resolve);
       modal.open();
     });
-  }
-
-  private get snapshotPath(): string {
-    return `${this.manifest.dir}/snapshots.json`;
-  }
-
-  loadVersionHistory(): void {
-    this.app.vault.adapter
-      .read(this.snapshotPath)
-      .then((raw) => {
-        try {
-          this.versionHistory.loadStore(JSON.parse(raw));
-        } catch {}
-      })
-      .catch(() => {});
-  }
-
-  saveVersionHistory(): void {
-    const store = this.versionHistory.getStore();
-    this.app.vault.adapter.write(this.snapshotPath, JSON.stringify(store)).catch(() => {});
   }
 }

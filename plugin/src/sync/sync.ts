@@ -324,7 +324,7 @@ export class SyncManager {
 
     const decoder = decoding.createDecoder(payload);
     const syncEncoder = encoding.createEncoder();
-    const syncType = decoding.peekVarUint(decoder);
+    const msgType = decoding.peekVarUint(decoder);
 
     syncProtocol.readSyncMessage(decoder, syncEncoder, doc, this);
 
@@ -332,7 +332,7 @@ export class SyncManager {
       this.sendMux(docId, MUX_SYNC, encoding.toUint8Array(syncEncoder));
     }
 
-    if (syncType === SYNC_STEP2) {
+    if (msgType === SYNC_STEP2) {
       this.setSynced(docId, true);
     }
   }

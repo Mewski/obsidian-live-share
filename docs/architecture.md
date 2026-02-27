@@ -2,118 +2,75 @@
 
 ## Overview
 
-Obsidian Live Share is a two-part system: a **relay server** and an **Obsidian plugin**. The server relays Yjs CRDT updates and control messages between connected clients. The plugin integrates with Obsidian's CodeMirror 6 editor to provide real-time collaborative editing.
+Obsidian Live Share has two parts: a **relay server** and an **Obsidian plugin**. The server relays Yjs CRDT updates and control messages between clients. The plugin integrates with Obsidian's CodeMirror 6 editor for real-time collaborative editing.
 
 ## Channels
 
 Each session uses two WebSocket channels:
 
-1. **Yjs sync channel** (`/ws-mux/:roomId`): Multiplexed binary channel carrying Yjs CRDT updates and cursor awareness for all shared files. One Y.Doc per file, keyed as `roomId:filePath`. The manifest doc (file inventory) is at `roomId:__manifest__`. The server is a stateless relay that forwards messages between peers. Read-only enforcement is handled by peeking at sync message types server-side.
+1. **Yjs sync** (`/ws-mux/:roomId`) — Multiplexed binary channel for Yjs CRDT updates and cursor awareness. One Y.Doc per file, keyed as `roomId:filePath`. The manifest doc is at `roomId:__manifest__`. The server is a stateless relay. Read-only enforcement peeks at sync message types server-side.
 
-2. **Control channel** (`/control/:roomId`): JSON messages for file operations (create/delete/rename/modify), presence updates, follow mode, focus/summon requests, guest approval, kick, ping/pong latency, and session lifecycle.
+2. **Control** (`/control/:roomId`) — JSON messages for file operations, presence, permissions, follow/summon, guest approval, kick, ping/pong, and session lifecycle.
 
 ## Data Flow
 
-1. Host starts a session, creating a room on the server via `POST /rooms`
-2. Host's plugin scans the vault and publishes a manifest (file list with hashes) to a shared Y.Map
-3. Guest joins via invite link, receives the manifest, and pulls text files via per-file Yjs docs. Binary files are requested from the host via `sync-request` and delivered as chunked file operations.
-4. Both open the same file: Yjs syncs document content character-by-character in real-time
-5. File creates/deletes/renames are broadcast via the control channel with per-path suppression to prevent echo
-6. Presence (who's online, current file, scroll position, cursor line) is broadcast via debounced control messages
-7. Binary files are transferred as base64 via the control channel, automatically chunked for files over 512 KB
+1. Host starts a session via `POST /rooms`
+2. Host publishes a manifest (file list with hashes) to a shared Y.Map
+3. Guest joins via invite link, receives the manifest, pulls text files via per-file Yjs docs. Binary files are requested via `sync-request` and delivered as chunked file operations.
+4. Both open the same file: Yjs syncs content character-by-character
+5. File creates/deletes/renames broadcast via control channel with per-path suppression to prevent echo
+6. Presence (current file, scroll position, cursor) broadcasts via debounced control messages
 
 ## Server Components
 
 | Component | File | Responsibility |
 |-----------|------|----------------|
-| REST API | `rooms.ts` | Room CRUD, join validation, token-based auth |
-| Yjs handler | `ws-handler.ts` | Stateless message relay, awareness relay, read-only enforcement |
+| REST API | `rooms.ts` | Room CRUD, join validation, token auth |
+| Yjs handler | `ws-handler.ts` | Stateless message relay, read-only enforcement |
 | Control handler | `control-handler.ts` | Message routing, host determination, rate limiting, permission enforcement |
 | Persistence | `persistence.ts` | LevelDB storage for room metadata |
-| Permissions | `permissions.ts` | Per-user permission store for read-only enforcement |
+| Permissions | `permissions.ts` | Per-user permission store |
 | Auth | `github-auth.ts` | GitHub OAuth flow, JWT signing/verification |
-| Audit log | `audit-log.ts` | Append-only event log per room (join, leave, kick, permission changes) |
-| Util | `util.ts` | Timing-safe token comparison |
+| Audit log | `audit-log.ts` | Append-only event log per room |
 | Entry | `index.ts` | HTTP/HTTPS server, WebSocket upgrade routing, graceful shutdown |
 
 ## Plugin Components
 
-| Component | File | Responsibility |
-|-----------|------|----------------|
-| Main plugin | `main.ts` | Commands, vault event handlers, session lifecycle, presentation mode, ribbon menu, protocol handlers |
-| Background sync | `background-sync.ts` | Yjs observer-based sync for non-active text files, disk writes |
-| Control channel | `control-ws.ts` | WebSocket client with ping/pong latency, E2E encryption |
-| File operations | `file-ops.ts` | Remote op application, per-path suppression, chunked transfer |
-| Collaboration | `collab.ts` | CodeMirror 6 Yjs integration, per-file activation, cursor awareness |
-| Sync manager | `sync.ts` | Per-file Y.Doc management over multiplexed WebSocket |
-| Manifest | `manifest.ts` | File inventory sync via shared Y.Map, hash-based change detection |
-| Presence view | `presence-view.ts` | Sidebar panel showing users, follow/kick/summon buttons |
-| Approval modal | `approval-modal.ts` | Host approval dialog for guest join requests |
-| Focus notification | `focus-notification.ts` | Focus request notification with "Go to" action |
-| Connection state | `connection-state.ts` | State machine for connection lifecycle |
-| Crypto | `crypto.ts` | AES-256-GCM encryption with PBKDF2 key derivation |
-| Session | `session.ts` | Room creation/join, invite link encoding/parsing |
-| Debug logger | `debug-logger.ts` | Optional timestamped debug log written to a vault file |
-| Settings | `settings.ts` | Plugin settings UI with session actions |
-| Auth | `auth.ts` | GitHub OAuth token handling with protocol handler support |
-| Exclusion | `exclusion.ts` | File exclusion patterns from `.liveshare.json` |
-| Version history | `version-history.ts` | Manual and automatic file snapshots with restore |
-| Comments | `comments.ts` | Line-anchored comments synced via Yjs Y.Array |
-| Comment gutter | `comment-gutter.ts` | CM6 gutter extension showing comment indicators |
-| Comment modals | `comment-modal.ts` | Add, list, and thread comment modals |
-| Conflict decoration | `conflict-decoration.ts` | CM6 extension highlighting overlapping remote/local edits |
-| Canvas sync | `canvas-sync.ts` | Real-time `.canvas` file sync via Yjs Y.Map |
-| Explorer indicators | `explorer-indicators.ts` | Dynamic CSS injection for file permission icons in explorer |
-| Offline queue | `offline-queue.ts` | Buffers file operations while disconnected, replays on reconnect |
-| File permission modal | `file-permission-modal.ts` | Per-file permission assignment UI |
-| Audit modal | `audit-modal.ts` | Audit log viewer modal |
-| History modal | `history-modal.ts` | Version history browser and restore modal |
-| Types | `types.ts` | Shared type definitions and default settings |
-| Utils | `utils.ts` | Path normalization, line ending normalization, file type detection |
+| Component | Directory | Responsibility |
+|-----------|-----------|----------------|
+| Entry point | `main.ts` | Session lifecycle, vault events, ribbon menu, protocol handlers |
+| `sync/` | Networking | SyncManager (Yjs mux), ControlChannel (JSON WS), E2E crypto, connection state, offline queue |
+| `editor/` | CM6 | CollabManager (yCollab integration), conflict decoration |
+| `files/` | File sync | BackgroundSync (Yjs observers + disk writes), FileOpsManager (remote ops), ManifestManager, CanvasSync, ExclusionManager |
+| `session/` | Session | SessionManager, PresenceManager, PresenceView, AuthManager, command registration |
+| `ui/` | Modals | Settings, approval modal, audit modal, file permission modal, focus notification, explorer indicators |
 
 ## Key Design Decisions
 
-- **Yjs CRDT**: Character-level conflict-free merging without coordination. Battle-tested with CodeMirror 6 via `y-codemirror.next`.
-- **One Y.Doc per file**: Each shared text file gets its own Y.Doc, synced peer-to-peer through the relay.
-- **Hub-and-spoke topology**: All clients connect to the central relay server. No peer-to-peer.
-- **Per-path suppression**: Ref-counted suppression map prevents vault events from echoing remote operations back to the server. Uses 50ms delayed unsuppress to handle async vault event firing.
-- **Host determination**: Server-side, not client-side. JWT-verified identity is preferred; fallback without JWT: first connected client becomes host.
-- **Stateless relay**: Server forwards Yjs messages without maintaining Y.Doc state. The host's vault is the single source of truth. Room metadata is persisted to LevelDB. Document rooms are cleaned up 30 seconds after the last client disconnects.
-- **Background sync**: Non-active text files are synced via Y.Text observers with debounced disk writes. The active file syncs through yCollab in the editor.
-- **Minimal Y.Text updates**: When the host re-seeds a Yjs doc (e.g., on reload), only the differing portion is replaced (prefix/suffix preserved) to avoid CRDT merge artifacts.
-- **Line ending normalization**: All text content is normalized to `\n` at every entry point to prevent cross-platform mismatches.
-- **Forward-slash path normalization**: All file paths are normalized to `/` separators for cross-platform compatibility.
-- **Automatic reconnection**: The Yjs sync channel reconnects with exponential backoff on connection loss. The control channel connection drop ends the session immediately.
+- **One Y.Doc per file**: Each shared text file gets its own Y.Doc synced through the relay.
+- **Stateless relay**: Server forwards messages without maintaining document state. The host's vault is the source of truth.
+- **Per-path suppression**: Ref-counted suppression prevents vault events from echoing remote operations.
+- **Server-side host determination**: JWT-verified identity preferred; fallback: first connected client.
+- **Minimal Y.Text updates**: Only the differing portion is replaced (prefix/suffix preserved) to avoid CRDT artifacts.
+- **Background sync**: Non-active text files sync via Y.Text observers with debounced disk writes. The active file syncs through yCollab in the editor.
 
 ## Control Message Types
 
 | Type | Direction | Description |
 |------|-----------|-------------|
 | `file-op` | Bidirectional | File create/modify/delete/rename |
-| `file-chunk-start` | Bidirectional | Start chunked binary file transfer with total size |
-| `file-chunk-data` | Bidirectional | Individual chunk of binary file data |
-| `file-chunk-end` | Bidirectional | Signal end of chunked binary file transfer |
-| `presence-update` | Client -> All | Current file, scroll position, cursor line |
+| `file-chunk-*` | Bidirectional | Chunked binary file transfer (start/data/end/resume) |
+| `presence-update` | Client -> All | Current file, scroll, cursor |
 | `presence-leave` | Server -> All | User disconnected |
 | `focus-request` | Client -> All | "Look here" notification |
-| `summon` | Host -> Target(s) | Navigate user(s) to host's cursor |
-| `join-request` | Guest -> Host | Request to join (when approval required) |
-| `join-response` | Host -> Guest | Approve/deny with permission level |
-| `kick` | Host -> Server | Request to remove a participant |
-| `kicked` | Server -> Guest | Notification that you were removed |
-| `set-permission` | Host -> Server | Change a guest's permission (read-write / read-only) |
-| `permission-update` | Server -> Guest | Notification that your permission was changed |
-| `session-end` | Host -> All | Host ended the session |
-| `sync-request` | Guest -> Host | Request full file resync |
-| `present-start` | Host -> All | Host started presentation mode |
-| `present-stop` | Host -> All | Host stopped presentation mode |
-| `host-transfer-offer` | Host -> Target | Offer host role to a participant |
-| `host-transfer-accept` | Target -> Server | Accept host transfer (server validates pending offer) |
-| `host-transfer-decline` | Target -> Host | Decline host transfer |
-| `host-transfer-complete` | Server -> New Host | Confirmation that host role was transferred |
-| `host-changed` | Server -> All | Notification that the host changed |
-| `host-disconnected` | Server -> All | Notification that the host disconnected |
-| `set-file-permission` | Host -> Server | Set per-file permission override for a guest |
-| `file-permission-update` | Server -> Guest | Notification of per-file permission change |
-| `file-chunk-resume` | Receiver -> Sender | Request retransmission of missing chunks |
-| `ping` / `pong` | Client <-> Server | Latency measurement (30s interval) |
+| `summon` | Host -> Target(s) | Navigate user to host's cursor |
+| `join-request/response` | Guest <-> Host | Approval flow |
+| `kick` / `kicked` | Host -> Server -> Guest | Remove participant |
+| `set-permission` / `permission-update` | Host -> Server -> Guest | Permission changes |
+| `session-end` | Host -> All | Session ended |
+| `sync-request` | Guest -> Host | Request file resync |
+| `present-start/stop` | Host -> All | Presentation mode |
+| `host-transfer-*` | Various | Host role transfer flow |
+| `host-changed` | Server -> All | New host notification |
+| `set-file-permission` / `file-permission-update` | Host -> Server -> Guest | Per-file permission |
+| `ping` / `pong` | Client <-> Server | Latency measurement |
