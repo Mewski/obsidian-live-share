@@ -54,8 +54,8 @@ export class ConnectionStateManager {
   onChange(listener: Listener): () => void {
     this.listeners.push(listener);
     return () => {
-      const idx = this.listeners.indexOf(listener);
-      if (idx >= 0) this.listeners.splice(idx, 1);
+      const index = this.listeners.indexOf(listener);
+      if (index >= 0) this.listeners.splice(index, 1);
     };
   }
 }

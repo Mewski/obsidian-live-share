@@ -8,6 +8,7 @@ import {
   clearRoomPermissions,
   clearUserFilePermissions,
   getEffectivePermission,
+  getPermission,
   setFilePermission,
   setPermission,
 } from "./permissions.js";
@@ -64,6 +65,7 @@ interface ControlRoom {
   clients: Map<WebSocket, ControlClient>;
   pendingApprovals: Map<string, WebSocket>;
   pendingTransferTarget: string | null;
+  kickedUserIds: Set<string>;
   cleanupTimer?: ReturnType<typeof setTimeout>;
   nextJoinOrder: number;
 }
@@ -86,6 +88,7 @@ export function createControlWSS(options?: ControlWSSOptions) {
         clients: new Map(),
         pendingApprovals: new Map(),
         pendingTransferTarget: null,
+        kickedUserIds: new Set(),
         nextJoinOrder: 0,
       };
       rooms.set(roomId, room);
@@ -104,14 +107,14 @@ export function createControlWSS(options?: ControlWSSOptions) {
   }
 
   function broadcast(room: ControlRoom, data: Buffer | string, exclude?: WebSocket) {
-    const str = typeof data === "string" ? data : data.toString("utf-8");
+    const messageString = typeof data === "string" ? data : data.toString("utf-8");
     for (const [ws, client] of room.clients) {
-      if (ws !== exclude && client.isApproved) safeSend(ws, str);
+      if (ws !== exclude && client.isApproved) safeSend(ws, messageString);
     }
   }
 
-  function sendTo(ws: WebSocket, msg: Record<string, unknown>) {
-    safeSend(ws, JSON.stringify(msg));
+  function sendTo(ws: WebSocket, message: Record<string, unknown>) {
+    safeSend(ws, JSON.stringify(message));
   }
 
   function getHostClient(room: ControlRoom): ControlClient | undefined {
@@ -230,6 +233,40 @@ export function createControlWSS(options?: ControlWSSOptions) {
           typeof msg.displayName === "string" ? msg.displayName.slice(0, 100) : "";
 
         if (serverRoom?.requireApproval) {
+          const existingPermission = client.userId
+            ? getPermission(roomId, client.userId)
+            : undefined;
+          if (existingPermission) {
+            client.isApproved = true;
+            client.permission = existingPermission;
+            appendLog(roomId, {
+              timestamp: Date.now(),
+              event: "rejoin",
+              userId: client.userId,
+              displayName: client.displayName,
+            });
+            sendTo(ws, {
+              type: "join-response",
+              approved: true,
+              permission: client.permission,
+            });
+          } else {
+            client.isApproved = false;
+            room.pendingApprovals.set(client.userId, ws);
+
+            const host = getHostClient(room);
+            if (host) {
+              sendTo(host.ws, {
+                type: "join-request",
+                userId: client.userId,
+                displayName: client.displayName,
+                avatarUrl: msg.avatarUrl || "",
+                verified: !!client.verifiedUserId,
+              });
+            }
+          }
+        } else if (room.kickedUserIds.has(client.userId)) {
+          room.kickedUserIds.delete(client.userId);
           client.isApproved = false;
           room.pendingApprovals.set(client.userId, ws);
 
@@ -296,6 +333,7 @@ export function createControlWSS(options?: ControlWSSOptions) {
       if (msg.type === "kick" && client.isHost) {
         const targetUserId = msg.userId;
         if (typeof targetUserId !== "string" || !targetUserId) return;
+        room.kickedUserIds.add(targetUserId);
         for (const [clientWs, targetClient] of room.clients) {
           if (targetClient.userId === targetUserId) {
             appendLog(roomId, {

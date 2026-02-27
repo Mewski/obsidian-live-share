@@ -11,6 +11,8 @@ import {
   isTextFile,
   normalizeLineEndings,
   normalizePath,
+  toCanonicalPath,
+  toLocalPath,
 } from "../utils";
 import type { FileOpsManager } from "./file-ops";
 import type { ManifestManager } from "./manifest";
@@ -20,6 +22,7 @@ const DEBOUNCE_MS = 1000;
 export class BackgroundSync {
   private observers = new Map<string, () => void>();
   private subscribing = new Set<string>();
+  private cancelledSubscribes = new Set<string>();
   private writeTimers = new Map<string, ReturnType<typeof setTimeout>>();
   private activeFile: string | null = null;
   private recentDiskWrites = new Set<string>();
@@ -53,9 +56,17 @@ export class BackgroundSync {
     }
   }
 
+  cancelSubscribe(rawPath: string): void {
+    const path = toCanonicalPath(normalizePath(rawPath));
+    if (this.subscribing.has(path)) {
+      this.cancelledSubscribes.add(path);
+    }
+  }
+
   async subscribe(rawPath: string): Promise<void> {
-    const path = normalizePath(rawPath);
+    const path = toCanonicalPath(normalizePath(rawPath));
     if (this.observers.has(path) || this.subscribing.has(path)) return;
+    this.cancelledSubscribes.delete(path);
     this.subscribing.add(path);
 
     try {
@@ -68,18 +79,21 @@ export class BackgroundSync {
         return;
       }
 
+      if (this.cancelledSubscribes.has(path)) return;
       if (this.observers.has(path)) return;
       if (docHandle.doc.isDestroyed) return;
 
+      const diskPath = toLocalPath(path);
       if (this.role === "host" && path !== this.activeFile) {
-        const file = getFileByPath(this.vault, path);
+        const file = getFileByPath(this.vault, diskPath);
         if (file) {
           const content = normalizeLineEndings(await this.vault.read(file));
+          if (this.cancelledSubscribes.has(path)) return;
           applyMinimalYTextUpdate(docHandle.doc, docHandle.text, content);
           this.lastWrittenContent.set(path, content);
         }
       } else if (this.role === "guest" && docHandle.text.length > 0) {
-        const file = getFileByPath(this.vault, path);
+        const file = getFileByPath(this.vault, diskPath);
         const remoteContent = docHandle.text.toString();
         const localContent = file ? normalizeLineEndings(await this.vault.read(file)) : "";
         if (remoteContent !== localContent) {
@@ -89,20 +103,17 @@ export class BackgroundSync {
         }
       }
 
-      const observer = (_event: Y.YTextEvent, transaction: Y.Transaction) => {
-        if (transaction.local) return;
-        if (path === this.activeFile) return;
-        this.scheduleDiskWrite(path, docHandle.text);
-      };
-      docHandle.text.observe(observer);
-      this.observers.set(path, () => docHandle.text.unobserve(observer));
+      if (this.cancelledSubscribes.has(path)) return;
+
+      this.attachObserver(path, docHandle.text);
     } finally {
       this.subscribing.delete(path);
+      this.cancelledSubscribes.delete(path);
     }
   }
 
   unsubscribe(rawPath: string): void {
-    const path = normalizePath(rawPath);
+    const path = toCanonicalPath(normalizePath(rawPath));
     this.flushWrite(path);
     const unobserve = this.observers.get(path);
     if (unobserve) {
@@ -112,7 +123,7 @@ export class BackgroundSync {
   }
 
   setActiveFile(rawPath: string | null): void {
-    const path = rawPath ? normalizePath(rawPath) : null;
+    const path = rawPath ? toCanonicalPath(normalizePath(rawPath)) : null;
     const oldActive = this.activeFile;
     this.activeFile = path;
 
@@ -122,7 +133,7 @@ export class BackgroundSync {
         const content = docHandle.text.toString();
         this.writeToDisk(oldActive, content);
         if (this.role === "host") {
-          const file = getFileByPath(this.vault, oldActive);
+          const file = getFileByPath(this.vault, toLocalPath(oldActive));
           if (file) this.manifestManager.updateFile(file, content);
         }
       }
@@ -130,13 +141,13 @@ export class BackgroundSync {
   }
 
   async onFileAdded(rawPath: string): Promise<void> {
-    const path = normalizePath(rawPath);
+    const path = toCanonicalPath(normalizePath(rawPath));
     if (!isTextFile(path)) return;
     await this.subscribe(path);
   }
 
   onFileRemoved(rawPath: string): void {
-    const path = normalizePath(rawPath);
+    const path = toCanonicalPath(normalizePath(rawPath));
     const timer = this.writeTimers.get(path);
     if (timer) {
       clearTimeout(timer);
@@ -151,8 +162,8 @@ export class BackgroundSync {
   }
 
   async onFileRenamed(oldPath: string, newPath: string): Promise<void> {
-    const normOld = normalizePath(oldPath);
-    const normNew = normalizePath(newPath);
+    const normOld = toCanonicalPath(normalizePath(oldPath));
+    const normNew = toCanonicalPath(normalizePath(newPath));
 
     const timer = this.writeTimers.get(normOld);
     if (timer) {
@@ -186,14 +197,15 @@ export class BackgroundSync {
       if (this.observers.has(normNew)) return;
       if (docHandle.doc.isDestroyed) return;
 
+      const diskNew = toLocalPath(normNew);
       if (this.role === "host") {
-        const file = getFileByPath(this.vault, normNew);
+        const file = getFileByPath(this.vault, diskNew);
         if (file) {
           const content = normalizeLineEndings(await this.vault.read(file));
           applyMinimalYTextUpdate(docHandle.doc, docHandle.text, content);
         }
       } else if (docHandle.text.length > 0) {
-        const file = getFileByPath(this.vault, normNew);
+        const file = getFileByPath(this.vault, diskNew);
         const remoteContent = docHandle.text.toString();
         const localContent = file ? normalizeLineEndings(await this.vault.read(file)) : "";
         if (remoteContent !== localContent) {
@@ -201,27 +213,21 @@ export class BackgroundSync {
         }
       }
 
-      const observer = (_event: Y.YTextEvent, transaction: Y.Transaction) => {
-        if (transaction.local) return;
-        if (normNew === this.activeFile) return;
-        this.scheduleDiskWrite(normNew, docHandle.text);
-      };
-      docHandle.text.observe(observer);
-      this.observers.set(normNew, () => docHandle.text.unobserve(observer));
+      this.attachObserver(normNew, docHandle.text);
     } finally {
       this.subscribing.delete(normNew);
     }
   }
 
   async handleLocalTextModify(rawPath: string): Promise<void> {
-    const path = normalizePath(rawPath);
+    const path = toCanonicalPath(normalizePath(rawPath));
     if (this.recentDiskWrites.has(path)) return;
     if (path === this.activeFile) return;
 
     const docHandle = this.syncManager.getDoc(path);
     if (!docHandle) return;
 
-    const file = getFileByPath(this.vault, path);
+    const file = getFileByPath(this.vault, toLocalPath(path));
     if (!file) return;
 
     const localContent = normalizeLineEndings(await this.vault.read(file));
@@ -235,7 +241,7 @@ export class BackgroundSync {
   }
 
   isRecentDiskWrite(rawPath: string): boolean {
-    return this.recentDiskWrites.has(normalizePath(rawPath));
+    return this.recentDiskWrites.has(toCanonicalPath(normalizePath(rawPath)));
   }
 
   destroy(): void {
@@ -248,9 +254,20 @@ export class BackgroundSync {
       unobserve();
     }
     this.observers.clear();
+    this.cancelledSubscribes.clear();
     this.activeFile = null;
     this.recentDiskWrites.clear();
     this.lastWrittenContent.clear();
+  }
+
+  private attachObserver(path: string, text: Y.Text): void {
+    const observer = (_event: Y.YTextEvent, transaction: Y.Transaction) => {
+      if (transaction.local) return;
+      if (path === this.activeFile) return;
+      this.scheduleDiskWrite(path, text);
+    };
+    text.observe(observer);
+    this.observers.set(path, () => text.unobserve(observer));
   }
 
   private flushWrite(path: string): void {
@@ -284,10 +301,11 @@ export class BackgroundSync {
 
   private async doWriteToDisk(path: string, content: string): Promise<void> {
     if (this.lastWrittenContent.get(path) === content) return;
+    const diskPath = toLocalPath(path);
     this.recentDiskWrites.add(path);
-    this.fileOpsManager.mutePathEvents(path);
+    this.fileOpsManager.mutePathEvents(diskPath);
     try {
-      const file = getFileByPath(this.vault, path);
+      const file = getFileByPath(this.vault, diskPath);
       if (file) {
         const existing = normalizeLineEndings(await this.vault.read(file));
         if (existing === content) {
@@ -295,16 +313,16 @@ export class BackgroundSync {
           return;
         }
       }
-      const dir = path.substring(0, path.lastIndexOf("/"));
-      if (dir) await ensureFolder(this.vault, dir);
-      await this.vault.adapter.write(path, content);
+      const parentDir = diskPath.substring(0, diskPath.lastIndexOf("/"));
+      if (parentDir) await ensureFolder(this.vault, parentDir);
+      await this.vault.adapter.write(diskPath, content);
       this.lastWrittenContent.set(path, content);
     } catch {
-      new Notice(`Live Share: failed to write ${path}`);
+      new Notice(`Live Share: failed to write ${diskPath}`);
     } finally {
       setTimeout(() => {
         this.recentDiskWrites.delete(path);
-        this.fileOpsManager.unmutePathEvents(path);
+        this.fileOpsManager.unmutePathEvents(diskPath);
       }, VAULT_EVENT_SETTLE_MS);
     }
   }

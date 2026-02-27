@@ -5,6 +5,7 @@ import { isTextFile } from "../utils";
 
 export function registerVaultEvents(plugin: LiveSharePlugin): void {
   let pendingRename: Promise<void> | null = null;
+  const renamedPaths = new Set<string>();
 
   plugin.registerEvent(
     plugin.app.workspace.on("active-leaf-change", async () => {
@@ -16,24 +17,29 @@ export function registerVaultEvents(plugin: LiveSharePlugin): void {
 
   plugin.registerEvent(
     plugin.app.vault.on("create", async (file: TAbstractFile) => {
-      if (!plugin.manifestManager.isSharedPath(file.path)) return;
-      if (plugin.fileOpsManager.isPathMuted(file.path)) return;
+      const originalPath = file.path;
+      if (!plugin.manifestManager.isSharedPath(originalPath)) return;
+      if (plugin.fileOpsManager.isPathMuted(originalPath)) return;
       plugin.fileOpsManager.onFileCreate(file);
       if (plugin.settings.role === "host") {
         if (file instanceof TFile) {
           try {
-            const content = isTextFile(file.path)
+            const content = isTextFile(originalPath)
               ? await plugin.app.vault.read(file)
               : await plugin.app.vault.readBinary(file);
-            if (isTextFile(file.path)) {
-              await plugin.backgroundSync.onFileAdded(file.path);
+            if (renamedPaths.has(originalPath)) return;
+            if (isTextFile(originalPath)) {
+              await plugin.backgroundSync.onFileAdded(originalPath);
             }
+            if (renamedPaths.has(originalPath)) return;
             await plugin.manifestManager.updateFile(file, content);
           } catch {
-            new Notice(`Live Share: failed to update manifest for ${file.path}`);
+            if (!renamedPaths.has(originalPath)) {
+              new Notice(`Live Share: failed to update manifest for ${originalPath}`);
+            }
           }
         } else {
-          plugin.manifestManager.addFolder(file.path);
+          plugin.manifestManager.addFolder(originalPath);
         }
       }
     }),
@@ -65,8 +71,11 @@ export function registerVaultEvents(plugin: LiveSharePlugin): void {
       )
         return;
 
+      renamedPaths.add(oldPath);
+
       pendingRename = (async () => {
         plugin.fileOpsManager.onFileRename(file, oldPath);
+        plugin.backgroundSync.cancelSubscribe(oldPath);
         await plugin.backgroundSync.onFileRenamed(oldPath, file.path);
         if (plugin.settings.role === "host") {
           plugin.manifestManager.renameFile(oldPath, file.path, plugin.syncManager);
@@ -77,6 +86,7 @@ export function registerVaultEvents(plugin: LiveSharePlugin): void {
         }
       })().finally(() => {
         pendingRename = null;
+        renamedPaths.delete(oldPath);
       });
     }),
   );

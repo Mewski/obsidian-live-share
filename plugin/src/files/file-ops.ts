@@ -6,10 +6,11 @@ import {
   arrayBufferToBase64,
   base64ToArrayBuffer,
   ensureFolder,
-  getPathWarning,
   isTextFile,
   normalizeLineEndings,
   normalizePath,
+  toCanonicalPath,
+  toLocalPath,
 } from "../utils";
 
 const CHUNK_SIZE = 512 * 1024;
@@ -151,21 +152,13 @@ export class FileOpsManager {
 
   private async applyRemoteOpInner(rawOp: FileOp) {
     const op = { ...rawOp } as FileOp;
-    if ("path" in op) op.path = normalizePath(op.path);
-    if ("oldPath" in op) op.oldPath = normalizePath(op.oldPath);
-    if ("newPath" in op) op.newPath = normalizePath(op.newPath);
+    if ("path" in op) op.path = toLocalPath(normalizePath(op.path));
+    if ("oldPath" in op) op.oldPath = toLocalPath(normalizePath(op.oldPath));
+    if ("newPath" in op) op.newPath = toLocalPath(normalizePath(op.newPath));
 
     if ("path" in op && !this.isPathSafe(op.path)) return;
     if ("oldPath" in op && !this.isPathSafe(op.oldPath)) return;
     if ("newPath" in op && !this.isPathSafe(op.newPath)) return;
-
-    for (const opPath of this.getOpPaths(op)) {
-      const warning = getPathWarning(opPath);
-      if (warning) {
-        new Notice(`Live Share: ${warning}, skipping ${op.type}`);
-        return;
-      }
-    }
 
     const paths = this.getOpPaths(op);
     for (const path of paths) this.mutePathEvents(path);
@@ -175,17 +168,17 @@ export class FileOpsManager {
           const exists = this.vault.getAbstractFileByPath(op.path);
           if (exists) {
             if (op.binary) {
-              const buf = base64ToArrayBuffer(op.content);
-              await this.vault.modifyBinary(exists as TFile, buf);
+              const binaryData = base64ToArrayBuffer(op.content);
+              await this.vault.modifyBinary(exists as TFile, binaryData);
             } else {
               await this.vault.modify(exists as TFile, op.content);
             }
           } else {
-            const dir = op.path.substring(0, op.path.lastIndexOf("/"));
-            if (dir) await ensureFolder(this.vault, dir);
+            const parentDir = op.path.substring(0, op.path.lastIndexOf("/"));
+            if (parentDir) await ensureFolder(this.vault, parentDir);
             if (op.binary) {
-              const buf = base64ToArrayBuffer(op.content);
-              await this.vault.createBinary(op.path, buf);
+              const binaryData = base64ToArrayBuffer(op.content);
+              await this.vault.createBinary(op.path, binaryData);
             } else {
               await this.vault.create(op.path, op.content);
             }
@@ -196,8 +189,8 @@ export class FileOpsManager {
           const file = this.vault.getAbstractFileByPath(op.path);
           if (file) {
             if (op.binary) {
-              const buf = base64ToArrayBuffer(op.content);
-              await this.vault.modifyBinary(file as TFile, buf);
+              const binaryData = base64ToArrayBuffer(op.content);
+              await this.vault.modifyBinary(file as TFile, binaryData);
             } else {
               await this.vault.modify(file as TFile, op.content);
             }
@@ -225,8 +218,8 @@ export class FileOpsManager {
             break;
           }
           if (file && !alreadyExists) {
-            const dir = op.newPath.substring(0, op.newPath.lastIndexOf("/"));
-            if (dir) await ensureFolder(this.vault, dir);
+            const parentDir = op.newPath.substring(0, op.newPath.lastIndexOf("/"));
+            if (parentDir) await ensureFolder(this.vault, parentDir);
             try {
               await this.vault.rename(file, op.newPath);
             } catch {
@@ -299,12 +292,12 @@ export class FileOpsManager {
           const joined = assembly.chunks.join("");
           const exists = this.vault.getAbstractFileByPath(op.path);
           if (!exists) {
-            const dir = op.path.substring(0, op.path.lastIndexOf("/"));
-            if (dir) await ensureFolder(this.vault, dir);
+            const parentDir = op.path.substring(0, op.path.lastIndexOf("/"));
+            if (parentDir) await ensureFolder(this.vault, parentDir);
           }
           if (assembly.binary) {
-            const buf = base64ToArrayBuffer(joined);
-            await this.vault.adapter.writeBinary(op.path, buf);
+            const binaryData = base64ToArrayBuffer(joined);
+            await this.vault.adapter.writeBinary(op.path, binaryData);
           } else {
             await this.vault.adapter.write(op.path, joined);
           }
@@ -350,90 +343,102 @@ export class FileOpsManager {
   }
 
   async onFileCreate(file: TAbstractFile) {
-    const path = normalizePath(file.path);
-    if (this.isPathMuted(path) || !this.sendOp) return;
+    const localPath = normalizePath(file.path);
+    if (this.isPathMuted(localPath) || !this.sendOp) return;
+    const wirePath = toCanonicalPath(localPath);
     if (!("extension" in file)) {
-      this.emitOp({ type: "folder-create", path });
+      this.emitOp({ type: "folder-create", path: wirePath });
       return;
     }
-    const prev = this.sendQueues.get(path) ?? Promise.resolve();
+    const prev = this.sendQueues.get(localPath) ?? Promise.resolve();
     const binary = !isTextFile(file.path);
     const task = prev.then(async () => {
       if (!this.sendOp) return;
       try {
         if (binary) {
-          const buf = await this.vault.readBinary(file as TFile);
-          if (this.isPathMuted(path)) return;
-          if (buf.byteLength > MAX_FILE_SIZE) {
-            new Notice(`Live Share: ${path} exceeds 50 MB limit, skipping`);
+          const binaryContent = await this.vault.readBinary(file as TFile);
+          if (this.isPathMuted(localPath)) return;
+          if (binaryContent.byteLength > MAX_FILE_SIZE) {
+            new Notice(`Live Share: ${localPath} exceeds 50 MB limit, skipping`);
             return;
           }
-          this.sendFileContent(path, arrayBufferToBase64(buf), true);
+          this.sendFileContent(wirePath, arrayBufferToBase64(binaryContent), true);
         } else {
           const content = normalizeLineEndings(await this.vault.read(file as TFile));
-          if (this.isPathMuted(path)) return;
-          this.sendFileContent(path, content, false);
+          if (this.isPathMuted(localPath)) return;
+          this.sendFileContent(wirePath, content, false);
         }
       } catch {
-        new Notice(`Live Share: failed to sync ${path}`);
+        new Notice(`Live Share: failed to sync ${localPath}`);
       }
     });
-    this.sendQueues.set(path, task);
+    this.sendQueues.set(localPath, task);
     await task;
-    if (this.sendQueues.get(path) === task) this.sendQueues.delete(path);
+    if (this.sendQueues.get(localPath) === task) this.sendQueues.delete(localPath);
   }
 
   async onFileModify(file: TAbstractFile) {
-    const path = normalizePath(file.path);
-    if (this.isPathMuted(path) || !this.sendOp) return;
+    const localPath = normalizePath(file.path);
+    if (this.isPathMuted(localPath) || !this.sendOp) return;
     if (!("extension" in file)) return;
     const binary = !isTextFile(file.path);
     if (!binary) return;
-    const prev = this.sendQueues.get(path) ?? Promise.resolve();
+    const wirePath = toCanonicalPath(localPath);
+    const prev = this.sendQueues.get(localPath) ?? Promise.resolve();
     const task = prev.then(async () => {
       if (!this.sendOp) return;
       try {
-        const buf = await this.vault.readBinary(file as TFile);
-        if (this.isPathMuted(path)) return;
-        if (buf.byteLength > MAX_FILE_SIZE) {
-          new Notice(`Live Share: ${path} exceeds 50 MB limit, skipping`);
+        const binaryContent = await this.vault.readBinary(file as TFile);
+        if (this.isPathMuted(localPath)) return;
+        if (binaryContent.byteLength > MAX_FILE_SIZE) {
+          new Notice(`Live Share: ${localPath} exceeds 50 MB limit, skipping`);
           return;
         }
-        const content = arrayBufferToBase64(buf);
+        const content = arrayBufferToBase64(binaryContent);
         if (content.length > CHUNK_SIZE) {
-          this.sendChunked(path, content, true);
+          this.sendChunked(wirePath, content, true);
         } else {
-          this.emitOp({ type: "modify", path, content, binary: true });
+          this.emitOp({
+            type: "modify",
+            path: wirePath,
+            content,
+            binary: true,
+          });
         }
       } catch {
-        new Notice(`Live Share: failed to sync ${path}`);
+        new Notice(`Live Share: failed to sync ${localPath}`);
       }
     });
-    this.sendQueues.set(path, task);
+    this.sendQueues.set(localPath, task);
     await task;
-    if (this.sendQueues.get(path) === task) this.sendQueues.delete(path);
+    if (this.sendQueues.get(localPath) === task) this.sendQueues.delete(localPath);
   }
 
   onFileDelete(file: TAbstractFile) {
-    const path = normalizePath(file.path);
-    if (this.isPathMuted(path) || !this.sendOp) return;
-    const prev = this.sendQueues.get(path) ?? Promise.resolve();
+    const localPath = normalizePath(file.path);
+    if (this.isPathMuted(localPath) || !this.sendOp) return;
+    const wirePath = toCanonicalPath(localPath);
+    const prev = this.sendQueues.get(localPath) ?? Promise.resolve();
     const task = prev.then(() => {
-      this.emitOp({ type: "delete", path });
+      this.emitOp({ type: "delete", path: wirePath });
     });
-    this.sendQueues.set(path, task);
+    this.sendQueues.set(localPath, task);
   }
 
   onFileRename(file: TAbstractFile, oldPath: string) {
-    const newPath = normalizePath(file.path);
-    const oldNorm = normalizePath(oldPath);
-    if (this.isPathMuted(newPath) || this.isPathMuted(oldNorm) || !this.sendOp) return;
-    const prev = this.sendQueues.get(oldNorm) ?? Promise.resolve();
+    const localNew = normalizePath(file.path);
+    const localOld = normalizePath(oldPath);
+    if (this.isPathMuted(localNew) || this.isPathMuted(localOld) || !this.sendOp) return;
+    const prev = this.sendQueues.get(localOld) ?? Promise.resolve();
     const task = prev.then(() => {
-      this.emitOp({ type: "rename", oldPath: oldNorm, newPath });
+      this.emitOp({
+        type: "rename",
+        oldPath: toCanonicalPath(localOld),
+        newPath: toCanonicalPath(localNew),
+      });
     });
-    this.sendQueues.set(oldNorm, task);
-    this.sendQueues.set(newPath, task);
+    this.sendQueues.set(localOld, task);
+    this.sendQueues.set(localNew, task);
   }
 
   private sendFileContent(path: string, content: string, binary: boolean) {

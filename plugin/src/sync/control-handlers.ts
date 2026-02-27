@@ -5,7 +5,7 @@ import type { ControlMessage, FileOp } from "../types";
 import { ApprovalModal } from "../ui/approval-modal";
 import { showFocusNotification } from "../ui/focus-notification";
 import { ConfirmModal } from "../ui/modals";
-import { isTextFile } from "../utils";
+import { isTextFile, toLocalPath } from "../utils";
 
 const CHUNK_TO_CONTROL = {
   "chunk-start": "file-chunk-start",
@@ -15,28 +15,28 @@ const CHUNK_TO_CONTROL = {
 } as const;
 
 const CONTROL_TO_CHUNK = Object.fromEntries(
-  Object.entries(CHUNK_TO_CONTROL).map(([k, v]) => [v, k]),
+  Object.entries(CHUNK_TO_CONTROL).map(([chunkType, controlType]) => [controlType, chunkType]),
 ) as Record<
   (typeof CHUNK_TO_CONTROL)[keyof typeof CHUNK_TO_CONTROL],
   keyof typeof CHUNK_TO_CONTROL
 >;
 
 export function registerControlHandlers(plugin: LiveSharePlugin): void {
-  const cc = plugin.controlChannel;
-  if (!cc) return;
+  const channel = plugin.controlChannel;
+  if (!channel) return;
 
   plugin.fileOpsManager.setSender((op) => {
     if (op.type === "chunk-start" || op.type === "chunk-data" || op.type === "chunk-end") {
-      cc.send({
+      channel.send({
         ...op,
         type: CHUNK_TO_CONTROL[op.type],
       } as ControlMessage);
     } else {
-      cc.send({ type: "file-op", op });
+      channel.send({ type: "file-op", op });
     }
   });
 
-  cc.on("file-op", (msg) => {
+  channel.on("file-op", (msg) => {
     const op = msg.op;
     const paths = [
       "path" in op ? op.path : null,
@@ -55,7 +55,7 @@ export function registerControlHandlers(plugin: LiveSharePlugin): void {
       .then(async () => {
         if (plugin.settings.role !== "host") return;
         if (op.type === "create" && "path" in op) {
-          const file = plugin.app.vault.getAbstractFileByPath(op.path);
+          const file = plugin.app.vault.getAbstractFileByPath(toLocalPath(op.path));
           if (file instanceof TFile) {
             const content = isTextFile(file.path)
               ? await plugin.app.vault.read(file)
@@ -66,7 +66,7 @@ export function registerControlHandlers(plugin: LiveSharePlugin): void {
             }
           }
         } else if (op.type === "modify" && "path" in op && !isTextFile(op.path)) {
-          const file = plugin.app.vault.getAbstractFileByPath(op.path);
+          const file = plugin.app.vault.getAbstractFileByPath(toLocalPath(op.path));
           if (file instanceof TFile) {
             const content = await plugin.app.vault.readBinary(file);
             await plugin.manifestManager.updateFile(file, content);
@@ -96,7 +96,7 @@ export function registerControlHandlers(plugin: LiveSharePlugin): void {
     "file-chunk-end",
     "file-chunk-resume",
   ] as const) {
-    cc.on(chunkType, (msg) => {
+    channel.on(chunkType, (msg) => {
       if (!msg.path || !plugin.manifestManager.isSharedPath(msg.path)) return;
       plugin.fileOpsManager
         .applyRemoteOp({
@@ -109,15 +109,15 @@ export function registerControlHandlers(plugin: LiveSharePlugin): void {
     });
   }
 
-  cc.on("presence-update", (msg) => {
+  channel.on("presence-update", (msg) => {
     plugin.presenceManager?.handlePresenceUpdate(msg);
   });
 
-  cc.on("presence-leave", (msg) => {
+  channel.on("presence-leave", (msg) => {
     if (msg.userId) plugin.presenceManager?.handlePresenceLeave(msg.userId);
   });
 
-  cc.on("join-request", (msg) => {
+  channel.on("join-request", (msg) => {
     if (plugin.settings.role !== "host") return;
     new ApprovalModal(
       plugin.app,
@@ -138,7 +138,7 @@ export function registerControlHandlers(plugin: LiveSharePlugin): void {
     ).open();
   });
 
-  cc.on("join-response", async (msg) => {
+  channel.on("join-response", async (msg) => {
     if (plugin.settings.role !== "guest") return;
     if (msg.approved === false) {
       new Notice("Live Share: join request denied by host");
@@ -151,18 +151,18 @@ export function registerControlHandlers(plugin: LiveSharePlugin): void {
     plugin.presenceManager?.broadcastPresence();
   });
 
-  cc.on("permission-update", async (msg) => {
+  channel.on("permission-update", async (msg) => {
     plugin.settings.permission = msg.permission;
     plugin.onActiveFileChange();
     plugin.notify(`Live Share: your permission was changed to ${msg.permission}`);
   });
 
-  cc.on("focus-request", (msg) => {
+  channel.on("focus-request", (msg) => {
     showFocusNotification(plugin, msg);
   });
 
-  cc.on("summon", async (msg) => {
-    const file = plugin.app.vault.getAbstractFileByPath(msg.filePath);
+  channel.on("summon", async (msg) => {
+    const file = plugin.app.vault.getAbstractFileByPath(toLocalPath(msg.filePath));
     if (file instanceof TFile) {
       await plugin.app.workspace.getLeaf().openFile(file);
       const view = plugin.app.workspace.getActiveViewOfType(MarkdownView);
@@ -182,35 +182,35 @@ export function registerControlHandlers(plugin: LiveSharePlugin): void {
     );
   });
 
-  cc.on("present-start", (msg) => {
+  channel.on("present-start", (msg) => {
     if (msg.userId) plugin.presenceManager?.handlePresentStart(msg.userId);
   });
 
-  cc.on("present-stop", (msg) => {
+  channel.on("present-stop", (msg) => {
     if (msg.userId) plugin.presenceManager?.handlePresentStop(msg.userId);
   });
 
-  cc.on("sync-request", async (msg) => {
+  channel.on("sync-request", async (msg) => {
     if (plugin.settings.role !== "host") return;
     if (msg.path && plugin.manifestManager.isSharedPath(msg.path)) {
-      const file = plugin.app.vault.getAbstractFileByPath(msg.path);
+      const file = plugin.app.vault.getAbstractFileByPath(toLocalPath(msg.path));
       if (file instanceof TFile) {
         plugin.fileOpsManager.onFileCreate(file);
       }
     }
   });
 
-  cc.on("kicked", () => {
+  channel.on("kicked", () => {
     new Notice("Live Share: you have been removed from the session");
     plugin.endSession();
   });
 
-  cc.on("session-end", () => {
+  channel.on("session-end", () => {
     new Notice("Live Share: the host ended the session");
     plugin.endSession();
   });
 
-  cc.on("host-transfer-offer", (msg) => {
+  channel.on("host-transfer-offer", (msg) => {
     new ConfirmModal(
       plugin.app,
       `${msg.displayName ?? msg.userId} wants to make you the host. Accept?`,
@@ -230,7 +230,7 @@ export function registerControlHandlers(plugin: LiveSharePlugin): void {
     ).open();
   });
 
-  cc.on("host-transfer-complete", async () => {
+  channel.on("host-transfer-complete", async () => {
     plugin.settings.role = "host";
     plugin.settings.permission = "read-write";
     await plugin.saveSettings();
@@ -242,16 +242,16 @@ export function registerControlHandlers(plugin: LiveSharePlugin): void {
     plugin.logger.log("session", "became host via transfer");
   });
 
-  cc.on("host-transfer-decline", (msg) => {
+  channel.on("host-transfer-decline", (msg) => {
     plugin.notify(`Live Share: ${msg.displayName ?? msg.userId} declined host transfer`);
   });
 
-  cc.on("host-disconnected", () => {
+  channel.on("host-disconnected", () => {
     new Notice("Live Share: the host has disconnected");
     plugin.logger.log("session", "host disconnected");
   });
 
-  cc.on("host-changed", async (msg) => {
+  channel.on("host-changed", async (msg) => {
     if (plugin.settings.role === "host") {
       plugin.settings.role = "guest";
       await plugin.saveSettings();
@@ -267,7 +267,7 @@ export function registerControlHandlers(plugin: LiveSharePlugin): void {
     plugin.logger.log("session", `host changed to ${msg.userId}`);
   });
 
-  cc.on("file-permission-update", (msg) => {
+  channel.on("file-permission-update", (msg) => {
     plugin.filePermissions.set(msg.filePath, msg.permission);
     plugin.explorerIndicators?.update(plugin.filePermissions);
     plugin.onActiveFileChange();

@@ -7,10 +7,11 @@ import {
   VAULT_EVENT_SETTLE_MS,
   ensureFolder,
   getFileByPath,
-  getPathWarning,
   isTextFile,
   normalizeLineEndings,
   normalizePath,
+  toCanonicalPath,
+  toLocalPath,
 } from "../utils";
 import type { ExclusionManager } from "./exclusion";
 
@@ -71,17 +72,18 @@ export class ManifestManager {
     for (const file of files) {
       try {
         const binary = !isTextFile(file.path);
+        const canonicalPath = toCanonicalPath(normalizePath(file.path));
         if (binary) {
-          const buf = await this.vault.readBinary(file);
-          entries.set(normalizePath(file.path), {
-            hash: await hashBuffer(buf),
+          const binaryContent = await this.vault.readBinary(file);
+          entries.set(canonicalPath, {
+            hash: await hashBuffer(binaryContent),
             size: file.stat.size,
             mtime: file.stat.mtime,
             binary: true,
           });
         } else {
           const content = normalizeLineEndings(await this.vault.read(file));
-          entries.set(normalizePath(file.path), {
+          entries.set(canonicalPath, {
             hash: await hashContent(content),
             size: content.length,
             mtime: file.stat.mtime,
@@ -97,7 +99,7 @@ export class ManifestManager {
       if (!item.path || item.path === "/") continue;
       if (!this.isSharedPath(item.path)) continue;
       if (item.children.length > 0) continue;
-      entries.set(normalizePath(item.path), {
+      entries.set(toCanonicalPath(normalizePath(item.path)), {
         hash: "",
         size: 0,
         mtime: 0,
@@ -136,16 +138,12 @@ export class ManifestManager {
       if (!path || path.startsWith("/") || path.startsWith("\\")) continue;
       const segments = path.split(/[\\/]/);
       if (segments.some((segment) => segment === ".." || segment === ".")) continue;
-      const warning = getPathWarning(path);
-      if (warning) {
-        new Notice(`Live Share: ${warning}, skipping ${path}`);
-        continue;
-      }
 
+      const diskPath = toLocalPath(path);
       if (entry.directory) {
-        const existing = this.vault.getAbstractFileByPath(path);
+        const existing = this.vault.getAbstractFileByPath(diskPath);
         if (!existing) {
-          await ensureFolder(this.vault, path);
+          await ensureFolder(this.vault, diskPath);
           synced++;
         }
         continue;
@@ -153,14 +151,14 @@ export class ManifestManager {
 
       if (options?.skipText && !entry.binary && isTextFile(path)) continue;
 
-      const localFile = getFileByPath(this.vault, path);
+      const localFile = getFileByPath(this.vault, diskPath);
 
       let needsSync = false;
       if (!localFile) {
         needsSync = true;
       } else if (entry.binary) {
-        const buf = await this.vault.readBinary(localFile);
-        if ((await hashBuffer(buf)) !== entry.hash) {
+        const binaryContent = await this.vault.readBinary(localFile);
+        if ((await hashBuffer(binaryContent)) !== entry.hash) {
           needsSync = true;
         }
       } else {
@@ -186,19 +184,19 @@ export class ManifestManager {
 
         const content = tempHandle.text.toString();
 
-        const dir = path.substring(0, path.lastIndexOf("/"));
-        if (dir) await ensureFolder(this.vault, dir);
+        const parentDir = diskPath.substring(0, diskPath.lastIndexOf("/"));
+        if (parentDir) await ensureFolder(this.vault, parentDir);
 
-        mute?.(path);
+        mute?.(diskPath);
         try {
           if (localFile) {
             await this.vault.modify(localFile, content);
           } else {
-            await this.vault.create(path, content);
+            await this.vault.create(diskPath, content);
           }
         } finally {
           if (unmute) {
-            setTimeout(() => unmute(path), VAULT_EVENT_SETTLE_MS);
+            setTimeout(() => unmute(diskPath), VAULT_EVENT_SETTLE_MS);
           }
         }
         synced++;
@@ -231,8 +229,9 @@ export class ManifestManager {
 
   async updateFile(file: TFile, content: string | ArrayBuffer): Promise<void> {
     if (!this.manifest || !this.isSharedPath(file.path)) return;
+    const canonical = toCanonicalPath(normalizePath(file.path));
     if (content instanceof ArrayBuffer) {
-      this.manifest.set(normalizePath(file.path), {
+      this.manifest.set(canonical, {
         hash: await hashBuffer(content),
         size: content.byteLength,
         mtime: file.stat.mtime,
@@ -240,7 +239,7 @@ export class ManifestManager {
       });
     } else {
       const normalized = normalizeLineEndings(content);
-      this.manifest.set(normalizePath(file.path), {
+      this.manifest.set(canonical, {
         hash: await hashContent(normalized),
         size: normalized.length,
         mtime: file.stat.mtime,
@@ -250,20 +249,20 @@ export class ManifestManager {
 
   removeFile(path: string): void {
     if (!this.manifest) return;
-    this.manifest.delete(normalizePath(path));
+    this.manifest.delete(toCanonicalPath(normalizePath(path)));
   }
 
   addFolder(rawPath: string): void {
     if (!this.manifest || !this.isSharedPath(rawPath)) return;
-    const path = normalizePath(rawPath);
+    const path = toCanonicalPath(normalizePath(rawPath));
     if (this.manifest.has(path)) return;
     this.manifest.set(path, { hash: "", size: 0, mtime: 0, directory: true });
   }
 
   renameFile(oldPath: string, newPath: string, syncManager?: SyncManager): void {
     if (!this.manifest || !this.docHandle) return;
-    const normOld = normalizePath(oldPath);
-    const normNew = normalizePath(newPath);
+    const normOld = toCanonicalPath(normalizePath(oldPath));
+    const normNew = toCanonicalPath(normalizePath(newPath));
     const fileEntry = this.manifest.get(normOld);
     if (fileEntry) {
       this.docHandle.doc.transact(() => {
@@ -282,7 +281,7 @@ export class ManifestManager {
   }
 
   isSharedPath(rawPath: string): boolean {
-    const path = normalizePath(rawPath);
+    const path = toCanonicalPath(normalizePath(rawPath));
     if (this.exclusionManager?.isExcluded(path)) return false;
     if (!this.settings.sharedFolder) return true;
     const folder = normalizePath(

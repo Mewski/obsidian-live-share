@@ -10,6 +10,7 @@ export interface PresenceUser {
   displayName: string;
   cursorColor: string;
   currentFile: string;
+  avatarUrl?: string;
   scrollTop?: number;
   isHost?: boolean;
   line?: number;
@@ -37,11 +38,11 @@ export class PresenceView extends ItemView {
     return "users";
   }
 
-  setFollowHandler(handler: (userId: string) => void) {
+  setFollowHandler(handler: (userId: string) => void): void {
     this.onFollowRequest = handler;
   }
 
-  setKickHandler(handler: (userId: string) => void) {
+  setKickHandler(handler: (userId: string) => void): void {
     this.onKickRequest = handler;
   }
 
@@ -53,7 +54,11 @@ export class PresenceView extends ItemView {
     this.onSetPermissionRequest = handler;
   }
 
-  updateState(users: Map<string, PresenceUser>, isHost: boolean, followedUserId: string | null) {
+  updateState(
+    users: Map<string, PresenceUser>,
+    isHost: boolean,
+    followedUserId: string | null,
+  ): void {
     this.users = users;
     this.isHost = isHost;
     this.followedUserId = followedUserId;
@@ -105,10 +110,34 @@ export class PresenceView extends ItemView {
 
       const avatar = row.createEl("div", {
         cls: "live-share-user-avatar",
-        text: this.getInitial(user.displayName),
       });
       if (HEX_COLOR_RE.test(user.cursorColor)) {
         avatar.setCssProps({ "--user-color": user.cursorColor });
+      }
+      let hasAvatar = false;
+      if (user.avatarUrl) {
+        try {
+          const url = new URL(user.avatarUrl);
+          if (url.protocol === "https:") {
+            const img = avatar.createEl("img", {
+              attr: {
+                src: url.href,
+                width: "28",
+                height: "28",
+                referrerpolicy: "no-referrer",
+              },
+              cls: "live-share-user-avatar-img",
+            });
+            img.addEventListener("error", () => {
+              img.remove();
+              avatar.setText(this.getInitial(user.displayName));
+            });
+            hasAvatar = true;
+          }
+        } catch {}
+      }
+      if (!hasAvatar) {
+        avatar.setText(this.getInitial(user.displayName));
       }
 
       const info = row.createEl("div", { cls: "live-share-user-info" });

@@ -27,8 +27,8 @@ export class PromptModal extends Modal {
         this.close();
       }
     });
-    const btn = contentEl.createEl("button", { text: "OK" });
-    btn.addEventListener("click", () => {
+    const submitButton = contentEl.createEl("button", { text: "OK" });
+    submitButton.addEventListener("click", () => {
       this.result = input.value;
       this.close();
     });

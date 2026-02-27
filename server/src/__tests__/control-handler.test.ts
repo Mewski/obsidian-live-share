@@ -1109,4 +1109,138 @@ describe("Control WebSocket handler", () => {
     const permMsg = host.messages.find((m) => JSON.parse(m).type === "file-permission-update");
     expect(permMsg).toBeUndefined();
   });
+
+  it("kicked user must be re-approved on rejoin (no requireApproval)", async () => {
+    const room = await createRoom("ctrl-kick-rejoin");
+
+    const host = await connectControl(room.id, room.token);
+    await delay(50);
+    sendJSON(host.ws, {
+      type: "join-request",
+      userId: "host-1",
+      displayName: "Host",
+    });
+    await delay(100);
+
+    const guest = await connectControl(room.id, room.token);
+    await delay(50);
+    sendJSON(guest.ws, {
+      type: "join-request",
+      userId: "guest-1",
+      displayName: "Guest",
+    });
+    await waitForMessages(guest.messages, 1);
+    const autoApproval = JSON.parse(guest.messages[0]);
+    expect(autoApproval.type).toBe("join-response");
+    expect(autoApproval.approved).toBe(true);
+
+    const guestClosed = new Promise<void>((resolve) => {
+      guest.ws.on("close", () => resolve());
+    });
+    sendJSON(host.ws, { type: "kick", userId: "guest-1" });
+    await guestClosed;
+    await delay(100);
+
+    host.messages.length = 0;
+    const guest2 = await connectControl(room.id, room.token);
+    await delay(50);
+    sendJSON(guest2.ws, {
+      type: "join-request",
+      userId: "guest-1",
+      displayName: "Guest",
+    });
+
+    await waitForMessages(host.messages, 1);
+    const joinReq = JSON.parse(host.messages[0]);
+    expect(joinReq.type).toBe("join-request");
+    expect(joinReq.userId).toBe("guest-1");
+
+    await delay(200);
+    const earlyResponse = guest2.messages.find((m) => JSON.parse(m).type === "join-response");
+    expect(earlyResponse).toBeUndefined();
+
+    sendJSON(host.ws, {
+      type: "join-response",
+      userId: "guest-1",
+      approved: true,
+      permission: "read-write",
+    });
+
+    await waitForMessages(guest2.messages, 1);
+    const approval = JSON.parse(guest2.messages[0]);
+    expect(approval.type).toBe("join-response");
+    expect(approval.approved).toBe(true);
+  });
+
+  it("kicked user approval is one-time — second rejoin auto-approves", async () => {
+    const room = await createRoom("ctrl-kick-onetime");
+
+    const host = await connectControl(room.id, room.token);
+    await delay(50);
+    sendJSON(host.ws, {
+      type: "join-request",
+      userId: "host-1",
+      displayName: "Host",
+    });
+    await delay(100);
+
+    const guest = await connectControl(room.id, room.token);
+    await delay(50);
+    sendJSON(guest.ws, {
+      type: "join-request",
+      userId: "guest-1",
+      displayName: "Guest",
+    });
+    await waitForMessages(guest.messages, 1);
+
+    const guestClosed = new Promise<void>((resolve) => {
+      guest.ws.on("close", () => resolve());
+    });
+    sendJSON(host.ws, { type: "kick", userId: "guest-1" });
+    await guestClosed;
+
+    host.messages.length = 0;
+    const guest2 = await connectControl(room.id, room.token);
+    await delay(50);
+    sendJSON(guest2.ws, {
+      type: "join-request",
+      userId: "guest-1",
+      displayName: "Guest",
+    });
+    await waitForMessages(host.messages, 1);
+
+    sendJSON(host.ws, {
+      type: "join-response",
+      userId: "guest-1",
+      approved: true,
+      permission: "read-write",
+    });
+    await waitForMessages(guest2.messages, 1);
+    expect(JSON.parse(guest2.messages[0]).approved).toBe(true);
+
+    const guest2Closed = new Promise<void>((resolve) => {
+      guest2.ws.on("close", () => resolve());
+    });
+    guest2.ws.close();
+    await guest2Closed;
+    await delay(100);
+
+    host.messages.length = 0;
+    const guest3 = await connectControl(room.id, room.token);
+    await delay(50);
+    sendJSON(guest3.ws, {
+      type: "join-request",
+      userId: "guest-1",
+      displayName: "Guest",
+    });
+
+    await waitForMessages(guest3.messages, 1);
+    const autoApproval = JSON.parse(guest3.messages[0]);
+    expect(autoApproval.type).toBe("join-response");
+    expect(autoApproval.approved).toBe(true);
+
+    await delay(200);
+    const hostJoinReq = host.messages.find((m) => JSON.parse(m).type === "join-request");
+    expect(hostJoinReq).toBeUndefined();
+  });
 });

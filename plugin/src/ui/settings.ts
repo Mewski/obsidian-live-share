@@ -18,8 +18,9 @@ export class LiveShareSettingTab extends PluginSettingTab {
 
     new SettingGroup(containerEl)
       .setHeading("Connection")
-      .addSetting((s) => {
-        s.setName("Server URL")
+      .addSetting((setting) => {
+        setting
+          .setName("Server URL")
           .setDesc("The Live Share server to connect to")
           .addText((text) => {
             text
@@ -32,8 +33,9 @@ export class LiveShareSettingTab extends PluginSettingTab {
             if (active) text.setDisabled(true);
           });
       })
-      .addSetting((s) => {
-        s.setName("Server password")
+      .addSetting((setting) => {
+        setting
+          .setName("Server password")
           .setDesc("Required if the server has a password set")
           .addText((text) => {
             text
@@ -47,21 +49,23 @@ export class LiveShareSettingTab extends PluginSettingTab {
             if (active) text.setDisabled(true);
           });
       })
-      .addSetting((s) => {
+      .addSetting((setting) => {
         if (authManager.isAuthenticated) {
-          s.setName("GitHub account")
+          setting
+            .setName("GitHub account")
             .setDesc(`Logged in as ${settings.displayName}`)
-            .addButton((btn) =>
-              btn.setButtonText("Log out").onClick(async () => {
+            .addButton((button) =>
+              button.setButtonText("Log out").onClick(async () => {
                 await authManager.logout();
                 this.display();
               }),
             );
         } else {
-          s.setName("GitHub account")
+          setting
+            .setName("GitHub account")
             .setDesc("Optional, used for identity verification")
-            .addButton((btn) =>
-              btn
+            .addButton((button) =>
+              button
                 .setButtonText("Log in with GitHub")
                 .setCta()
                 .onClick(async () => {
@@ -74,8 +78,9 @@ export class LiveShareSettingTab extends PluginSettingTab {
 
     new SettingGroup(containerEl)
       .setHeading("Identity")
-      .addSetting((s) => {
-        s.setName("Display name")
+      .addSetting((setting) => {
+        setting
+          .setName("Display name")
           .setDesc("Shown to other collaborators")
           .addText((text) => {
             text
@@ -88,8 +93,9 @@ export class LiveShareSettingTab extends PluginSettingTab {
             if (authManager.isAuthenticated) text.setDisabled(true);
           });
       })
-      .addSetting((s) => {
-        s.setName("Cursor color")
+      .addSetting((setting) => {
+        setting
+          .setName("Cursor color")
           .setDesc("Your cursor and selection color visible to others")
           .addColorPicker((color) =>
             color.setValue(settings.cursorColor).onChange(async (value) => {
@@ -101,29 +107,28 @@ export class LiveShareSettingTab extends PluginSettingTab {
 
     const session = new SettingGroup(containerEl).setHeading("Session");
 
-    session.addSetting((s) => {
+    session.addSetting((setting) => {
       if (active) {
         const connectionState = this.plugin.connectionState.getState();
         const role = settings.role === "host" ? "Hosting" : "Joined";
-        const stateLabel =
-          connectionState === "connected"
-            ? "Connected"
-            : connectionState === "connecting"
-              ? "Connecting..."
-              : connectionState === "error"
-                ? "Error"
-                : connectionState === "auth-required"
-                  ? "Auth required"
-                  : connectionState;
-        s.setName(`${role} · ${stateLabel}`).setDesc(`Room: ${settings.roomId}`);
-        s.addButton((btn) =>
-          btn.setButtonText("Copy invite link").onClick(() => {
+        const stateLabels: Record<string, string> = {
+          connected: "Connected",
+          connecting: "Connecting...",
+          reconnecting: "Reconnecting...",
+          error: "Error",
+          "auth-required": "Auth required",
+          disconnected: "Disconnected",
+        };
+        const stateLabel = stateLabels[connectionState] ?? connectionState;
+        setting.setName(`${role} · ${stateLabel}`).setDesc(`Room: ${settings.roomId}`);
+        setting.addButton((button) =>
+          button.setButtonText("Copy invite link").onClick(() => {
             sessionManager.copyInvite();
           }),
         );
         if (settings.role === "host") {
-          s.addButton((btn) =>
-            btn
+          setting.addButton((button) =>
+            button
               .setButtonText("End session")
               .setWarning()
               .onClick(async () => {
@@ -132,8 +137,8 @@ export class LiveShareSettingTab extends PluginSettingTab {
               }),
           );
         } else {
-          s.addButton((btn) =>
-            btn
+          setting.addButton((button) =>
+            button
               .setButtonText("Leave session")
               .setWarning()
               .onClick(async () => {
@@ -143,15 +148,15 @@ export class LiveShareSettingTab extends PluginSettingTab {
           );
         }
       } else {
-        s.setName("No active session");
-        s.addButton((btn) =>
-          btn.setButtonText("Join session").onClick(async () => {
+        setting.setName("No active session");
+        setting.addButton((button) =>
+          button.setButtonText("Join session").onClick(async () => {
             await this.plugin.joinSession();
             this.display();
           }),
         );
-        s.addButton((btn) =>
-          btn
+        setting.addButton((button) =>
+          button
             .setButtonText("Start session")
             .setCta()
             .onClick(async () => {
@@ -163,8 +168,9 @@ export class LiveShareSettingTab extends PluginSettingTab {
     });
 
     session
-      .addSetting((s) => {
-        s.setName("Shared folder")
+      .addSetting((setting) => {
+        setting
+          .setName("Shared folder")
           .setDesc("Only share a subfolder instead of the whole vault")
           .addText((text) => {
             text
@@ -177,8 +183,9 @@ export class LiveShareSettingTab extends PluginSettingTab {
             if (active) text.setDisabled(true);
           });
       })
-      .addSetting((s) => {
-        s.setName("Require approval")
+      .addSetting((setting) => {
+        setting
+          .setName("Require approval")
           .setDesc("Guests must be approved by the host before joining")
           .addToggle((toggle) => {
             toggle.setValue(settings.requireApproval).onChange(async (value) => {
@@ -188,8 +195,9 @@ export class LiveShareSettingTab extends PluginSettingTab {
             if (active) toggle.setDisabled(true);
           });
       })
-      .addSetting((s) => {
-        s.setName("Approval timeout (seconds)")
+      .addSetting((setting) => {
+        setting
+          .setName("Approval timeout (seconds)")
           .setDesc("Auto-deny join requests after this many seconds. 0 to disable.")
           .addText((text) => {
             text
@@ -204,17 +212,18 @@ export class LiveShareSettingTab extends PluginSettingTab {
       });
 
     if (active) {
-      session.addSetting((s) => {
-        s.setName("End-to-end encryption").setDesc(
-          settings.encryptionPassphrase ? "Active" : "Inactive",
-        );
+      session.addSetting((setting) => {
+        setting
+          .setName("End-to-end encryption")
+          .setDesc(settings.encryptionPassphrase ? "Active" : "Inactive");
       });
     }
 
     new SettingGroup(containerEl)
       .setHeading("Preferences")
-      .addSetting((s) => {
-        s.setName("Notifications")
+      .addSetting((setting) => {
+        setting
+          .setName("Notifications")
           .setDesc("Show status notices for non-critical events like file syncs and follows")
           .addToggle((toggle) =>
             toggle.setValue(settings.notificationsEnabled).onChange(async (value) => {
@@ -223,8 +232,9 @@ export class LiveShareSettingTab extends PluginSettingTab {
             }),
           );
       })
-      .addSetting((s) => {
-        s.setName("Auto-reconnect")
+      .addSetting((setting) => {
+        setting
+          .setName("Auto-reconnect")
           .setDesc("Automatically rejoin the previous session when Obsidian starts")
           .addToggle((toggle) =>
             toggle.setValue(settings.autoReconnect).onChange(async (value) => {
@@ -236,8 +246,9 @@ export class LiveShareSettingTab extends PluginSettingTab {
 
     new SettingGroup(containerEl)
       .setHeading("Debug")
-      .addSetting((s) => {
-        s.setName("Debug logging")
+      .addSetting((setting) => {
+        setting
+          .setName("Debug logging")
           .setDesc("Write timestamped debug logs to a file in your vault")
           .addToggle((toggle) =>
             toggle.setValue(settings.debugLogging).onChange(async (value) => {
@@ -246,8 +257,9 @@ export class LiveShareSettingTab extends PluginSettingTab {
             }),
           );
       })
-      .addSetting((s) => {
-        s.setName("Debug log file")
+      .addSetting((setting) => {
+        setting
+          .setName("Debug log file")
           .setDesc("Path within your vault for the debug log")
           .addText((text) =>
             text
@@ -262,10 +274,12 @@ export class LiveShareSettingTab extends PluginSettingTab {
 
     const advanced = new SettingGroup(containerEl).setHeading("Advanced");
 
-    advanced.addSetting((s) => {
-      s.setName("Excluded patterns").setDesc("Glob patterns for files to exclude from sharing.");
-      s.addButton((btn) =>
-        btn
+    advanced.addSetting((setting) => {
+      setting
+        .setName("Excluded patterns")
+        .setDesc("Glob patterns for files to exclude from sharing.");
+      setting.addButton((button) =>
+        button
           .setButtonText("Add exclusion")
           .setCta()
           .onClick(async () => {
@@ -283,10 +297,10 @@ export class LiveShareSettingTab extends PluginSettingTab {
     });
 
     for (const pattern of settings.excludePatterns) {
-      advanced.addSetting((s) => {
-        s.setName(pattern);
-        s.addExtraButton((btn) =>
-          btn
+      advanced.addSetting((setting) => {
+        setting.setName(pattern);
+        setting.addExtraButton((button) =>
+          button
             .setIcon("cross")
             .setTooltip("Remove this pattern")
             .onClick(async () => {

@@ -42,9 +42,9 @@ export class FilePermissionModal extends Modal {
           .addOption("read-only", "Read-Only")
           .setValue(user.permission)
           .onChange((value) => {
-            const perm = value as Permission;
-            user.permission = perm;
-            this.onSetPermission(user.userId, this.filePath, perm);
+            const newPermission = value as Permission;
+            user.permission = newPermission;
+            this.onSetPermission(user.userId, this.filePath, newPermission);
           });
       });
     }

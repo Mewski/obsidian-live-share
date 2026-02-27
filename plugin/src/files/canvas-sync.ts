@@ -2,7 +2,14 @@ import { Notice, type Vault } from "obsidian";
 import * as Y from "yjs";
 
 import type { SyncManager } from "../sync/sync";
-import { VAULT_EVENT_SETTLE_MS, ensureFolder, getFileByPath, normalizePath } from "../utils";
+import {
+  VAULT_EVENT_SETTLE_MS,
+  ensureFolder,
+  getFileByPath,
+  normalizePath,
+  toCanonicalPath,
+  toLocalPath,
+} from "../utils";
 import type { FileOpsManager } from "./file-ops";
 
 const CANVAS_DOC_PREFIX = "__canvas__:";
@@ -96,7 +103,7 @@ export class CanvasSync {
   }
 
   async subscribe(rawPath: string, role: "host" | "guest"): Promise<void> {
-    const path = normalizePath(rawPath);
+    const path = toCanonicalPath(normalizePath(rawPath));
     if (this.subscribedPaths.has(path)) return;
     this.subscribedPaths.add(path);
 
@@ -113,8 +120,9 @@ export class CanvasSync {
     const nodesMap = docHandle.doc.getMap<Y.Map<unknown>>("nodes");
     const edgesMap = docHandle.doc.getMap<Y.Map<unknown>>("edges");
 
+    const diskPath = toLocalPath(path);
     if (role === "host") {
-      const file = getFileByPath(this.vault, path);
+      const file = getFileByPath(this.vault, diskPath);
       if (file) {
         const content = await this.vault.read(file);
         const data = parseCanvas(content);
@@ -144,7 +152,7 @@ export class CanvasSync {
   }
 
   unsubscribe(rawPath: string): void {
-    const path = normalizePath(rawPath);
+    const path = toCanonicalPath(normalizePath(rawPath));
     this.subscribedPaths.delete(path);
     const timer = this.writeTimers.get(path);
     if (timer) {
@@ -160,7 +168,7 @@ export class CanvasSync {
   }
 
   async handleLocalModify(rawPath: string): Promise<void> {
-    const path = normalizePath(rawPath);
+    const path = toCanonicalPath(normalizePath(rawPath));
     if (this.recentDiskWrites.has(path)) return;
     if (!this.subscribedPaths.has(path)) return;
 
@@ -168,7 +176,7 @@ export class CanvasSync {
     const docHandle = this.syncManager.getDoc(docId);
     if (!docHandle) return;
 
-    const file = getFileByPath(this.vault, path);
+    const file = getFileByPath(this.vault, toLocalPath(path));
     if (!file) return;
 
     const content = await this.vault.read(file);
@@ -184,11 +192,11 @@ export class CanvasSync {
   }
 
   isRecentDiskWrite(rawPath: string): boolean {
-    return this.recentDiskWrites.has(normalizePath(rawPath));
+    return this.recentDiskWrites.has(toCanonicalPath(normalizePath(rawPath)));
   }
 
   isSubscribed(rawPath: string): boolean {
-    return this.subscribedPaths.has(normalizePath(rawPath));
+    return this.subscribedPaths.has(toCanonicalPath(normalizePath(rawPath)));
   }
 
   destroy(): void {
@@ -262,19 +270,20 @@ export class CanvasSync {
 
   private async writeToDisk(path: string, content: string): Promise<void> {
     if (this.lastWrittenContent.get(path) === content) return;
+    const diskPath = toLocalPath(path);
     this.recentDiskWrites.add(path);
-    this.fileOpsManager.mutePathEvents(path);
+    this.fileOpsManager.mutePathEvents(diskPath);
     try {
-      const dir = path.substring(0, path.lastIndexOf("/"));
-      if (dir) await ensureFolder(this.vault, dir);
-      await this.vault.adapter.write(path, content);
+      const parentDir = diskPath.substring(0, diskPath.lastIndexOf("/"));
+      if (parentDir) await ensureFolder(this.vault, parentDir);
+      await this.vault.adapter.write(diskPath, content);
       this.lastWrittenContent.set(path, content);
     } catch {
-      new Notice(`Live Share: failed to write canvas ${path}`);
+      new Notice(`Live Share: failed to write canvas ${diskPath}`);
     } finally {
       setTimeout(() => {
         this.recentDiskWrites.delete(path);
-        this.fileOpsManager.unmutePathEvents(path);
+        this.fileOpsManager.unmutePathEvents(diskPath);
       }, VAULT_EVENT_SETTLE_MS);
     }
   }

@@ -1,14 +1,16 @@
-import { describe, expect, it, vi } from "vitest";
+import { Platform } from "obsidian";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   applyMinimalYTextUpdate,
   arrayBufferToBase64,
   base64ToArrayBuffer,
   ensureFolder,
-  getPathWarning,
   isTextFile,
   normalizeLineEndings,
   normalizePath,
   parseJwtPayload,
+  toCanonicalPath,
+  toLocalPath,
   toWsUrl,
 } from "../utils";
 
@@ -200,35 +202,6 @@ describe("applyMinimalYTextUpdate", () => {
   });
 });
 
-describe("getPathWarning", () => {
-  it("returns null for clean paths", () => {
-    expect(getPathWarning("folder/subfolder/file.md")).toBeNull();
-    expect(getPathWarning("notes/my-note.md")).toBeNull();
-  });
-
-  it("warns about Windows reserved names", () => {
-    expect(getPathWarning("folder/CON.md")).not.toBeNull();
-    expect(getPathWarning("folder/PRN.txt")).not.toBeNull();
-    expect(getPathWarning("folder/AUX")).not.toBeNull();
-    expect(getPathWarning("NUL")).not.toBeNull();
-    expect(getPathWarning("COM1.txt")).not.toBeNull();
-    expect(getPathWarning("LPT1.doc")).not.toBeNull();
-  });
-
-  it("warns about invalid characters", () => {
-    expect(getPathWarning("folder/<file>.md")).not.toBeNull();
-    expect(getPathWarning("folder/file?.md")).not.toBeNull();
-    expect(getPathWarning('folder/"file".md')).not.toBeNull();
-    expect(getPathWarning("folder/file|name.md")).not.toBeNull();
-    expect(getPathWarning("folder/file*.md")).not.toBeNull();
-  });
-
-  it("warns about trailing dot or space", () => {
-    expect(getPathWarning("folder/file.")).not.toBeNull();
-    expect(getPathWarning("folder/file ")).not.toBeNull();
-  });
-});
-
 describe("ensureFolder", () => {
   it("creates nested folders", async () => {
     const created: string[] = [];
@@ -298,5 +271,88 @@ describe("parseJwtPayload", () => {
     expect(() => parseJwtPayload(makeJwt({ sub: "123" }))).toThrow("Invalid JWT payload");
     expect(() => parseJwtPayload(makeJwt({ username: "alice" }))).toThrow("Invalid JWT payload");
     expect(() => parseJwtPayload(makeJwt({}))).toThrow("Invalid JWT payload");
+  });
+});
+
+describe("toLocalPath / toCanonicalPath", () => {
+  const savedIsWin = Platform.isWin;
+
+  afterEach(() => {
+    (Platform as any).isWin = savedIsWin;
+  });
+
+  describe("on non-Windows", () => {
+    beforeEach(() => {
+      (Platform as any).isWin = false;
+    });
+
+    it("toLocalPath is a no-op", () => {
+      expect(toLocalPath("notes/What?.md")).toBe("notes/What?.md");
+    });
+
+    it("toCanonicalPath is a no-op", () => {
+      expect(toCanonicalPath("notes/What\uFF1F.md")).toBe("notes/What\uFF1F.md");
+    });
+  });
+
+  describe("on Windows", () => {
+    beforeEach(() => {
+      (Platform as any).isWin = true;
+    });
+
+    it("toLocalPath replaces ? with fullwidth question mark", () => {
+      expect(toLocalPath("notes/What?.md")).toBe("notes/What\uFF1F.md");
+    });
+
+    it("toLocalPath replaces * with low asterisk", () => {
+      expect(toLocalPath("files/*.txt")).toBe("files/\u204E.txt");
+    });
+
+    it("toLocalPath replaces < and >", () => {
+      expect(toLocalPath("a<b>c")).toBe("a\uFF1Cb\uFF1Ec");
+    });
+
+    it('toLocalPath replaces "', () => {
+      expect(toLocalPath('say "hello"')).toBe("say \uFF02hello\uFF02");
+    });
+
+    it("toLocalPath replaces |", () => {
+      expect(toLocalPath("a|b")).toBe("a\uFF5Cb");
+    });
+
+    it("toLocalPath replaces :", () => {
+      expect(toLocalPath("time:stamp")).toBe("time\uFF1Astamp");
+    });
+
+    it("toLocalPath handles multiple special chars", () => {
+      expect(toLocalPath('What? "yes" <no> *all* |pipe|')).toBe(
+        "What\uFF1F \uFF02yes\uFF02 \uFF1Cno\uFF1E \u204Eall\u204E \uFF5Cpipe\uFF5C",
+      );
+    });
+
+    it("toLocalPath leaves normal paths unchanged", () => {
+      expect(toLocalPath("notes/hello world.md")).toBe("notes/hello world.md");
+    });
+
+    it("toCanonicalPath reverses toLocalPath", () => {
+      const canonical = "notes/What? <file>.md";
+      const local = toLocalPath(canonical);
+      expect(toCanonicalPath(local)).toBe(canonical);
+    });
+
+    it("toCanonicalPath replaces fullwidth question mark back", () => {
+      expect(toCanonicalPath("notes/What\uFF1F.md")).toBe("notes/What?.md");
+    });
+
+    it("toCanonicalPath leaves normal paths unchanged", () => {
+      expect(toCanonicalPath("notes/hello.md")).toBe("notes/hello.md");
+    });
+
+    it("round-trips all special characters", () => {
+      const original = '?*<>"|:';
+      const local = toLocalPath(original);
+      expect(local).not.toBe(original);
+      expect(toCanonicalPath(local)).toBe(original);
+    });
   });
 });

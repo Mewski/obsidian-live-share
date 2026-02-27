@@ -1,10 +1,11 @@
 import type { ControlChannel } from "../sync/control-ws";
-import { normalizePath } from "../utils";
+import { normalizePath, toCanonicalPath } from "../utils";
 import type { PresenceUser } from "./presence-view";
 
 export interface PresenceContext {
   getUserId(): string;
   getDisplayName(): string;
+  getAvatarUrl(): string;
   getCursorColor(): string;
   getRole(): string;
   getCurrentFile(): string;
@@ -62,8 +63,9 @@ export class PresenceManager {
       type: "presence-update",
       userId: this.ctx.getUserId(),
       displayName: this.ctx.getDisplayName(),
+      avatarUrl: this.ctx.getAvatarUrl() || undefined,
       cursorColor: this.ctx.getCursorColor(),
-      currentFile: normalizePath(this.ctx.getCurrentFile()),
+      currentFile: toCanonicalPath(normalizePath(this.ctx.getCurrentFile())),
       scrollTop: this.ctx.getScrollTop(),
       line: this.ctx.getCursorLine(),
       isHost: this.ctx.getRole() === "host",
@@ -83,10 +85,10 @@ export class PresenceManager {
     const handler = () => {
       if (!this.followSuppressUnfollow) this.unfollowUser();
     };
-    const events = ["keydown", "mousedown", "wheel"] as const;
-    for (const evt of events) {
-      document.addEventListener(evt, handler);
-      this.unfollowListeners.push(() => document.removeEventListener(evt, handler));
+    const eventTypes = ["keydown", "mousedown", "wheel"] as const;
+    for (const eventType of eventTypes) {
+      document.addEventListener(eventType, handler);
+      this.unfollowListeners.push(() => document.removeEventListener(eventType, handler));
     }
 
     if (user) this.applyFollowState(user);

@@ -33,6 +33,8 @@ import {
   isTextFile,
   normalizePath,
   parseJwtPayload,
+  toCanonicalPath,
+  toLocalPath,
 } from "./utils";
 
 function getCmView(view: MarkdownView): EditorView | undefined {
@@ -79,21 +81,23 @@ export default class LiveSharePlugin extends Plugin {
         for (const oldPath of removed) {
           for (const newPath of added) {
             if (renamedNewPaths.has(newPath)) continue;
-            const oldFile = this.app.vault.getAbstractFileByPath(oldPath);
-            const newFile = this.app.vault.getAbstractFileByPath(newPath);
+            const localOld = toLocalPath(oldPath);
+            const localNew = toLocalPath(newPath);
+            const oldFile = this.app.vault.getAbstractFileByPath(localOld);
+            const newFile = this.app.vault.getAbstractFileByPath(localNew);
             if (oldFile && !newFile) {
               renamedOldPaths.add(oldPath);
               renamedNewPaths.add(newPath);
-              this.fileOpsManager.mutePathEvents(oldPath);
-              this.fileOpsManager.mutePathEvents(newPath);
+              this.fileOpsManager.mutePathEvents(localOld);
+              this.fileOpsManager.mutePathEvents(localNew);
               try {
-                const dir = newPath.substring(0, newPath.lastIndexOf("/"));
-                if (dir) await ensureFolder(this.app.vault, dir);
-                await this.app.vault.rename(oldFile, newPath);
+                const parentDir = localNew.substring(0, localNew.lastIndexOf("/"));
+                if (parentDir) await ensureFolder(this.app.vault, parentDir);
+                await this.app.vault.rename(oldFile, localNew);
               } finally {
                 setTimeout(() => {
-                  this.fileOpsManager.unmutePathEvents(oldPath);
-                  this.fileOpsManager.unmutePathEvents(newPath);
+                  this.fileOpsManager.unmutePathEvents(localOld);
+                  this.fileOpsManager.unmutePathEvents(localNew);
                 }, VAULT_EVENT_SETTLE_MS);
               }
               if (isTextFile(oldPath)) {
@@ -138,7 +142,7 @@ export default class LiveSharePlugin extends Plugin {
       }
       for (const path of actuallyRemoved) {
         this.backgroundSync.onFileRemoved(path);
-        const file = this.app.vault.getAbstractFileByPath(path);
+        const file = this.app.vault.getAbstractFileByPath(toLocalPath(path));
         if (file) await this.app.vault.trash(file, true);
       }
       if (actuallyRemoved.length > 0)
@@ -216,9 +220,9 @@ export default class LiveSharePlugin extends Plugin {
     const ribbonEl = this.addRibbonIcon("users", "Collaborators", () => {
       this.activatePresenceView();
     });
-    const ribbonCtxHandler = (evt: MouseEvent) => {
-      evt.preventDefault();
-      this.showRibbonMenu(evt);
+    const ribbonCtxHandler = (event: MouseEvent) => {
+      event.preventDefault();
+      this.showRibbonMenu(event);
     };
     ribbonEl.addEventListener("contextmenu", ribbonCtxHandler);
     this.register(() => ribbonEl.removeEventListener("contextmenu", ribbonCtxHandler));
@@ -577,29 +581,30 @@ export default class LiveSharePlugin extends Plugin {
     this.presenceManager = new PresenceManager({
       getUserId: () => this.userId,
       getDisplayName: () => this.settings.displayName,
+      getAvatarUrl: () => this.settings.avatarUrl,
       getCursorColor: () => this.settings.cursorColor,
       getRole: () => this.settings.role ?? "guest",
       getCurrentFile: () => {
-        const v = this.app.workspace.getActiveViewOfType(MarkdownView);
-        return v?.file?.path ?? "";
+        const activeView = this.app.workspace.getActiveViewOfType(MarkdownView);
+        return activeView?.file?.path ?? "";
       },
       getScrollTop: () => {
-        const v = this.app.workspace.getActiveViewOfType(MarkdownView);
-        if (!v) return 0;
-        const cmView = getCmView(v);
+        const activeView = this.app.workspace.getActiveViewOfType(MarkdownView);
+        if (!activeView) return 0;
+        const cmView = getCmView(activeView);
         return cmView ? cmView.scrollDOM.scrollTop : 0;
       },
       getCursorLine: () => {
-        const v = this.app.workspace.getActiveViewOfType(MarkdownView);
-        return v ? v.editor.getCursor().line : 0;
+        const activeView = this.app.workspace.getActiveViewOfType(MarkdownView);
+        return activeView ? activeView.editor.getCursor().line : 0;
       },
       getControlChannel: () => this.controlChannel,
       getRemoteUsers: () => this.remoteUsers,
       notify: (msg) => this.notify(msg),
       openFileAndScroll: async (filePath, scrollTop) => {
         const currentView = this.app.workspace.getActiveViewOfType(MarkdownView);
-        if (currentView?.file?.path !== filePath) {
-          const file = this.app.vault.getAbstractFileByPath(filePath);
+        if (currentView?.file?.path !== toLocalPath(filePath)) {
+          const file = this.app.vault.getAbstractFileByPath(toLocalPath(filePath));
           if (file instanceof TFile) {
             await this.app.workspace.getLeaf().openFile(file);
             this.onActiveFileChange();
@@ -631,7 +636,7 @@ export default class LiveSharePlugin extends Plugin {
     const filePath = file?.path ?? null;
     const sharedPath =
       filePath && this.manifestManager.isSharedPath(filePath) && isTextFile(filePath)
-        ? filePath
+        ? toCanonicalPath(normalizePath(filePath))
         : null;
     this.backgroundSync.setActiveFile(sharedPath);
     const effectivePermission = sharedPath
@@ -697,7 +702,7 @@ export default class LiveSharePlugin extends Plugin {
     }
   }
 
-  private showRibbonMenu(evt: MouseEvent): void {
+  private showRibbonMenu(event: MouseEvent): void {
     const menu = new Menu();
     const active = this.sessionManager.isActive;
 
@@ -768,7 +773,7 @@ export default class LiveSharePlugin extends Plugin {
         }),
     );
 
-    menu.showAtMouseEvent(evt);
+    menu.showAtMouseEvent(event);
   }
 
   async activatePresenceView() {

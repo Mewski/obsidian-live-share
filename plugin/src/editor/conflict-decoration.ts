@@ -38,25 +38,25 @@ const conflictField = StateField.define<{
   create() {
     return { localEdits: [], marks: [], decorations: Decoration.none };
   },
-  update(state, tr) {
+  update(state, transaction) {
     let { localEdits, marks } = state;
     let changed = false;
 
-    if (tr.docChanged) {
-      marks = marks.map((m) => {
-        const from = tr.changes.mapPos(m.from, 1);
-        const to = tr.changes.mapPos(m.to, -1);
-        return { ...m, from: Math.min(from, to), to: Math.max(from, to) };
+    if (transaction.docChanged) {
+      marks = marks.map((mark) => {
+        const from = transaction.changes.mapPos(mark.from, 1);
+        const to = transaction.changes.mapPos(mark.to, -1);
+        return { ...mark, from: Math.min(from, to), to: Math.max(from, to) };
       });
-      localEdits = localEdits.map((e) => {
-        const from = tr.changes.mapPos(e.from, 1);
-        const to = tr.changes.mapPos(e.to, -1);
-        return { ...e, from: Math.min(from, to), to: Math.max(from, to) };
+      localEdits = localEdits.map((edit) => {
+        const from = transaction.changes.mapPos(edit.from, 1);
+        const to = transaction.changes.mapPos(edit.to, -1);
+        return { ...edit, from: Math.min(from, to), to: Math.max(from, to) };
       });
       changed = true;
     }
 
-    for (const effect of tr.effects) {
+    for (const effect of transaction.effects) {
       if (effect.is(addConflictEffect)) {
         marks = [...marks, effect.value];
         changed = true;
@@ -77,18 +77,18 @@ const conflictField = StateField.define<{
 
     const decorations = Decoration.set(
       marks
-        .filter((m) => m.from < m.to)
-        .map((m) => conflictMark.range(m.from, m.to))
+        .filter((mark) => mark.from < mark.to)
+        .map((mark) => conflictMark.range(mark.from, mark.to))
         .sort((a, b) => a.from - b.from),
     );
     return { localEdits, marks, decorations };
   },
-  provide: (field) => EditorView.decorations.from(field, (s) => s.decorations),
+  provide: (field) => EditorView.decorations.from(field, (state) => state.decorations),
 });
 
-function isLocalTransaction(tr: Transaction): boolean {
-  const ann = tr.annotation(Transaction.remote);
-  return ann !== true;
+function isLocalTransaction(transaction: Transaction): boolean {
+  const annotation = transaction.annotation(Transaction.remote);
+  return annotation !== true;
 }
 
 const conflictPlugin = ViewPlugin.fromClass(
@@ -104,23 +104,25 @@ const conflictPlugin = ViewPlugin.fromClass(
       const now = Date.now();
       const state = update.view.state.field(conflictField);
 
-      for (const tr of update.transactions) {
-        if (!tr.docChanged) continue;
+      for (const transaction of update.transactions) {
+        if (!transaction.docChanged) continue;
 
-        if (isLocalTransaction(tr)) {
+        if (isLocalTransaction(transaction)) {
           const newEdits = [...state.localEdits];
-          tr.changes.iterChangedRanges((_fromA, _toA, fromB, toB) => {
+          transaction.changes.iterChangedRanges((_fromA, _toA, fromB, toB) => {
             newEdits.push({ from: fromB, to: toB, timestamp: now });
           });
           const cutoff = now - OVERLAP_WINDOW_MS;
-          const filtered = newEdits.filter((e) => e.timestamp > cutoff);
+          const filtered = newEdits.filter((edit) => edit.timestamp > cutoff);
           update.view.dispatch({ effects: setLocalEditsEffect.of(filtered) });
         } else {
-          const recentLocal = state.localEdits.filter((e) => now - e.timestamp < OVERLAP_WINDOW_MS);
+          const recentLocal = state.localEdits.filter(
+            (edit) => now - edit.timestamp < OVERLAP_WINDOW_MS,
+          );
           if (recentLocal.length === 0) continue;
 
           const effects: StateEffect<ConflictMark>[] = [];
-          tr.changes.iterChangedRanges((_fromA, _toA, fromB, toB) => {
+          transaction.changes.iterChangedRanges((_fromA, _toA, fromB, toB) => {
             for (const local of recentLocal) {
               if (fromB < local.to && toB > local.from) {
                 const overlapFrom = Math.max(fromB, local.from);

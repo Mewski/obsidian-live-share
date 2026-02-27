@@ -160,6 +160,7 @@ export interface PresenceUpdateMessage {
   displayName: string;
   cursorColor: string;
   currentFile: string;
+  avatarUrl?: string;
   scrollTop?: number;
   isHost?: boolean;
   line?: number;

@@ -39,7 +39,7 @@ export class CollabManager {
 
     if (filePath !== this.currentPath || view !== this.currentView) {
       if (this.currentAwareness) {
-        this.currentAwareness.setLocalStateField("cursor", null);
+        this.currentAwareness.setLocalState(null);
       }
       if (this.currentView && this.currentView !== view) {
         try {
@@ -111,9 +111,9 @@ export class CollabManager {
       effects: this.compartment.reconfigure(extensions),
     });
 
-    const sel = view.state.selection.main;
-    const anchor = Y.createRelativePositionFromTypeIndex(docHandle.text, sel.anchor);
-    const head = Y.createRelativePositionFromTypeIndex(docHandle.text, sel.head);
+    const selection = view.state.selection.main;
+    const anchor = Y.createRelativePositionFromTypeIndex(docHandle.text, selection.anchor);
+    const head = Y.createRelativePositionFromTypeIndex(docHandle.text, selection.head);
     docHandle.awareness.setLocalStateField("cursor", { anchor, head });
   }
 

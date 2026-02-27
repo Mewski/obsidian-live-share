@@ -1,6 +1,35 @@
-import { TFile, TFolder, type Vault } from "obsidian";
+import { Platform, TFile, TFolder, type Vault } from "obsidian";
 
 export const VAULT_EVENT_SETTLE_MS = 250;
+
+const WIN_CHAR_MAP: [string, string][] = [
+  ["?", "\uFF1F"],
+  ["*", "\u204E"],
+  ["<", "\uFF1C"],
+  [">", "\uFF1E"],
+  ['"', "\uFF02"],
+  ["|", "\uFF5C"],
+  [":", "\uFF1A"],
+];
+
+const ASCII_TO_FULLWIDTH = new Map(WIN_CHAR_MAP.map(([a, f]) => [a, f]));
+const FULLWIDTH_TO_ASCII = new Map(WIN_CHAR_MAP.map(([a, f]) => [f, a]));
+
+const FULLWIDTH_RE = new RegExp(`[${WIN_CHAR_MAP.map(([, f]) => f).join("")}]`, "g");
+const ASCII_RE = new RegExp(
+  `[${WIN_CHAR_MAP.map(([a]) => a.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("")}]`,
+  "g",
+);
+
+export function toLocalPath(canonicalPath: string): string {
+  if (!Platform.isWin) return canonicalPath;
+  return canonicalPath.replace(ASCII_RE, (ch) => ASCII_TO_FULLWIDTH.get(ch) ?? ch);
+}
+
+export function toCanonicalPath(localPath: string): string {
+  if (!Platform.isWin) return localPath;
+  return localPath.replace(FULLWIDTH_RE, (ch) => FULLWIDTH_TO_ASCII.get(ch) ?? ch);
+}
 
 export const HEX_COLOR_RE = /^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/;
 
@@ -113,27 +142,6 @@ export function isTextFile(path: string): boolean {
   const dot = path.lastIndexOf(".");
   if (dot < 0) return false;
   return TEXT_EXTENSIONS.has(path.slice(dot + 1).toLowerCase());
-}
-
-const WINDOWS_RESERVED = /^(CON|PRN|AUX|NUL|COM\d|LPT\d)$/i;
-const WINDOWS_INVALID_CHARS = /[<>:"|?*]/;
-
-export function getPathWarning(path: string): string | null {
-  const segments = path.split("/");
-  for (const seg of segments) {
-    if (!seg) continue;
-    if (WINDOWS_INVALID_CHARS.test(seg)) {
-      return `"${seg}" contains characters not allowed on Windows`;
-    }
-    const name = seg.replace(/\.[^.]*$/, "");
-    if (WINDOWS_RESERVED.test(name)) {
-      return `"${seg}" is a reserved filename on Windows`;
-    }
-    if (seg.endsWith(".") || seg.endsWith(" ")) {
-      return `"${seg}" ends with a dot or space, which fails on Windows`;
-    }
-  }
-  return null;
 }
 
 export function arrayBufferToBase64(buf: ArrayBuffer): string {

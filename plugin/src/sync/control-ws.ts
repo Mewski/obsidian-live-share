@@ -167,8 +167,8 @@ export class ControlChannel {
   off<T extends ControlMessageType>(type: T, handler: (msg: ControlMessageMap[T]) => void): void {
     const list = this.handlers.get(type);
     if (list) {
-      const idx = list.indexOf(handler as Handler<ControlMessageType>);
-      if (idx >= 0) list.splice(idx, 1);
+      const index = list.indexOf(handler as Handler<ControlMessageType>);
+      if (index >= 0) list.splice(index, 1);
     }
   }
 

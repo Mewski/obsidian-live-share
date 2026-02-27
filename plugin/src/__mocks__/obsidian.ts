@@ -76,6 +76,22 @@ export class TAbstractFile {
   path = "";
 }
 
+export const Platform = {
+  isDesktop: true,
+  isMobile: false,
+  isDesktopApp: true,
+  isMobileApp: false,
+  isIosApp: false,
+  isAndroidApp: false,
+  isPhone: false,
+  isTablet: false,
+  isMacOS: false,
+  isWin: false,
+  isLinux: true,
+  isSafari: false,
+  resourcePathPrefix: "app://local/",
+};
+
 export class Setting {
   setName(_n: string) {
     return this;
