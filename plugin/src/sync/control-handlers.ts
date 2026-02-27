@@ -148,6 +148,7 @@ export function registerControlHandlers(plugin: LiveSharePlugin): void {
     if (msg.permission) {
       plugin.settings.permission = msg.permission;
     }
+    plugin.fileOpsManager.setOnline(true);
     plugin.presenceManager?.broadcastPresence();
   });
 
@@ -254,6 +255,9 @@ export function registerControlHandlers(plugin: LiveSharePlugin): void {
   channel.on("host-changed", async (msg) => {
     if (plugin.settings.role === "host") {
       plugin.settings.role = "guest";
+      if (plugin.presenceManager?.getIsPresenting()) {
+        plugin.presenceManager.togglePresent();
+      }
       await plugin.saveSettings();
     }
     for (const [userId, user] of plugin.remoteUsers) {

@@ -109,11 +109,15 @@ export class CanvasSync {
 
     const docId = `${CANVAS_DOC_PREFIX}${path}`;
     const docHandle = this.syncManager.getDoc(docId);
-    if (!docHandle) return;
+    if (!docHandle) {
+      this.subscribedPaths.delete(path);
+      return;
+    }
 
     try {
       await this.syncManager.waitForSync(docId);
     } catch {
+      this.subscribedPaths.delete(path);
       return;
     }
 

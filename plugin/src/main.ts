@@ -534,7 +534,9 @@ export default class LiveSharePlugin extends Plugin {
       this.logger.log("connection", `control channel ${controlState}`);
       if (controlState === "connected") {
         this.connectionState.transition({ type: "connected" });
-        this.fileOpsManager.setOnline(true);
+        if (this.settings.role === "host") {
+          this.fileOpsManager.setOnline(true);
+        }
         if (this.settings.role === "guest") {
           this.controlChannel?.send({
             type: "join-request",

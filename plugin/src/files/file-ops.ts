@@ -121,6 +121,7 @@ export class FileOpsManager {
   clearPendingChunks(): void {
     this.pendingChunks.clear();
     this.outgoingTransfers.clear();
+    this.offlineQueue.clear();
   }
 
   async applyRemoteOp(op: FileOp) {
