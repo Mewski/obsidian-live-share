@@ -69,6 +69,7 @@ vi.mock("@codemirror/view", () => {
       domEventHandlers: () => "mock-dom-event-handlers",
     },
     GutterMarker: MockGutterMarker,
+    ViewPlugin: { fromClass: (cls: unknown) => ({ extension: cls }) },
     gutter: () => "mock-gutter",
   };
 });

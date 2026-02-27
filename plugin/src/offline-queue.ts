@@ -14,16 +14,25 @@ export class OfflineQueue {
     const path = getOpPath(op);
 
     if (path && op.type === "delete") {
-      // Delete cancels all preceding ops for this path
       this.queue = this.queue.filter((prev) => getOpPath(prev) !== path);
     } else if (path && (op.type === "modify" || op.type === "create")) {
-      // Latest modify/create for the same path wins
       const idx = this.queue.findIndex(
-        (prev) => getOpPath(prev) === path && (prev.type === "modify" || prev.type === "create"),
+        (prev) =>
+          getOpPath(prev) === path &&
+          (prev.type === "modify" || prev.type === "create"),
       );
       if (idx >= 0) {
         this.queue.splice(idx, 1);
       }
+    } else if (op.type === "rename" && "oldPath" in op && "newPath" in op) {
+      const oldPath = normalizePath(op.oldPath);
+      const newPath = normalizePath(op.newPath);
+      this.queue = this.queue.map((prev) => {
+        if ("path" in prev && normalizePath(prev.path) === oldPath) {
+          return { ...prev, path: newPath };
+        }
+        return prev;
+      });
     }
 
     this.queue.push(op);

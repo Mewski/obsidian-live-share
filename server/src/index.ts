@@ -79,7 +79,10 @@ export function createApp(
       res.status(404).json({ error: "room not found" });
       return;
     }
-    const token = req.query.token;
+    const authHeader = req.headers.authorization;
+    const token = authHeader?.startsWith("Bearer ")
+      ? authHeader.slice(7)
+      : (req.query.token as string);
     if (typeof token !== "string" || !safeTokenCompare(token, room.token)) {
       res.status(403).json({ error: "invalid token" });
       return;

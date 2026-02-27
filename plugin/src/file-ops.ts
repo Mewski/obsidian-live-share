@@ -237,8 +237,10 @@ export class FileOpsManager {
           break;
         }
         case "chunk-start": {
-          if (op.totalSize > MAX_FILE_SIZE) {
-            new Notice(`Live Share: incoming ${op.path} exceeds 50 MB limit, skipping`);
+          if (op.totalSize <= 0 || op.totalSize > MAX_FILE_SIZE) {
+            if (op.totalSize > MAX_FILE_SIZE) {
+              new Notice(`Live Share: incoming ${op.path} exceeds 50 MB limit, skipping`);
+            }
             break;
           }
           const chunkKey = op.transferId ?? op.path;
@@ -256,6 +258,8 @@ export class FileOpsManager {
           const dataKey = op.transferId ?? op.path;
           const assembly = this.pendingChunks.get(dataKey);
           if (assembly) {
+            const expectedChunks = Math.ceil(assembly.totalSize / CHUNK_SIZE);
+            if (op.index < 0 || op.index >= expectedChunks) break;
             assembly.chunks[op.index] = op.data;
             assembly.lastActivity = Date.now();
           }

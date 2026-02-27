@@ -1,5 +1,11 @@
 import { type Extension, StateEffect, StateField, Transaction } from "@codemirror/state";
-import { Decoration, type DecorationSet, EditorView } from "@codemirror/view";
+import {
+  Decoration,
+  type DecorationSet,
+  EditorView,
+  ViewPlugin,
+  type ViewUpdate,
+} from "@codemirror/view";
 
 const OVERLAP_WINDOW_MS = 2000;
 const DECORATION_LIFETIME_MS = 5000;
@@ -18,6 +24,7 @@ interface ConflictMark {
 
 const addConflictEffect = StateEffect.define<ConflictMark>();
 const clearExpiredEffect = StateEffect.define<number>();
+const setLocalEditsEffect = StateEffect.define<EditRegion[]>();
 
 const conflictMark = Decoration.mark({
   class: "live-share-conflict",
@@ -60,6 +67,10 @@ const conflictField = StateField.define<{
         marks = marks.filter((m) => m.expiry > now);
         if (marks.length !== before) changed = true;
       }
+      if (effect.is(setLocalEditsEffect)) {
+        localEdits = effect.value;
+        changed = true;
+      }
     }
 
     if (!changed) return state;
@@ -80,80 +91,77 @@ function isLocalTransaction(tr: Transaction): boolean {
   return ann !== true;
 }
 
-export function conflictExtension(): Extension {
-  let cleanupTimer: ReturnType<typeof setInterval> | null = null;
+const conflictPlugin = ViewPlugin.fromClass(
+  class {
+    private cleanupTimer: ReturnType<typeof setInterval> | null = null;
 
-  const trackEdits = EditorView.updateListener.of((update) => {
-    if (!update.docChanged) return;
-    const now = Date.now();
-    const state = update.view.state.field(conflictField);
+    constructor(private view: EditorView) {
+      this.startCleanup();
+    }
 
-    for (const tr of update.transactions) {
-      if (!tr.docChanged) continue;
+    update(update: ViewUpdate) {
+      if (!update.docChanged) return;
+      const now = Date.now();
+      const state = update.view.state.field(conflictField);
 
-      if (isLocalTransaction(tr)) {
-        const newEdits = [...state.localEdits];
-        tr.changes.iterChangedRanges((_fromA, _toA, fromB, toB) => {
-          newEdits.push({ from: fromB, to: toB, timestamp: now });
-        });
-        const cutoff = now - OVERLAP_WINDOW_MS;
-        const filtered = newEdits.filter((e) => e.timestamp > cutoff);
-        const currentField = update.view.state.field(conflictField);
-        currentField.localEdits = filtered;
-      } else {
-        const recentLocal = state.localEdits.filter((e) => now - e.timestamp < OVERLAP_WINDOW_MS);
-        if (recentLocal.length === 0) continue;
+      for (const tr of update.transactions) {
+        if (!tr.docChanged) continue;
 
-        const effects: StateEffect<ConflictMark>[] = [];
-        tr.changes.iterChangedRanges((_fromA, _toA, fromB, toB) => {
-          for (const local of recentLocal) {
-            if (fromB < local.to && toB > local.from) {
-              const overlapFrom = Math.max(fromB, local.from);
-              const overlapTo = Math.min(toB, local.to);
-              if (overlapFrom < overlapTo) {
-                effects.push(
-                  addConflictEffect.of({
-                    from: overlapFrom,
-                    to: overlapTo,
-                    expiry: now + DECORATION_LIFETIME_MS,
-                  }),
-                );
+        if (isLocalTransaction(tr)) {
+          const newEdits = [...state.localEdits];
+          tr.changes.iterChangedRanges((_fromA, _toA, fromB, toB) => {
+            newEdits.push({ from: fromB, to: toB, timestamp: now });
+          });
+          const cutoff = now - OVERLAP_WINDOW_MS;
+          const filtered = newEdits.filter((e) => e.timestamp > cutoff);
+          update.view.dispatch({ effects: setLocalEditsEffect.of(filtered) });
+        } else {
+          const recentLocal = state.localEdits.filter((e) => now - e.timestamp < OVERLAP_WINDOW_MS);
+          if (recentLocal.length === 0) continue;
+
+          const effects: StateEffect<ConflictMark>[] = [];
+          tr.changes.iterChangedRanges((_fromA, _toA, fromB, toB) => {
+            for (const local of recentLocal) {
+              if (fromB < local.to && toB > local.from) {
+                const overlapFrom = Math.max(fromB, local.from);
+                const overlapTo = Math.min(toB, local.to);
+                if (overlapFrom < overlapTo) {
+                  effects.push(
+                    addConflictEffect.of({
+                      from: overlapFrom,
+                      to: overlapTo,
+                      expiry: now + DECORATION_LIFETIME_MS,
+                    }),
+                  );
+                }
               }
             }
-          }
-        });
+          });
 
-        if (effects.length > 0) {
-          update.view.dispatch({ effects });
+          if (effects.length > 0) {
+            update.view.dispatch({ effects });
+          }
         }
       }
     }
-  });
 
-  const setupCleanup = EditorView.domEventHandlers({
-    focus: (_event, view) => {
-      if (cleanupTimer) return;
-      cleanupTimer = setInterval(() => {
-        const state = view.state.field(conflictField, false);
+    private startCleanup() {
+      this.cleanupTimer = setInterval(() => {
+        const state = this.view.state.field(conflictField, false);
         if (!state || state.marks.length === 0) return;
-        view.dispatch({ effects: clearExpiredEffect.of(Date.now()) });
+        this.view.dispatch({ effects: clearExpiredEffect.of(Date.now()) });
       }, 1000);
-    },
-  });
+    }
 
-  const teardown = EditorView.updateListener.of((update) => {
-    if (update.view.state.field(conflictField, false)) {
-      if (!cleanupTimer) {
-        cleanupTimer = setInterval(() => {
-          const state = update.view.state.field(conflictField, false);
-          if (!state || state.marks.length === 0) return;
-          update.view.dispatch({
-            effects: clearExpiredEffect.of(Date.now()),
-          });
-        }, 1000);
+    destroy() {
+      if (this.cleanupTimer) {
+        clearInterval(this.cleanupTimer);
+        this.cleanupTimer = null;
       }
     }
-  });
+  },
+);
 
-  return [conflictField, trackEdits, setupCleanup, teardown];
+export function conflictExtension(): Extension {
+  return [conflictField, conflictPlugin];
 }

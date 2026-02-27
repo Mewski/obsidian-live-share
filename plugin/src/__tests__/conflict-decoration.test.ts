@@ -5,7 +5,7 @@ describe("conflictExtension", () => {
   it("returns an array of extensions", () => {
     const ext = conflictExtension();
     expect(Array.isArray(ext)).toBe(true);
-    expect((ext as unknown[]).length).toBeGreaterThanOrEqual(3);
+    expect((ext as unknown[]).length).toBeGreaterThanOrEqual(2);
   });
 
   it("returns a new instance each time", () => {

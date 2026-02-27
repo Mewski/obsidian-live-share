@@ -658,6 +658,12 @@ export default class LiveSharePlugin extends Plugin {
     this.logger.destroy();
     this.controlChannel?.destroy();
     this.controlChannel = null;
+    this.commentManager?.destroy();
+    this.commentManager = null;
+    this.explorerIndicators?.destroy();
+    this.explorerIndicators = null;
+    this.canvasSync?.destroy();
+    this.canvasSync = null;
     this.clearUnfollowListeners();
     this.removeScrollListener();
     this.connectionStateUnsub?.();
@@ -1531,8 +1537,10 @@ export default class LiveSharePlugin extends Plugin {
   private async fetchAuditLog() {
     if (!this.settings.serverUrl || !this.settings.roomId || !this.settings.token) return;
     try {
-      const url = `${this.settings.serverUrl}/rooms/${this.settings.roomId}/logs?token=${encodeURIComponent(this.settings.token)}&limit=100`;
-      const res = await fetch(url);
+      const url = `${this.settings.serverUrl}/rooms/${this.settings.roomId}/logs?limit=100`;
+      const res = await fetch(url, {
+        headers: { Authorization: `Bearer ${this.settings.token}` },
+      });
       if (!res.ok) {
         new Notice("Live Share: failed to fetch audit log");
         return;

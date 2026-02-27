@@ -3,7 +3,12 @@ import type { Permission } from "./types";
 const STYLE_ID = "live-share-explorer-indicators";
 
 function escapeCssString(str: string): string {
-  return str.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+  return str
+    .replace(/\\/g, "\\\\")
+    .replace(/"/g, '\\"')
+    .replace(/\n/g, "\\a ")
+    .replace(/\r/g, "\\d ")
+    .replace(/\f/g, "\\c ");
 }
 
 export class ExplorerIndicators {

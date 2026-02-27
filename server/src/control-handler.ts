@@ -7,6 +7,7 @@ import {
   clearPermission,
   clearRoomPermissions,
   clearUserFilePermissions,
+  getEffectivePermission,
   setFilePermission,
   setPermission,
 } from "./permissions.js";
@@ -62,6 +63,7 @@ interface ControlClient {
 interface ControlRoom {
   clients: Map<WebSocket, ControlClient>;
   pendingApprovals: Map<string, WebSocket>;
+  pendingTransferTarget: string | null;
   cleanupTimer?: ReturnType<typeof setTimeout>;
   nextJoinOrder: number;
 }
@@ -83,6 +85,7 @@ export function createControlWSS(options?: ControlWSSOptions) {
       room = {
         clients: new Map(),
         pendingApprovals: new Map(),
+        pendingTransferTarget: null,
         nextJoinOrder: 0,
       };
       rooms.set(roomId, room);
@@ -357,6 +360,7 @@ export function createControlWSS(options?: ControlWSSOptions) {
         if (typeof targetUserId !== "string" || !targetUserId) return;
         const target = findClientByUserId(room, targetUserId);
         if (!target || !target.isApproved) return;
+        room.pendingTransferTarget = targetUserId;
         sendTo(target.ws, {
           type: "host-transfer-offer",
           userId: client.userId,
@@ -366,6 +370,8 @@ export function createControlWSS(options?: ControlWSSOptions) {
       }
 
       if (msg.type === "host-transfer-accept") {
+        if (room.pendingTransferTarget !== client.userId) return;
+        room.pendingTransferTarget = null;
         const targetUserId = msg.userId;
         if (typeof targetUserId !== "string" || !targetUserId) return;
         const oldHost = findClientByUserId(room, targetUserId);
@@ -400,6 +406,7 @@ export function createControlWSS(options?: ControlWSSOptions) {
       }
 
       if (msg.type === "host-transfer-decline") {
+        room.pendingTransferTarget = null;
         const targetUserId = msg.userId;
         if (typeof targetUserId !== "string" || !targetUserId) return;
         const oldHost = findClientByUserId(room, targetUserId);
@@ -419,8 +426,20 @@ export function createControlWSS(options?: ControlWSSOptions) {
         msg.type === "file-chunk-start" ||
         msg.type === "file-chunk-data" ||
         msg.type === "file-chunk-end";
-      if (isFileWrite && client.permission === "read-only") {
-        return;
+      if (isFileWrite) {
+        const filePath =
+          msg.type === "file-op" && typeof msg.op === "object" && msg.op !== null
+            ? ((msg.op as Record<string, unknown>).path ??
+              (msg.op as Record<string, unknown>).newPath)
+            : msg.path;
+        const effectivePerm = getEffectivePermission(
+          roomId,
+          client.userId,
+          typeof filePath === "string" ? filePath : undefined,
+        );
+        if ((effectivePerm ?? client.permission) === "read-only") {
+          return;
+        }
       }
 
       if (HOST_ONLY_TYPES.has(msg.type) && !client.isHost) {

@@ -286,7 +286,7 @@ describe("FileOpsManager", () => {
       await manager.applyRemoteOp({
         type: "chunk-start",
         path: "big.md",
-        totalSize: 10,
+        totalSize: 512 * 1024 + 5,
       });
       await manager.applyRemoteOp({
         type: "chunk-data",
@@ -313,7 +313,7 @@ describe("FileOpsManager", () => {
       await manager.applyRemoteOp({
         type: "chunk-start",
         path: "big.md",
-        totalSize: 10,
+        totalSize: 512 * 1024 + 5,
       });
       await manager.applyRemoteOp({
         type: "chunk-data",
@@ -339,7 +339,7 @@ describe("FileOpsManager", () => {
       await manager.applyRemoteOp({
         type: "chunk-start",
         path: "big.png",
-        totalSize: 6,
+        totalSize: 512 * 1024 + 3,
         binary: true,
       });
       await manager.applyRemoteOp({
