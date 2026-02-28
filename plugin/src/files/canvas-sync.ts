@@ -41,10 +41,7 @@ function parseCanvas(content: string): CanvasData {
   }
 }
 
-function serializeCanvas(
-  nodesMap: Y.Map<Y.Map<unknown>>,
-  edgesMap: Y.Map<Y.Map<unknown>>,
-): string {
+function serializeCanvas(nodesMap: Y.Map<Y.Map<unknown>>, edgesMap: Y.Map<Y.Map<unknown>>): string {
   const nodes: Record<string, unknown>[] = [];
   const edges: Record<string, unknown>[] = [];
 
@@ -95,11 +92,7 @@ export class CanvasSync {
   private recentLocalEdits = new Set<string>();
   private lastWrittenContent = new Map<string, string>();
 
-  constructor(
-    vault: Vault,
-    syncManager: SyncManager,
-    fileOpsManager: FileOpsManager,
-  ) {
+  constructor(vault: Vault, syncManager: SyncManager, fileOpsManager: FileOpsManager) {
     this.vault = vault;
     this.syncManager = syncManager;
     this.fileOpsManager = fileOpsManager;

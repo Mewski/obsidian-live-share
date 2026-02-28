@@ -17,10 +17,7 @@ export default [
     },
     rules: {
       ...obsidianPlugin.configs.recommended,
-      "obsidianmd/ui/sentence-case": [
-        "warn",
-        { brands: ["Live Share", "Obsidian"] },
-      ],
+      "obsidianmd/ui/sentence-case": ["warn", { brands: ["Live Share", "Obsidian"] }],
     },
   },
 ];

@@ -47,9 +47,7 @@ export class AuthManager {
         (payload.displayName || payload.username || "").trim() || "Anonymous";
       this.plugin.settings.avatarUrl = payload.avatar || "";
       await this.plugin.saveSettings();
-      new Notice(
-        `Live Share: authenticated as ${this.plugin.settings.displayName}`,
-      );
+      new Notice(`Live Share: authenticated as ${this.plugin.settings.displayName}`);
       return true;
     } catch {
       new Notice("Live Share: invalid auth token");

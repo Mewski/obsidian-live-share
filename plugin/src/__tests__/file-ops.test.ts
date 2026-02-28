@@ -187,9 +187,7 @@ describe("FileOpsManager", () => {
 
     it("broadcasts file delete", async () => {
       manager.onFileDelete({ path: "deleted.md" } as any);
-      await vi.waitFor(() =>
-        expect(sentOps).toEqual([{ type: "delete", path: "deleted.md" }]),
-      );
+      await vi.waitFor(() => expect(sentOps).toEqual([{ type: "delete", path: "deleted.md" }]));
     });
 
     it("broadcasts file rename", async () => {

@@ -17,9 +17,7 @@ export function showFocusNotification(
     cls: "live-share-focus-goto",
   });
   goToButton.addEventListener("click", () => {
-    const file = plugin.app.vault.getAbstractFileByPath(
-      toLocalPath(request.filePath),
-    );
+    const file = plugin.app.vault.getAbstractFileByPath(toLocalPath(request.filePath));
     if (file instanceof TFile) {
       void plugin.app.workspace
         .getLeaf()

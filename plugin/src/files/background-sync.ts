@@ -95,9 +95,7 @@ export class BackgroundSync {
       } else if (this.role === "guest" && docHandle.text.length > 0) {
         const file = getFileByPath(this.vault, diskPath);
         const remoteContent = docHandle.text.toString();
-        const localContent = file
-          ? normalizeLineEndings(await this.vault.read(file))
-          : "";
+        const localContent = file ? normalizeLineEndings(await this.vault.read(file)) : "";
         if (remoteContent !== localContent) {
           await this.writeToDisk(path, remoteContent);
         } else {
@@ -209,9 +207,7 @@ export class BackgroundSync {
       } else if (docHandle.text.length > 0) {
         const file = getFileByPath(this.vault, diskNew);
         const remoteContent = docHandle.text.toString();
-        const localContent = file
-          ? normalizeLineEndings(await this.vault.read(file))
-          : "";
+        const localContent = file ? normalizeLineEndings(await this.vault.read(file)) : "";
         if (remoteContent !== localContent) {
           await this.writeToDisk(normNew, remoteContent);
         }
@@ -299,9 +295,7 @@ export class BackgroundSync {
 
   private writeToDisk(path: string, content: string): Promise<void> {
     if (this.lastWrittenContent.get(path) === content) return Promise.resolve();
-    this.writeQueue = this.writeQueue.then(() =>
-      this.doWriteToDisk(path, content),
-    );
+    this.writeQueue = this.writeQueue.then(() => this.doWriteToDisk(path, content));
     return this.writeQueue;
   }
 

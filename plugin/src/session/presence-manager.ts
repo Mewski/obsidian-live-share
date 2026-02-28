@@ -88,9 +88,7 @@ export class PresenceManager {
     const eventTypes = ["keydown", "mousedown", "wheel"] as const;
     for (const eventType of eventTypes) {
       document.addEventListener(eventType, handler);
-      this.unfollowListeners.push(() =>
-        document.removeEventListener(eventType, handler),
-      );
+      this.unfollowListeners.push(() => document.removeEventListener(eventType, handler));
     }
 
     if (user) void this.applyFollowState(user);

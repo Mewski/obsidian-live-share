@@ -137,8 +137,7 @@ export class ManifestManager {
     for (const [path, entry] of entries) {
       if (!path || path.startsWith("/") || path.startsWith("\\")) continue;
       const segments = path.split(/[\\/]/);
-      if (segments.some((segment) => segment === ".." || segment === "."))
-        continue;
+      if (segments.some((segment) => segment === ".." || segment === ".")) continue;
 
       const diskPath = toLocalPath(path);
       if (entry.directory) {
@@ -209,9 +208,7 @@ export class ManifestManager {
     return synced;
   }
 
-  setManifestChangeHandler(
-    callback: (added: string[], removed: string[]) => void,
-  ): void {
+  setManifestChangeHandler(callback: (added: string[], removed: string[]) => void): void {
     if (!this.manifest) return;
 
     if (this.observer && this.manifest) {
@@ -264,11 +261,7 @@ export class ManifestManager {
     this.manifest.set(path, { hash: "", size: 0, mtime: 0, directory: true });
   }
 
-  renameFile(
-    oldPath: string,
-    newPath: string,
-    syncManager?: SyncManager,
-  ): void {
+  renameFile(oldPath: string, newPath: string, syncManager?: SyncManager): void {
     if (!this.manifest || !this.docHandle) return;
     const normOld = toCanonicalPath(normalizePath(oldPath));
     const normNew = toCanonicalPath(normalizePath(newPath));
@@ -298,10 +291,7 @@ export class ManifestManager {
         ? this.settings.sharedFolder
         : `${this.settings.sharedFolder}/`,
     );
-    return (
-      path.startsWith(folder) ||
-      path === normalizePath(this.settings.sharedFolder)
-    );
+    return path.startsWith(folder) || path === normalizePath(this.settings.sharedFolder);
   }
 
   destroy(): void {

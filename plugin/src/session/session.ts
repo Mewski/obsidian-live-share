@@ -12,9 +12,7 @@ interface InvitePayload {
 
 function generatePassphrase(): string {
   const bytes = crypto.getRandomValues(new Uint8Array(16));
-  return Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join(
-    "",
-  );
+  return Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 
 export class SessionManager {
@@ -27,8 +25,7 @@ export class SessionManager {
     const headers: Record<string, string> = {
       "Content-Type": "application/json",
     };
-    if (settings.serverPassword)
-      headers["X-Server-Password"] = settings.serverPassword;
+    if (settings.serverPassword) headers["X-Server-Password"] = settings.serverPassword;
 
     let roomData: { id: string; token: string; name: string };
     try {
@@ -117,8 +114,7 @@ export class SessionManager {
       const deleteHeaders: Record<string, string> = {
         Authorization: `Bearer ${settings.token}`,
       };
-      if (settings.serverPassword)
-        deleteHeaders["X-Server-Password"] = settings.serverPassword;
+      if (settings.serverPassword) deleteHeaders["X-Server-Password"] = settings.serverPassword;
       try {
         await requestUrl({
           url: `${baseUrl}/rooms/${settings.roomId}`,

@@ -6,12 +6,7 @@ import type { ControlMessage, FileOp } from "../types";
 import { ApprovalModal } from "../ui/approval-modal";
 import { showFocusNotification } from "../ui/focus-notification";
 import { ConfirmModal } from "../ui/modals";
-import {
-  isTextFile,
-  normalizePath,
-  toCanonicalPath,
-  toLocalPath,
-} from "../utils";
+import { isTextFile, normalizePath, toCanonicalPath, toLocalPath } from "../utils";
 
 const CHUNK_TO_CONTROL = {
   "chunk-start": "file-chunk-start",
@@ -21,10 +16,7 @@ const CHUNK_TO_CONTROL = {
 } as const;
 
 const CONTROL_TO_CHUNK = Object.fromEntries(
-  Object.entries(CHUNK_TO_CONTROL).map(([chunkType, controlType]) => [
-    controlType,
-    chunkType,
-  ]),
+  Object.entries(CHUNK_TO_CONTROL).map(([chunkType, controlType]) => [controlType, chunkType]),
 ) as Record<
   (typeof CHUNK_TO_CONTROL)[keyof typeof CHUNK_TO_CONTROL],
   keyof typeof CHUNK_TO_CONTROL
@@ -35,11 +27,7 @@ export function registerControlHandlers(plugin: LiveSharePlugin): void {
   if (!channel) return;
 
   plugin.fileOpsManager.setSender((op) => {
-    if (
-      op.type === "chunk-start" ||
-      op.type === "chunk-data" ||
-      op.type === "chunk-end"
-    ) {
+    if (op.type === "chunk-start" || op.type === "chunk-data" || op.type === "chunk-end") {
       channel.send({
         ...op,
         type: CHUNK_TO_CONTROL[op.type],
@@ -59,20 +47,16 @@ export function registerControlHandlers(plugin: LiveSharePlugin): void {
     if (paths.length === 0) return;
     const isRename = op.type === "rename";
     if (isRename) {
-      if (!paths.some((path) => plugin.manifestManager.isSharedPath(path)))
-        return;
+      if (!paths.some((path) => plugin.manifestManager.isSharedPath(path))) return;
     } else {
-      if (paths.some((path) => !plugin.manifestManager.isSharedPath(path)))
-        return;
+      if (paths.some((path) => !plugin.manifestManager.isSharedPath(path))) return;
     }
     plugin.fileOpsManager
       .applyRemoteOp(op)
       .then(async () => {
         if (plugin.settings.role !== "host") return;
         if (op.type === "create" && "path" in op) {
-          const file = plugin.app.vault.getAbstractFileByPath(
-            toLocalPath(op.path),
-          );
+          const file = plugin.app.vault.getAbstractFileByPath(toLocalPath(op.path));
           if (file instanceof TFile) {
             const content = isTextFile(file.path)
               ? await plugin.app.vault.read(file)
@@ -82,14 +66,8 @@ export function registerControlHandlers(plugin: LiveSharePlugin): void {
               await plugin.backgroundSync.onFileAdded(file.path);
             }
           }
-        } else if (
-          op.type === "modify" &&
-          "path" in op &&
-          !isTextFile(op.path)
-        ) {
-          const file = plugin.app.vault.getAbstractFileByPath(
-            toLocalPath(op.path),
-          );
+        } else if (op.type === "modify" && "path" in op && !isTextFile(op.path)) {
+          const file = plugin.app.vault.getAbstractFileByPath(toLocalPath(op.path));
           if (file instanceof TFile) {
             const content = await plugin.app.vault.readBinary(file);
             await plugin.manifestManager.updateFile(file, content);
@@ -103,16 +81,9 @@ export function registerControlHandlers(plugin: LiveSharePlugin): void {
             newPath: string;
           };
           if (isTextFile(renameOp.newPath)) {
-            await plugin.backgroundSync.onFileRenamed(
-              renameOp.oldPath,
-              renameOp.newPath,
-            );
+            await plugin.backgroundSync.onFileRenamed(renameOp.oldPath, renameOp.newPath);
           }
-          plugin.manifestManager.renameFile(
-            renameOp.oldPath,
-            renameOp.newPath,
-            plugin.syncManager,
-          );
+          plugin.manifestManager.renameFile(renameOp.oldPath, renameOp.newPath, plugin.syncManager);
         }
       })
       .catch((err) => {
@@ -134,11 +105,7 @@ export function registerControlHandlers(plugin: LiveSharePlugin): void {
           type: CONTROL_TO_CHUNK[chunkType],
         } as FileOp)
         .catch((err) => {
-          plugin.logger.error(
-            "file-op",
-            `failed to apply remote ${chunkType}`,
-            err,
-          );
+          plugin.logger.error("file-op", `failed to apply remote ${chunkType}`, err);
         });
     });
   }
@@ -197,9 +164,7 @@ export function registerControlHandlers(plugin: LiveSharePlugin): void {
   channel.on("permission-update", (msg) => {
     plugin.settings.permission = msg.permission;
     plugin.onActiveFileChange();
-    plugin.notify(
-      `Live Share: your permission was changed to ${msg.permission}`,
-    );
+    plugin.notify(`Live Share: your permission was changed to ${msg.permission}`);
   });
 
   channel.on("focus-request", (msg) => {
@@ -207,9 +172,7 @@ export function registerControlHandlers(plugin: LiveSharePlugin): void {
   });
 
   channel.on("summon", (msg) => {
-    const file = plugin.app.vault.getAbstractFileByPath(
-      toLocalPath(msg.filePath),
-    );
+    const file = plugin.app.vault.getAbstractFileByPath(toLocalPath(msg.filePath));
     if (file instanceof TFile) {
       void plugin.app.workspace
         .getLeaf()
@@ -244,9 +207,7 @@ export function registerControlHandlers(plugin: LiveSharePlugin): void {
   channel.on("sync-request", (msg) => {
     if (plugin.settings.role !== "host") return;
     if (msg.path && plugin.manifestManager.isSharedPath(msg.path)) {
-      const file = plugin.app.vault.getAbstractFileByPath(
-        toLocalPath(msg.path),
-      );
+      const file = plugin.app.vault.getAbstractFileByPath(toLocalPath(msg.path));
       if (file instanceof TFile) {
         void plugin.fileOpsManager.onFileCreate(file);
       }
@@ -300,9 +261,7 @@ export function registerControlHandlers(plugin: LiveSharePlugin): void {
   });
 
   channel.on("host-transfer-decline", (msg) => {
-    plugin.notify(
-      `Live Share: ${msg.displayName ?? msg.userId} declined host transfer`,
-    );
+    plugin.notify(`Live Share: ${msg.displayName ?? msg.userId} declined host transfer`);
   });
 
   channel.on("host-disconnected", () => {

@@ -1,10 +1,4 @@
-import {
-  type FileManager,
-  Notice,
-  type TAbstractFile,
-  TFile,
-  type Vault,
-} from "obsidian";
+import { type FileManager, Notice, type TAbstractFile, TFile, type Vault } from "obsidian";
 import { OfflineQueue } from "../sync/offline-queue";
 import type { FileOp } from "../types";
 import {
@@ -134,9 +128,7 @@ export class FileOpsManager {
 
   async applyRemoteOp(op: FileOp) {
     const paths = this.getOpPaths(op);
-    const waitFor = paths
-      .map((path) => this.opQueues.get(path))
-      .filter(Boolean) as Promise<void>[];
+    const waitFor = paths.map((path) => this.opQueues.get(path)).filter(Boolean) as Promise<void>[];
     if (waitFor.length > 0) await Promise.all(waitFor);
 
     const promise = this.applyRemoteOpInner(op);
@@ -223,9 +215,7 @@ export class FileOpsManager {
         case "rename": {
           let file = this.vault.getAbstractFileByPath(op.oldPath);
           if (!file) {
-            await new Promise((resolve) =>
-              setTimeout(resolve, RENAME_RETRY_DELAY_MS),
-            );
+            await new Promise((resolve) => setTimeout(resolve, RENAME_RETRY_DELAY_MS));
             file = this.vault.getAbstractFileByPath(op.oldPath);
           }
           const alreadyExists = this.vault.getAbstractFileByPath(op.newPath);
@@ -233,16 +223,12 @@ export class FileOpsManager {
             break;
           }
           if (file && !alreadyExists) {
-            const parentDir = op.newPath.substring(
-              0,
-              op.newPath.lastIndexOf("/"),
-            );
+            const parentDir = op.newPath.substring(0, op.newPath.lastIndexOf("/"));
             if (parentDir) await ensureFolder(this.vault, parentDir);
             try {
               await this.vault.rename(file, op.newPath);
             } catch (renameErr) {
-              if (!this.vault.getAbstractFileByPath(op.newPath))
-                throw renameErr;
+              if (!this.vault.getAbstractFileByPath(op.newPath)) throw renameErr;
             }
           } else if (file && alreadyExists) {
             await this.fileManager.trashFile(file);
@@ -252,9 +238,7 @@ export class FileOpsManager {
         case "chunk-start": {
           if (op.totalSize <= 0 || op.totalSize > MAX_FILE_SIZE) {
             if (op.totalSize > MAX_FILE_SIZE) {
-              new Notice(
-                `Live Share: incoming ${op.path} exceeds 50 MB limit, skipping`,
-              );
+              new Notice(`Live Share: incoming ${op.path} exceeds 50 MB limit, skipping`);
             }
             break;
           }
@@ -305,9 +289,7 @@ export class FileOpsManager {
               break;
             }
             this.pendingChunks.delete(endKey);
-            new Notice(
-              `Live Share: incomplete transfer for ${op.path}, some chunks were lost`,
-            );
+            new Notice(`Live Share: incomplete transfer for ${op.path}, some chunks were lost`);
             break;
           }
 
@@ -333,10 +315,7 @@ export class FileOpsManager {
           const receivedSet = new Set(op.receivedSeqs);
           for (let i = 0; i < transfer.totalChunks; i++) {
             if (!receivedSet.has(i)) {
-              const chunk = transfer.content.slice(
-                i * CHUNK_SIZE,
-                (i + 1) * CHUNK_SIZE,
-              );
+              const chunk = transfer.content.slice(i * CHUNK_SIZE, (i + 1) * CHUNK_SIZE);
               this.sendOp?.({
                 type: "chunk-data",
                 path: transfer.path,
@@ -386,16 +365,10 @@ export class FileOpsManager {
           const binaryContent = await this.vault.readBinary(tfile);
           if (this.isPathMuted(localPath)) return;
           if (binaryContent.byteLength > MAX_FILE_SIZE) {
-            new Notice(
-              `Live Share: ${localPath} exceeds 50 MB limit, skipping`,
-            );
+            new Notice(`Live Share: ${localPath} exceeds 50 MB limit, skipping`);
             return;
           }
-          this.sendFileContent(
-            wirePath,
-            arrayBufferToBase64(binaryContent),
-            true,
-          );
+          this.sendFileContent(wirePath, arrayBufferToBase64(binaryContent), true);
         } else {
           const content = normalizeLineEndings(await this.vault.read(tfile));
           if (this.isPathMuted(localPath)) return;
@@ -408,8 +381,7 @@ export class FileOpsManager {
     });
     this.sendQueues.set(localPath, task);
     await task;
-    if (this.sendQueues.get(localPath) === task)
-      this.sendQueues.delete(localPath);
+    if (this.sendQueues.get(localPath) === task) this.sendQueues.delete(localPath);
   }
 
   async onFileModify(file: TAbstractFile) {
@@ -447,8 +419,7 @@ export class FileOpsManager {
     });
     this.sendQueues.set(localPath, task);
     await task;
-    if (this.sendQueues.get(localPath) === task)
-      this.sendQueues.delete(localPath);
+    if (this.sendQueues.get(localPath) === task) this.sendQueues.delete(localPath);
   }
 
   onFileDelete(file: TAbstractFile) {
@@ -465,12 +436,7 @@ export class FileOpsManager {
   onFileRename(file: TAbstractFile, oldPath: string) {
     const localNew = normalizePath(file.path);
     const localOld = normalizePath(oldPath);
-    if (
-      this.isPathMuted(localNew) ||
-      this.isPathMuted(localOld) ||
-      !this.sendOp
-    )
-      return;
+    if (this.isPathMuted(localNew) || this.isPathMuted(localOld) || !this.sendOp) return;
     const prev = this.sendQueues.get(localOld) ?? Promise.resolve();
     const task = prev.then(() => {
       this.emitOp({
