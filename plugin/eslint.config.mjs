@@ -15,6 +15,12 @@ export default [
         tsconfigRootDir: import.meta.dirname,
       },
     },
-    rules: obsidianPlugin.configs.recommended,
+    rules: {
+      ...obsidianPlugin.configs.recommended,
+      "obsidianmd/ui/sentence-case": [
+        "warn",
+        { brands: ["Live Share", "Obsidian"] },
+      ],
+    },
   },
 ];

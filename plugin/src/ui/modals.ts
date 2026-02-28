@@ -5,9 +5,13 @@ export class PromptModal extends Modal {
   private placeholder: string;
   private resolve: (value: string | null) => void;
 
-  constructor(app: App, placeholder: string, resolve: (value: string | null) => void) {
+  constructor(
+    app: App,
+    placeholder: string,
+    resolve: (value: string | null) => void,
+  ) {
     super(app);
-    this.setTitle("Live share");
+    this.setTitle("Live Share");
     this.placeholder = placeholder;
     this.resolve = resolve;
   }
@@ -80,7 +84,7 @@ export class ConfirmModal extends Modal {
 
   constructor(app: App, message: string, resolve: (value: boolean) => void) {
     super(app);
-    this.setTitle("Live share");
+    this.setTitle("Live Share");
     this.message = message;
     this.resolve = resolve;
   }

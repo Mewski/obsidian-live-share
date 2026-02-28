@@ -21,7 +21,8 @@ export function registerCommands(plugin: LiveSharePlugin): void {
     id: "end-session",
     name: "End session",
     checkCallback: (checking) => {
-      if (plugin.settings.role !== "host" || !plugin.sessionManager.isActive) return false;
+      if (plugin.settings.role !== "host" || !plugin.sessionManager.isActive)
+        return false;
       if (checking) return true;
       (async () => {
         const confirmed = await plugin.confirm(
@@ -38,10 +39,13 @@ export function registerCommands(plugin: LiveSharePlugin): void {
     id: "leave-session",
     name: "Leave session",
     checkCallback: (checking) => {
-      if (plugin.settings.role !== "guest" || !plugin.sessionManager.isActive) return false;
+      if (plugin.settings.role !== "guest" || !plugin.sessionManager.isActive)
+        return false;
       if (checking) return true;
       (async () => {
-        const confirmed = await plugin.confirm("Are you sure you want to leave the session?");
+        const confirmed = await plugin.confirm(
+          "Are you sure you want to leave the session?",
+        );
         if (confirmed) void plugin.endSession();
       })().catch(() => {
         // Confirmation dialog was dismissed
@@ -88,7 +92,7 @@ export function registerCommands(plugin: LiveSharePlugin): void {
         line: cursor.line,
         ch: cursor.ch,
       });
-      plugin.notify("Live share: focus request sent");
+      plugin.notify("Live Share: focus request sent");
     },
   });
 
@@ -96,7 +100,8 @@ export function registerCommands(plugin: LiveSharePlugin): void {
     id: "summon-all",
     name: "Summon all participants here",
     checkCallback: (checking) => {
-      if (plugin.settings.role !== "host" || !plugin.sessionManager.isActive) return false;
+      if (plugin.settings.role !== "host" || !plugin.sessionManager.isActive)
+        return false;
       const activeView = plugin.app.workspace.getActiveViewOfType(MarkdownView);
       if (!activeView?.file) return false;
       if (checking) return true;
@@ -110,7 +115,7 @@ export function registerCommands(plugin: LiveSharePlugin): void {
         line: cursor.line,
         ch: cursor.ch,
       });
-      plugin.notify("Live share: summon sent to all participants");
+      plugin.notify("Live Share: summon sent to all participants");
     },
   });
 
@@ -118,7 +123,8 @@ export function registerCommands(plugin: LiveSharePlugin): void {
     id: "reload-from-host",
     name: "Reload all files from host",
     checkCallback: (checking) => {
-      if (plugin.settings.role !== "guest" || !plugin.sessionManager.isActive) return false;
+      if (plugin.settings.role !== "guest" || !plugin.sessionManager.isActive)
+        return false;
       if (checking) return true;
       void plugin.reloadFromHost();
     },
@@ -128,7 +134,8 @@ export function registerCommands(plugin: LiveSharePlugin): void {
     id: "summon-user",
     name: "Summon a specific participant here",
     checkCallback: (checking) => {
-      if (plugin.settings.role !== "host" || !plugin.sessionManager.isActive) return false;
+      if (plugin.settings.role !== "host" || !plugin.sessionManager.isActive)
+        return false;
       if (plugin.remoteUsers.size === 0) return false;
       if (checking) return true;
       new UserPickerModal(plugin.app, plugin.remoteUsers, (userId) => {
@@ -141,7 +148,8 @@ export function registerCommands(plugin: LiveSharePlugin): void {
     id: "toggle-present",
     name: "Toggle presentation mode",
     checkCallback: (checking) => {
-      if (plugin.settings.role !== "host" || !plugin.sessionManager.isActive) return false;
+      if (plugin.settings.role !== "host" || !plugin.sessionManager.isActive)
+        return false;
       if (checking) return true;
       plugin.presenceManager?.togglePresent();
     },
@@ -151,7 +159,8 @@ export function registerCommands(plugin: LiveSharePlugin): void {
     id: "transfer-host",
     name: "Transfer host role",
     checkCallback: (checking) => {
-      if (plugin.settings.role !== "host" || !plugin.sessionManager.isActive) return false;
+      if (plugin.settings.role !== "host" || !plugin.sessionManager.isActive)
+        return false;
       if (plugin.remoteUsers.size === 0) return false;
       if (checking) return true;
       new UserPickerModal(plugin.app, plugin.remoteUsers, (userId) => {
@@ -160,7 +169,9 @@ export function registerCommands(plugin: LiveSharePlugin): void {
           userId,
         });
         const user = plugin.remoteUsers.get(userId);
-        plugin.notify(`Live share: offered host role to ${user?.displayName ?? userId}`);
+        plugin.notify(
+          `Live Share: offered host role to ${user?.displayName ?? userId}`,
+        );
       }).open();
     },
   });
@@ -169,7 +180,8 @@ export function registerCommands(plugin: LiveSharePlugin): void {
     id: "show-audit-log",
     name: "Show audit log",
     checkCallback: (checking) => {
-      if (plugin.settings.role !== "host" || !plugin.sessionManager.isActive) return false;
+      if (plugin.settings.role !== "host" || !plugin.sessionManager.isActive)
+        return false;
       if (checking) return true;
       void plugin.fetchAuditLog();
     },

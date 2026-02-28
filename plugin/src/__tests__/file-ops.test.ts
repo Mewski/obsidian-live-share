@@ -51,14 +51,24 @@ function createMockVault() {
   };
 }
 
+function createMockFileManager(vault: ReturnType<typeof createMockVault>) {
+  return {
+    trashFile: vi.fn(async (file: { path: string }) => {
+      vault.files.delete(file.path);
+    }),
+  };
+}
+
 describe("FileOpsManager", () => {
   let vault: ReturnType<typeof createMockVault>;
+  let fileManager: ReturnType<typeof createMockFileManager>;
   let manager: FileOpsManager;
   let sentOps: FileOp[];
 
   beforeEach(() => {
     vault = createMockVault();
-    manager = new FileOpsManager(vault as any);
+    fileManager = createMockFileManager(vault);
+    manager = new FileOpsManager(vault as any, fileManager as any);
     sentOps = [];
     manager.setSender((op) => sentOps.push(op));
   });
@@ -87,12 +97,12 @@ describe("FileOpsManager", () => {
       const file = { path: "bye.md", extension: "md" };
       vault.files.set("bye.md", file);
       await manager.applyRemoteOp({ type: "delete", path: "bye.md" });
-      expect(vault.trash).toHaveBeenCalledWith(file, true);
+      expect(fileManager.trashFile).toHaveBeenCalledWith(file);
     });
 
     it("silently ignores delete of nonexistent file", async () => {
       await manager.applyRemoteOp({ type: "delete", path: "nope.md" });
-      expect(vault.trash).not.toHaveBeenCalled();
+      expect(fileManager.trashFile).not.toHaveBeenCalled();
     });
 
     it("renames an existing file", async () => {
@@ -177,7 +187,9 @@ describe("FileOpsManager", () => {
 
     it("broadcasts file delete", async () => {
       manager.onFileDelete({ path: "deleted.md" } as any);
-      await vi.waitFor(() => expect(sentOps).toEqual([{ type: "delete", path: "deleted.md" }]));
+      await vi.waitFor(() =>
+        expect(sentOps).toEqual([{ type: "delete", path: "deleted.md" }]),
+      );
     });
 
     it("broadcasts file rename", async () => {
@@ -190,7 +202,7 @@ describe("FileOpsManager", () => {
     });
 
     it("does not broadcast when no sender is set", () => {
-      const mgr = new FileOpsManager(vault as any);
+      const mgr = new FileOpsManager(vault as any, fileManager as any);
       mgr.onFileDelete({ path: "x.md" } as any);
     });
   });

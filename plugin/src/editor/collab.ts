@@ -70,7 +70,7 @@ export class CollabManager {
       await syncManager.waitForSync(filePath);
     } catch {
       if (this.activationGen !== gen) return;
-      new Notice("Live share: sync timed out");
+      new Notice("Live Share: sync timed out");
       this.currentAwareness = null;
       try {
         view.dispatch({ effects: this.compartment.reconfigure([]) });
@@ -106,7 +106,9 @@ export class CollabManager {
     const collabExt = yCollab(docHandle.text, docHandle.awareness, {
       undoManager: false,
     });
-    const extensions: Extension[] = Array.isArray(collabExt) ? [...collabExt] : [collabExt];
+    const extensions: Extension[] = Array.isArray(collabExt)
+      ? [...collabExt]
+      : [collabExt];
     extensions.push(conflictExtension());
     if (permission === "read-only") {
       extensions.push(EditorState.readOnly.of(true));
@@ -116,8 +118,14 @@ export class CollabManager {
     });
 
     const selection = view.state.selection.main;
-    const anchor = Y.createRelativePositionFromTypeIndex(docHandle.text, selection.anchor);
-    const head = Y.createRelativePositionFromTypeIndex(docHandle.text, selection.head);
+    const anchor = Y.createRelativePositionFromTypeIndex(
+      docHandle.text,
+      selection.anchor,
+    );
+    const head = Y.createRelativePositionFromTypeIndex(
+      docHandle.text,
+      selection.head,
+    );
     docHandle.awareness.setLocalStateField("cursor", { anchor, head });
   }
 

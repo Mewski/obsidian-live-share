@@ -12,7 +12,9 @@ interface InvitePayload {
 
 function generatePassphrase(): string {
   const bytes = crypto.getRandomValues(new Uint8Array(16));
-  return Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
+  return Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join(
+    "",
+  );
 }
 
 export class SessionManager {
@@ -25,7 +27,8 @@ export class SessionManager {
     const headers: Record<string, string> = {
       "Content-Type": "application/json",
     };
-    if (settings.serverPassword) headers["X-Server-Password"] = settings.serverPassword;
+    if (settings.serverPassword)
+      headers["X-Server-Password"] = settings.serverPassword;
 
     let roomData: { id: string; token: string; name: string };
     try {
@@ -42,12 +45,12 @@ export class SessionManager {
       });
       if (createResponse.status >= 400) {
         const errMsg = createResponse.json?.error ?? "unknown error";
-        new Notice(`Live share: ${errMsg}`);
+        new Notice(`Live Share: ${errMsg}`);
         return false;
       }
       roomData = createResponse.json;
     } catch {
-      new Notice("Live share: cannot reach server");
+      new Notice("Live Share: cannot reach server");
       return false;
     }
 
@@ -64,7 +67,7 @@ export class SessionManager {
   async joinSession(inviteString: string): Promise<boolean> {
     const parsedInvite = parseInvite(inviteString);
     if (!parsedInvite) {
-      new Notice("Live share: invalid invite string");
+      new Notice("Live Share: invalid invite string");
       return false;
     }
 
@@ -87,11 +90,11 @@ export class SessionManager {
       });
       if (joinResponse.status >= 400) {
         const errMsg = joinResponse.json?.error ?? "unknown error";
-        new Notice(`Live share: ${errMsg}`);
+        new Notice(`Live Share: ${errMsg}`);
         return false;
       }
     } catch {
-      new Notice("Live share: cannot reach server");
+      new Notice("Live Share: cannot reach server");
       return false;
     }
 
@@ -114,7 +117,8 @@ export class SessionManager {
       const deleteHeaders: Record<string, string> = {
         Authorization: `Bearer ${settings.token}`,
       };
-      if (settings.serverPassword) deleteHeaders["X-Server-Password"] = settings.serverPassword;
+      if (settings.serverPassword)
+        deleteHeaders["X-Server-Password"] = settings.serverPassword;
       try {
         await requestUrl({
           url: `${baseUrl}/rooms/${settings.roomId}`,
@@ -142,7 +146,7 @@ export class SessionManager {
   async copyInvite(): Promise<void> {
     const { settings } = this.plugin;
     if (!settings.roomId || !settings.token) {
-      new Notice("Live share: no active session");
+      new Notice("Live Share: no active session");
       return;
     }
 
@@ -155,7 +159,7 @@ export class SessionManager {
     };
     const invite = `obsliveshare:${btoa(JSON.stringify(payload))}`;
     await navigator.clipboard.writeText(invite);
-    new Notice("Live share: invite link copied to clipboard");
+    new Notice("Live Share: invite link copied to clipboard");
   }
 }
 

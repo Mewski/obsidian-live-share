@@ -79,7 +79,7 @@ export class PresenceManager {
     }
     this.followTarget = userId;
     const user = this.ctx.getRemoteUsers().get(userId);
-    this.ctx.notify(`Live share: following ${user?.displayName ?? userId}`);
+    this.ctx.notify(`Live Share: following ${user?.displayName ?? userId}`);
 
     this.clearUnfollowListeners();
     const handler = () => {
@@ -88,7 +88,9 @@ export class PresenceManager {
     const eventTypes = ["keydown", "mousedown", "wheel"] as const;
     for (const eventType of eventTypes) {
       document.addEventListener(eventType, handler);
-      this.unfollowListeners.push(() => document.removeEventListener(eventType, handler));
+      this.unfollowListeners.push(() =>
+        document.removeEventListener(eventType, handler),
+      );
     }
 
     if (user) void this.applyFollowState(user);
@@ -98,7 +100,7 @@ export class PresenceManager {
     if (!this.followTarget) return;
     this.followTarget = null;
     this.clearUnfollowListeners();
-    this.ctx.notify("Live share: stopped following");
+    this.ctx.notify("Live Share: stopped following");
   }
 
   clearUnfollowListeners(): void {
@@ -154,10 +156,10 @@ export class PresenceManager {
     const cc = this.ctx.getControlChannel();
     if (this.isPresenting) {
       cc?.send({ type: "present-start", userId: this.ctx.getUserId() });
-      this.ctx.notify("Live share: presentation mode ON");
+      this.ctx.notify("Live Share: presentation mode ON");
     } else {
       cc?.send({ type: "present-stop", userId: this.ctx.getUserId() });
-      this.ctx.notify("Live share: presentation mode OFF");
+      this.ctx.notify("Live Share: presentation mode OFF");
     }
     this.ctx.updateStatusBar();
   }
@@ -168,7 +170,7 @@ export class PresenceManager {
     this.followTarget = hostUserId;
     const user = this.ctx.getRemoteUsers().get(hostUserId);
     if (user) void this.applyFollowState(user);
-    this.ctx.notify("Live share: host started presenting, now following");
+    this.ctx.notify("Live Share: host started presenting, now following");
   }
 
   handlePresentStop(userId: string): void {
@@ -176,7 +178,7 @@ export class PresenceManager {
     if (this.followTarget === userId) {
       this.followTarget = null;
       this.clearUnfollowListeners();
-      this.ctx.notify("Live share: host stopped presenting");
+      this.ctx.notify("Live Share: host stopped presenting");
     }
   }
 

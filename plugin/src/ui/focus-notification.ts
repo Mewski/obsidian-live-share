@@ -9,7 +9,7 @@ export function showFocusNotification(
 ) {
   const fragment = document.createDocumentFragment();
   fragment.createEl("span", {
-    text: `Live share: ${request.fromDisplayName} wants your attention at ${request.filePath}:${request.line + 1}`,
+    text: `Live Share: ${request.fromDisplayName} wants your attention at ${request.filePath}:${request.line + 1}`,
   });
   fragment.createEl("br");
   const goToButton = fragment.createEl("button", {
@@ -17,7 +17,9 @@ export function showFocusNotification(
     cls: "live-share-focus-goto",
   });
   goToButton.addEventListener("click", () => {
-    const file = plugin.app.vault.getAbstractFileByPath(toLocalPath(request.filePath));
+    const file = plugin.app.vault.getAbstractFileByPath(
+      toLocalPath(request.filePath),
+    );
     if (file instanceof TFile) {
       void plugin.app.workspace
         .getLeaf()

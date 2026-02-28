@@ -42,7 +42,9 @@ export function registerVaultEvents(plugin: LiveSharePlugin): void {
               await plugin.manifestManager.updateFile(file, content);
             } catch {
               if (!renamedPaths.has(originalPath)) {
-                new Notice(`Live share: failed to update manifest for ${originalPath}`);
+                new Notice(
+                  `Live Share: failed to update manifest for ${originalPath}`,
+                );
               }
             }
           })();
@@ -93,10 +95,18 @@ export function registerVaultEvents(plugin: LiveSharePlugin): void {
         plugin.backgroundSync.cancelSubscribe(oldPath);
         await plugin.backgroundSync.onFileRenamed(oldPath, file.path);
         if (plugin.settings.role === "host") {
-          plugin.manifestManager.renameFile(oldPath, file.path, plugin.syncManager);
+          plugin.manifestManager.renameFile(
+            oldPath,
+            file.path,
+            plugin.syncManager,
+          );
         }
-        const activeFile = plugin.app.workspace.getActiveViewOfType(MarkdownView)?.file;
-        if (activeFile && (activeFile.path === file.path || activeFile.path === oldPath)) {
+        const activeFile =
+          plugin.app.workspace.getActiveViewOfType(MarkdownView)?.file;
+        if (
+          activeFile &&
+          (activeFile.path === file.path || activeFile.path === oldPath)
+        ) {
           plugin.onActiveFileChange();
         }
       });
@@ -109,7 +119,11 @@ export function registerVaultEvents(plugin: LiveSharePlugin): void {
 
   plugin.registerEvent(
     plugin.app.vault.on("modify", (file: TAbstractFile) => {
-      if (!(file instanceof TFile) || !plugin.manifestManager.isSharedPath(file.path)) return;
+      if (
+        !(file instanceof TFile) ||
+        !plugin.manifestManager.isSharedPath(file.path)
+      )
+        return;
       if (plugin.fileOpsManager.isPathMuted(file.path)) return;
 
       if (isTextFile(file.path)) {
@@ -133,7 +147,9 @@ export function registerVaultEvents(plugin: LiveSharePlugin): void {
             const buf = await plugin.app.vault.readBinary(file);
             await plugin.manifestManager.updateFile(file, buf);
           } catch {
-            new Notice(`Live share: failed to update manifest for ${file.path}`);
+            new Notice(
+              `Live Share: failed to update manifest for ${file.path}`,
+            );
           }
         })();
       }

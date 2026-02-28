@@ -47,10 +47,12 @@ export class AuthManager {
         (payload.displayName || payload.username || "").trim() || "Anonymous";
       this.plugin.settings.avatarUrl = payload.avatar || "";
       await this.plugin.saveSettings();
-      new Notice(`Live share: authenticated as ${this.plugin.settings.displayName}`);
+      new Notice(
+        `Live Share: authenticated as ${this.plugin.settings.displayName}`,
+      );
       return true;
     } catch {
-      new Notice("Live share: invalid auth token");
+      new Notice("Live Share: invalid auth token");
       return false;
     }
   }
@@ -61,6 +63,6 @@ export class AuthManager {
     this.plugin.settings.displayName = "Anonymous";
     this.plugin.settings.avatarUrl = "";
     await this.plugin.saveSettings();
-    new Notice("Live share: logged out");
+    new Notice("Live Share: logged out");
   }
 }
