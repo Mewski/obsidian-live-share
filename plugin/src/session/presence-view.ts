@@ -65,12 +65,14 @@ export class PresenceView extends ItemView {
     this.render();
   }
 
-  override async onOpen() {
+  override onOpen(): Promise<void> {
     this.render();
+    return Promise.resolve();
   }
 
-  override async onClose() {
+  override onClose(): Promise<void> {
     this.contentEl.empty();
+    return Promise.resolve();
   }
 
   private getInitial(name: string): string {
@@ -157,8 +159,7 @@ export class PresenceView extends ItemView {
       }
       if (user.permission === "read-only") {
         nameRow.createEl("span", {
-          // eslint-disable-next-line obsidianmd/ui/sentence-case
-          text: "R/O",
+          text: "Read-only",
           cls: "live-share-badge mod-readonly",
         });
       }

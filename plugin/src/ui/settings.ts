@@ -23,14 +23,11 @@ export class LiveShareSettingTab extends PluginSettingTab {
           .setName("Server URL")
           .setDesc("The server to connect to")
           .addText((text) => {
-            text
-              // eslint-disable-next-line obsidianmd/ui/sentence-case
-              .setPlaceholder("http://localhost:3000")
-              .setValue(settings.serverUrl)
-              .onChange(async (value) => {
-                settings.serverUrl = value;
-                await this.plugin.saveSettings();
-              });
+            text.setValue(settings.serverUrl).onChange(async (value) => {
+              settings.serverUrl = value;
+              await this.plugin.saveSettings();
+            });
+            text.inputEl.placeholder = "http://localhost:3000";
             if (active) text.setDisabled(true);
           });
       })
@@ -255,16 +252,13 @@ export class LiveShareSettingTab extends PluginSettingTab {
         setting
           .setName("Debug log file")
           .setDesc("Path within your vault for the debug log")
-          .addText((text) =>
-            text
-              // eslint-disable-next-line obsidianmd/ui/sentence-case
-              .setPlaceholder("live-share-debug.md")
-              .setValue(settings.debugLogPath)
-              .onChange(async (value) => {
-                settings.debugLogPath = value.trim() || "live-share-debug.md";
-                await this.plugin.saveSettings();
-              }),
-          );
+          .addText((text) => {
+            text.setValue(settings.debugLogPath).onChange(async (value) => {
+              settings.debugLogPath = value.trim() || "live-share-debug.md";
+              await this.plugin.saveSettings();
+            });
+            text.inputEl.placeholder = "live-share-debug.md";
+          });
       });
 
     const exclusions = new SettingGroup(containerEl).setHeading("Exclusions");

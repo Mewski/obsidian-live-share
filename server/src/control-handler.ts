@@ -163,7 +163,9 @@ export function createControlWSS(options?: ControlWSSOptions) {
         const payload = verifyJWT(jwtToken);
         if (payload) verifiedUserId = payload.sub;
       }
-    } catch {}
+    } catch {
+      // JWT may be invalid or absent
+    }
 
     const client: ControlClient = {
       ws,
@@ -239,7 +241,7 @@ export function createControlWSS(options?: ControlWSSOptions) {
           if (existingPermission) {
             client.isApproved = true;
             client.permission = existingPermission;
-            appendLog(roomId, {
+            void appendLog(roomId, {
               timestamp: Date.now(),
               event: "rejoin",
               userId: client.userId,
@@ -285,7 +287,7 @@ export function createControlWSS(options?: ControlWSSOptions) {
         } else {
           client.isApproved = true;
           setPermission(roomId, client.userId, client.permission);
-          appendLog(roomId, {
+          void appendLog(roomId, {
             timestamp: Date.now(),
             event: "join",
             userId: client.userId,
@@ -316,7 +318,7 @@ export function createControlWSS(options?: ControlWSSOptions) {
             }
             if (targetClient.isApproved && targetClient.userId) {
               setPermission(roomId, targetClient.userId, targetClient.permission);
-              appendLog(roomId, {
+              void appendLog(roomId, {
                 timestamp: Date.now(),
                 event: "join",
                 userId: targetClient.userId,
@@ -340,7 +342,7 @@ export function createControlWSS(options?: ControlWSSOptions) {
         room.kickedUserIds.add(targetUserId);
         for (const [clientWs, targetClient] of room.clients) {
           if (targetClient.userId === targetUserId) {
-            appendLog(roomId, {
+            void appendLog(roomId, {
               timestamp: Date.now(),
               event: "kick",
               userId: targetClient.userId,
@@ -360,7 +362,7 @@ export function createControlWSS(options?: ControlWSSOptions) {
         const permission = msg.permission;
         if (permission !== "read-write" && permission !== "read-only") return;
         setPermission(roomId, targetUserId, permission);
-        appendLog(roomId, {
+        void appendLog(roomId, {
           timestamp: Date.now(),
           event: "permission-change",
           userId: targetUserId,
@@ -404,7 +406,7 @@ export function createControlWSS(options?: ControlWSSOptions) {
           serverRoom.hostUserId = client.verifiedUserId;
           touchRoom(roomId);
         }
-        appendLog(roomId, {
+        void appendLog(roomId, {
           timestamp: Date.now(),
           event: "host-transfer",
           userId: client.userId,
@@ -504,7 +506,7 @@ export function createControlWSS(options?: ControlWSSOptions) {
         room.pendingApprovals.delete(closingClient.userId);
         if (closingClient.userId) {
           clearPermission(roomId, closingClient.userId);
-          appendLog(roomId, {
+          void appendLog(roomId, {
             timestamp: Date.now(),
             event: "leave",
             userId: closingClient.userId,

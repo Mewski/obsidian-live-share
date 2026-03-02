@@ -39,8 +39,7 @@ import {
 } from "./utils";
 
 function getCmView(view: MarkdownView): EditorView | undefined {
-  // biome-ignore lint/suspicious/noExplicitAny: Obsidian does not expose .cm in its public typings
-  return (view.editor as any).cm as EditorView | undefined;
+  return (view.editor as unknown as { cm?: EditorView }).cm;
 }
 
 export default class LiveSharePlugin extends Plugin {
@@ -263,7 +262,7 @@ export default class LiveSharePlugin extends Plugin {
       this.settings.autoReconnect
     ) {
       this.app.workspace.onLayoutReady(() => {
-        this.resumeSession().catch((err) => {
+        void this.resumeSession().catch((err) => {
           this.logger.error("session", "auto-reconnect failed", err);
         });
       });
@@ -781,10 +780,13 @@ export default class LiveSharePlugin extends Plugin {
         .setTitle("Settings")
         .setIcon("settings")
         .onClick(() => {
-          // biome-ignore lint/suspicious/noExplicitAny: Obsidian does not expose setting in public typings
-          const app = this.app as any;
-          app.setting.open();
-          app.setting.openTabById(this.manifest.id);
+          const setting = (
+            this.app as unknown as {
+              setting: { open(): void; openTabById(id: string): void };
+            }
+          ).setting;
+          setting.open();
+          setting.openTabById(this.manifest.id);
         }),
     );
 

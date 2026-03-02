@@ -81,15 +81,13 @@ export class CollabManager {
     }
 
     if (this.activationGen !== gen) return;
-    // biome-ignore lint/suspicious/noExplicitAny: CM6 marks `destroyed` private
-    if ((view as any).destroyed) return;
+    if ((view as unknown as { destroyed: boolean }).destroyed) return;
 
     if (role !== "host" && docHandle.text.length === 0) {
       for (let i = 0; i < 10; i++) {
         await new Promise((resolve) => setTimeout(resolve, 100));
         if (this.activationGen !== gen) return;
-        // biome-ignore lint/suspicious/noExplicitAny: CM6 marks `destroyed` private
-        if ((view as any).destroyed) return;
+        if ((view as unknown as { destroyed: boolean }).destroyed) return;
         if (docHandle.text.length > 0) break;
       }
     }
