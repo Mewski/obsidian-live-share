@@ -24,12 +24,13 @@ export class DebugLogger {
 
   error(category: string, message: string, err?: unknown): void {
     if (!this.enabled) return;
-    const errStr =
-      err instanceof Error
-        ? `: ${err.message}`
-        : err
-          ? `: ${typeof err === "object" ? JSON.stringify(err) : String(err)}`
-          : "";
+    let errStr = "";
+    if (err instanceof Error) {
+      errStr = `: ${err.message}`;
+    } else if (err !== undefined && err !== null) {
+      const detail = typeof err === "object" ? JSON.stringify(err) : String(err);
+      errStr = `: ${detail}`;
+    }
     this.appendLine("ERROR", category, `${message}${errStr}`);
   }
 

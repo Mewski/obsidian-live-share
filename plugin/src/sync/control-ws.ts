@@ -268,7 +268,8 @@ export class ControlChannel {
   private async decryptAndDispatch(raw: ControlMessage & { encrypted?: boolean }): Promise<void> {
     if (!this.e2e) return;
     try {
-      const { encrypted: _encrypted, ...msg } = raw;
+      const { encrypted: _omit, ...msg } = raw;
+      void _omit;
       let decryptedMsg: ControlMessage;
       if (
         (msg.type === "file-chunk-start" || msg.type === "file-chunk-end") &&

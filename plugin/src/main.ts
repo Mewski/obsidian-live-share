@@ -74,79 +74,81 @@ export default class LiveSharePlugin extends Plugin {
   private unmutePathEvents = (path: string) => this.fileOpsManager.unmutePathEvents(path);
 
   private registerManifestChangeHandler() {
-    this.manifestManager.setManifestChangeHandler(async (added, removed) => {
-      const renamedOldPaths = new Set<string>();
-      const renamedNewPaths = new Set<string>();
-      if (added.length > 0 && removed.length > 0) {
-        for (const oldPath of removed) {
-          for (const newPath of added) {
-            if (renamedNewPaths.has(newPath)) continue;
-            const localOld = toLocalPath(oldPath);
-            const localNew = toLocalPath(newPath);
-            const oldFile = this.app.vault.getAbstractFileByPath(localOld);
-            const newFile = this.app.vault.getAbstractFileByPath(localNew);
-            if (oldFile && !newFile) {
-              renamedOldPaths.add(oldPath);
-              renamedNewPaths.add(newPath);
-              this.fileOpsManager.mutePathEvents(localOld);
-              this.fileOpsManager.mutePathEvents(localNew);
-              try {
-                const parentDir = localNew.substring(0, localNew.lastIndexOf("/"));
-                if (parentDir) await ensureFolder(this.app.vault, parentDir);
-                await this.app.vault.rename(oldFile, localNew);
-              } finally {
-                setTimeout(() => {
-                  this.fileOpsManager.unmutePathEvents(localOld);
-                  this.fileOpsManager.unmutePathEvents(localNew);
-                }, VAULT_EVENT_SETTLE_MS);
+    this.manifestManager.setManifestChangeHandler((added, removed) => {
+      void (async () => {
+        const renamedOldPaths = new Set<string>();
+        const renamedNewPaths = new Set<string>();
+        if (added.length > 0 && removed.length > 0) {
+          for (const oldPath of removed) {
+            for (const newPath of added) {
+              if (renamedNewPaths.has(newPath)) continue;
+              const localOld = toLocalPath(oldPath);
+              const localNew = toLocalPath(newPath);
+              const oldFile = this.app.vault.getAbstractFileByPath(localOld);
+              const newFile = this.app.vault.getAbstractFileByPath(localNew);
+              if (oldFile && !newFile) {
+                renamedOldPaths.add(oldPath);
+                renamedNewPaths.add(newPath);
+                this.fileOpsManager.mutePathEvents(localOld);
+                this.fileOpsManager.mutePathEvents(localNew);
+                try {
+                  const parentDir = localNew.substring(0, localNew.lastIndexOf("/"));
+                  if (parentDir) await ensureFolder(this.app.vault, parentDir);
+                  await this.app.vault.rename(oldFile, localNew);
+                } finally {
+                  setTimeout(() => {
+                    this.fileOpsManager.unmutePathEvents(localOld);
+                    this.fileOpsManager.unmutePathEvents(localNew);
+                  }, VAULT_EVENT_SETTLE_MS);
+                }
+                if (isTextFile(oldPath)) {
+                  this.backgroundSync.onFileRemoved(oldPath);
+                }
+                if (isTextFile(newPath)) {
+                  await this.backgroundSync.onFileAdded(newPath);
+                }
+                break;
               }
-              if (isTextFile(oldPath)) {
-                this.backgroundSync.onFileRemoved(oldPath);
+              if (!oldFile && newFile) {
+                renamedOldPaths.add(oldPath);
+                renamedNewPaths.add(newPath);
+                if (isTextFile(oldPath)) {
+                  this.backgroundSync.onFileRemoved(oldPath);
+                }
+                if (isTextFile(newPath)) {
+                  await this.backgroundSync.onFileAdded(newPath);
+                }
+                break;
               }
-              if (isTextFile(newPath)) {
-                await this.backgroundSync.onFileAdded(newPath);
-              }
-              break;
-            }
-            if (!oldFile && newFile) {
-              renamedOldPaths.add(oldPath);
-              renamedNewPaths.add(newPath);
-              if (isTextFile(oldPath)) {
-                this.backgroundSync.onFileRemoved(oldPath);
-              }
-              if (isTextFile(newPath)) {
-                await this.backgroundSync.onFileAdded(newPath);
-              }
-              break;
             }
           }
         }
-      }
 
-      const actuallyAdded = added.filter((path) => !renamedNewPaths.has(path));
-      const actuallyRemoved = removed.filter((path) => !renamedOldPaths.has(path));
+        const actuallyAdded = added.filter((path) => !renamedNewPaths.has(path));
+        const actuallyRemoved = removed.filter((path) => !renamedOldPaths.has(path));
 
-      if (actuallyAdded.length > 0) {
-        const syncedCount = await this.manifestManager.syncFromManifest(
-          this.mutePathEvents,
-          this.unmutePathEvents,
-          this.requestBinaryFile,
-          { skipText: true },
-        );
-        if (syncedCount > 0) this.notify(`Live Share: synced ${syncedCount} file(s)`);
-        for (const path of actuallyAdded) {
-          if (isTextFile(path)) {
-            await this.backgroundSync.onFileAdded(path);
+        if (actuallyAdded.length > 0) {
+          const syncedCount = await this.manifestManager.syncFromManifest(
+            this.mutePathEvents,
+            this.unmutePathEvents,
+            this.requestBinaryFile,
+            { skipText: true },
+          );
+          if (syncedCount > 0) this.notify(`Live Share: synced ${syncedCount} file(s)`);
+          for (const path of actuallyAdded) {
+            if (isTextFile(path)) {
+              await this.backgroundSync.onFileAdded(path);
+            }
           }
         }
-      }
-      for (const path of actuallyRemoved) {
-        this.backgroundSync.onFileRemoved(path);
-        const file = this.app.vault.getAbstractFileByPath(toLocalPath(path));
-        if (file) await this.app.fileManager.trashFile(file);
-      }
-      if (actuallyRemoved.length > 0)
-        this.notify(`Live Share: removed ${actuallyRemoved.length} file(s)`);
+        for (const path of actuallyRemoved) {
+          this.backgroundSync.onFileRemoved(path);
+          const file = this.app.vault.getAbstractFileByPath(toLocalPath(path));
+          if (file) await this.app.fileManager.trashFile(file);
+        }
+        if (actuallyRemoved.length > 0)
+          this.notify(`Live Share: removed ${actuallyRemoved.length} file(s)`);
+      })();
     });
   }
 
@@ -581,7 +583,7 @@ export default class LiveSharePlugin extends Plugin {
     const role = this.settings.role === "host" ? "host" : "guest";
     for (const [path] of entries) {
       if (isTextFile(path) && path.endsWith(".canvas")) {
-        this.canvasSync.subscribe(path, role);
+        void this.canvasSync.subscribe(path, role);
       }
     }
 

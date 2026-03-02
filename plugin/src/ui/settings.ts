@@ -124,7 +124,7 @@ export class LiveShareSettingTab extends PluginSettingTab {
           .setDesc(`Room: ${settings.roomId} · ${encrypted}`);
         setting.addButton((button) =>
           button.setButtonText("Copy invite link").onClick(() => {
-            sessionManager.copyInvite();
+            void sessionManager.copyInvite();
           }),
         );
         if (settings.role === "host") {
