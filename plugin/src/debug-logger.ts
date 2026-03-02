@@ -2,6 +2,18 @@ import type { Vault } from "obsidian";
 
 const FLUSH_DELAY_MS = 500;
 
+function stringifyError(err: unknown): string {
+  if (err === undefined || err === null) return "";
+  if (err instanceof Error) return err.message;
+  if (typeof err === "string") return err;
+  if (typeof err === "number" || typeof err === "boolean") return String(err);
+  try {
+    return JSON.stringify(err);
+  } catch {
+    return "[unserializable error]";
+  }
+}
+
 export class DebugLogger {
   private buffer: string[] = [];
   private flushTimer: ReturnType<typeof setTimeout> | null = null;
@@ -24,14 +36,8 @@ export class DebugLogger {
 
   error(category: string, message: string, err?: unknown): void {
     if (!this.enabled) return;
-    let errStr = "";
-    if (err instanceof Error) {
-      errStr = `: ${err.message}`;
-    } else if (err !== undefined && err !== null) {
-      const detail = typeof err === "object" ? JSON.stringify(err) : String(err);
-      errStr = `: ${detail}`;
-    }
-    this.appendLine("ERROR", category, `${message}${errStr}`);
+    const suffix = stringifyError(err);
+    this.appendLine("ERROR", category, suffix ? `${message}: ${suffix}` : message);
   }
 
   private appendLine(level: string, category: string, message: string): void {
