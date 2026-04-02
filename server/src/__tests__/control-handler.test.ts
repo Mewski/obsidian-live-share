@@ -1000,7 +1000,7 @@ describe("Control WebSocket handler", () => {
     expect(declineMsg.userId).toBe("guest-1");
   });
 
-  it("host disconnect broadcasts host-disconnected", async () => {
+  it("host disconnect elects new host or broadcasts host-disconnected", async () => {
     const room = await createRoom("ctrl-host-disconnect");
 
     const host = await connectControl(room.id, room.token);
@@ -1026,11 +1026,51 @@ describe("Control WebSocket handler", () => {
     host.ws.close();
 
     await waitForMessages(guest.messages, 2);
-    const hostDisconnected = guest.messages.find((m) => {
+    const hostTransfer = guest.messages.find((m) => {
       const parsed = JSON.parse(m);
-      return parsed.type === "host-disconnected";
+      return parsed.type === "host-transfer-complete";
     });
-    expect(hostDisconnected).toBeDefined();
+    expect(hostTransfer).toBeDefined();
+    const parsed = JSON.parse(hostTransfer!);
+    expect(parsed.userId).toBe("guest-1");
+  });
+
+  it("auto-elects new host when current host disconnects", async () => {
+    const room = await createRoom("ctrl-host-reelect");
+
+    const host = await connectControl(room.id, room.token);
+    const guest = await connectControl(room.id, room.token);
+
+    await delay(100);
+
+    sendJSON(host.ws, {
+      type: "join-request",
+      userId: "host-1",
+      displayName: "Host",
+    });
+    await delay(100);
+
+    sendJSON(guest.ws, {
+      type: "join-request",
+      userId: "guest-1",
+      displayName: "Guest",
+    });
+    await delay(100);
+
+    guest.messages.length = 0;
+
+    host.ws.close();
+
+    await waitForMessages(guest.messages, 2);
+
+    const transferComplete = guest.messages.find((m) => {
+      const parsed = JSON.parse(m);
+      return parsed.type === "host-transfer-complete";
+    });
+    expect(transferComplete).toBeDefined();
+    const parsed2 = JSON.parse(transferComplete!);
+    expect(parsed2.userId).toBe("guest-1");
+    expect(parsed2.displayName).toBe("Guest");
   });
 
   it("kicked user must be re-approved on rejoin (no requireApproval)", async () => {

@@ -525,7 +525,43 @@ export function createControlWSS(options?: ControlWSSOptions) {
           sendTo(pendingWs, { type: "join-response", approved: false });
         }
         room.pendingApprovals.clear();
-        broadcast(room, JSON.stringify({ type: "host-disconnected" }));
+
+        let newHost: ControlClient | undefined;
+        for (const client of room.clients.values()) {
+          if (client.isApproved && (!newHost || client.joinOrder < newHost.joinOrder)) {
+            newHost = client;
+          }
+        }
+        if (newHost) {
+          newHost.isHost = true;
+          if (newHost.verifiedUserId && serverRoom) {
+            serverRoom.hostUserId = newHost.verifiedUserId;
+            touchRoom(roomId);
+          }
+          void appendLog(roomId, {
+            timestamp: Date.now(),
+            event: "host-transfer",
+            userId: newHost.userId,
+            displayName: newHost.displayName,
+            details: "auto-elected after host disconnect",
+          });
+          sendTo(newHost.ws, {
+            type: "host-transfer-complete",
+            userId: newHost.userId,
+            displayName: newHost.displayName,
+          });
+          broadcast(
+            room,
+            JSON.stringify({
+              type: "host-changed",
+              userId: newHost.userId,
+              displayName: newHost.displayName,
+            }),
+            newHost.ws,
+          );
+        } else {
+          broadcast(room, JSON.stringify({ type: "host-disconnected" }));
+        }
       }
       if (room.clients.size === 0) {
         room.cleanupTimer = setTimeout(() => {
