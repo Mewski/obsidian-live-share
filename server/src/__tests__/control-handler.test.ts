@@ -132,7 +132,7 @@ describe("Control WebSocket handler", () => {
     expect(clientB.messages.length).toBe(0);
   });
 
-  it("tracks identity from presence-update (verified via kick)", async () => {
+  it("tracks identity from join-request (verified via kick)", async () => {
     const room = await createRoom("ctrl-identity");
 
     const host = await connectControl(room.id, room.token);
@@ -141,14 +141,13 @@ describe("Control WebSocket handler", () => {
     await delay(100);
 
     sendJSON(host.ws, {
-      type: "presence-update",
+      type: "join-request",
       userId: "host-1",
       displayName: "Host",
-      isHost: true,
     });
 
     sendJSON(guest.ws, {
-      type: "presence-update",
+      type: "join-request",
       userId: "guest-1",
       displayName: "Guest",
     });
@@ -176,14 +175,13 @@ describe("Control WebSocket handler", () => {
     await delay(100);
 
     sendJSON(host.ws, {
-      type: "presence-update",
+      type: "join-request",
       userId: "host-1",
       displayName: "Host",
-      isHost: true,
     });
 
     sendJSON(guest.ws, {
-      type: "presence-update",
+      type: "join-request",
       userId: "guest-1",
       displayName: "Guest",
     });
@@ -388,13 +386,12 @@ describe("Control WebSocket handler", () => {
     await delay(100);
 
     sendJSON(clientA.ws, {
-      type: "presence-update",
+      type: "join-request",
       userId: "userA",
       displayName: "Alice",
-      isHost: true,
     });
     sendJSON(clientB.ws, {
-      type: "presence-update",
+      type: "join-request",
       userId: "userB",
       displayName: "Bob",
     });
@@ -420,10 +417,9 @@ describe("Control WebSocket handler", () => {
     await delay(100);
 
     sendJSON(host.ws, {
-      type: "presence-update",
+      type: "join-request",
       userId: "host-1",
       displayName: "Host",
-      isHost: true,
     });
 
     await delay(100);
@@ -436,7 +432,7 @@ describe("Control WebSocket handler", () => {
       displayName: "Guest",
     });
 
-    await waitForMessages(guest.messages, 1 + 1);
+    await waitForMessages(guest.messages, 1);
     const joinResponse = guest.messages.find((m) => {
       const parsed = JSON.parse(m);
       return parsed.type === "join-response";
@@ -592,13 +588,12 @@ describe("Control WebSocket handler", () => {
     await delay(100);
 
     sendJSON(host.ws, {
-      type: "presence-update",
+      type: "join-request",
       userId: "host-1",
       displayName: "Host",
-      isHost: true,
     });
     sendJSON(guest.ws, {
-      type: "presence-update",
+      type: "join-request",
       userId: "guest-1",
       displayName: "Guest",
     });
@@ -667,13 +662,12 @@ describe("Control WebSocket handler", () => {
     await delay(100);
 
     sendJSON(host.ws, {
-      type: "presence-update",
+      type: "join-request",
       userId: "host-1",
       displayName: "Host",
-      isHost: true,
     });
     sendJSON(guest.ws, {
-      type: "presence-update",
+      type: "join-request",
       userId: "guest-1",
       displayName: "Guest",
     });
@@ -817,13 +811,12 @@ describe("Control WebSocket handler", () => {
     await delay(100);
 
     sendJSON(host.ws, {
-      type: "presence-update",
+      type: "join-request",
       userId: "host-1",
       displayName: "Host",
-      isHost: true,
     });
     sendJSON(guest.ws, {
-      type: "presence-update",
+      type: "join-request",
       userId: "guest-1",
       displayName: "Guest",
     });
@@ -850,10 +843,9 @@ describe("Control WebSocket handler", () => {
     await delay(100);
 
     sendJSON(host.ws, {
-      type: "presence-update",
+      type: "join-request",
       userId: "host-1",
       displayName: "Host",
-      isHost: true,
     });
     sendJSON(guest.ws, {
       type: "join-request",
@@ -885,13 +877,12 @@ describe("Control WebSocket handler", () => {
     await delay(100);
 
     sendJSON(host.ws, {
-      type: "presence-update",
+      type: "join-request",
       userId: "host-1",
       displayName: "Host",
-      isHost: true,
     });
     sendJSON(guest.ws, {
-      type: "presence-update",
+      type: "join-request",
       userId: "guest-1",
       displayName: "Guest",
     });
@@ -918,10 +909,9 @@ describe("Control WebSocket handler", () => {
     await delay(100);
 
     sendJSON(host.ws, {
-      type: "presence-update",
+      type: "join-request",
       userId: "host-1",
       displayName: "Host",
-      isHost: true,
     });
     sendJSON(guest.ws, {
       type: "join-request",
@@ -965,10 +955,9 @@ describe("Control WebSocket handler", () => {
     await delay(100);
 
     sendJSON(host.ws, {
-      type: "presence-update",
+      type: "join-request",
       userId: "host-1",
       displayName: "Host",
-      isHost: true,
     });
     sendJSON(guest.ws, {
       type: "join-request",
@@ -1007,13 +996,12 @@ describe("Control WebSocket handler", () => {
     await delay(100);
 
     sendJSON(host.ws, {
-      type: "presence-update",
+      type: "join-request",
       userId: "host-1",
       displayName: "Host",
-      isHost: true,
     });
     sendJSON(guest.ws, {
-      type: "presence-update",
+      type: "join-request",
       userId: "guest-1",
       displayName: "Guest",
     });
