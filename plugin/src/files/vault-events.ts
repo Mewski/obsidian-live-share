@@ -122,9 +122,7 @@ export function registerVaultEvents(plugin: LiveSharePlugin): void {
         ) {
           void plugin.canvasSync.handleLocalModify(file.path);
         }
-        if (plugin.settings.role === "host") {
-          void plugin.backgroundSync.handleLocalTextModify(file.path);
-        }
+        void plugin.backgroundSync.handleLocalTextModify(file.path);
         return;
       }
       void plugin.fileOpsManager.onFileModify(file);

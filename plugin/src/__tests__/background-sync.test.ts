@@ -290,6 +290,24 @@ describe("BackgroundSync", () => {
     expect(text.toString()).toBe("from remote");
   });
 
+  it("guest pushes local text changes into Y.Doc but does not update manifest", async () => {
+    const entries = new Map([["note.md", { hash: "abc", size: 5, mtime: 1 }]]);
+    manifestManager = createManifestManager(entries);
+    const fakeFile = mockFile("note.md");
+    vault.getAbstractFileByPath.mockReturnValue(fakeFile);
+    vault.read.mockResolvedValue("initial");
+    bg = new BackgroundSync(vault, syncManager, manifestManager, fileOpsManager);
+
+    await bg.startAll("guest");
+
+    vault.read.mockResolvedValue("updated by plugin");
+    await bg.handleLocalTextModify("note.md");
+
+    const { text } = syncManager.getDoc("note.md");
+    expect(text.toString()).toBe("updated by plugin");
+    expect(manifestManager.updateFile).not.toHaveBeenCalled();
+  });
+
   it("onFileAdded subscribes a new text file", async () => {
     vault.getAbstractFileByPath.mockReturnValue(null);
     await bg.onFileAdded("new-file.md");
