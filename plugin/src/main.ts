@@ -569,16 +569,15 @@ export default class LiveSharePlugin extends Plugin {
       this.logger.log("connection", `control channel ${controlState}`);
       if (controlState === "connected") {
         this.connectionState.transition({ type: "connected" });
+        // Both host and guest must send join-request so the server knows identities
+        this.controlChannel?.send({
+          type: "join-request",
+          userId: this.userId,
+          displayName: this.settings.displayName,
+          avatarUrl: this.settings.avatarUrl,
+        });
         if (this.settings.role === "host") {
           this.fileOpsManager.setOnline(true);
-        }
-        if (this.settings.role === "guest") {
-          this.controlChannel?.send({
-            type: "join-request",
-            userId: this.userId,
-            displayName: this.settings.displayName,
-            avatarUrl: this.settings.avatarUrl,
-          });
         }
         this.presenceManager?.broadcastPresence();
         if (this.backgroundSync.isRunning()) {
