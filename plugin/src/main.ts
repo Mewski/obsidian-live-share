@@ -64,6 +64,7 @@ export default class LiveSharePlugin extends Plugin {
   private connectionStateUnsub: (() => void) | null = null;
   statusBarEl!: HTMLElement;
   private isEndingSession = false;
+  private isStartingSession = false;
   private currentScrollListener: (() => void) | null = null;
   private manifestHandlerQueue: Promise<void> = Promise.resolve();
 
@@ -408,87 +409,99 @@ export default class LiveSharePlugin extends Plugin {
   }
 
   public async startSession() {
-    if (this.sessionManager.isActive) {
+    if (this.sessionManager.isActive || this.isStartingSession) {
       new Notice("Live Share: session already active");
       return;
     }
-
-    const ok = await this.sessionManager.startSession();
-    if (ok) {
-      try {
-        await this.connectSync();
-        await this.manifestManager.connect(this.syncManager);
-        await this.manifestManager.publishManifest({ purge: true });
-        await this.backgroundSync.startAll("host");
-        this.registerManifestChangeHandler();
-        this.onActiveFileChange();
-        this.logger.log("session", `started, room=${this.settings.roomId}`);
-        this.notify("Live Share: session started, invite copied to clipboard");
-      } catch {
-        this.logger.error("session", "failed to start session");
-        await this.abortSession("Live Share: failed to start session");
+    this.isStartingSession = true;
+    try {
+      const ok = await this.sessionManager.startSession();
+      if (ok) {
+        try {
+          await this.connectSync();
+          await this.manifestManager.connect(this.syncManager);
+          await this.manifestManager.publishManifest({ purge: true });
+          await this.backgroundSync.startAll("host");
+          this.registerManifestChangeHandler();
+          this.onActiveFileChange();
+          this.logger.log("session", `started, room=${this.settings.roomId}`);
+          this.notify("Live Share: session started, invite copied to clipboard");
+        } catch {
+          this.logger.error("session", "failed to start session");
+          await this.abortSession("Live Share: failed to start session");
+        }
       }
+    } finally {
+      this.isStartingSession = false;
     }
   }
 
   public async joinSession() {
-    if (this.sessionManager.isActive) {
+    if (this.sessionManager.isActive || this.isStartingSession) {
       new Notice("Live Share: session already active");
       return;
     }
+    this.isStartingSession = true;
+    try {
+      const invite = await this.promptText("Paste invite link");
+      if (!invite) return;
 
-    const invite = await this.promptText("Paste invite link");
-    if (!invite) return;
-
-    const ok = await this.sessionManager.joinSession(invite);
-    if (ok) {
-      try {
-        await this.connectSync();
-        await this.manifestManager.connect(this.syncManager);
-        await this.cleanupStaleFiles();
-        const syncedCount = await this.manifestManager.syncFromManifest(
-          this.mutePathEvents,
-          this.unmutePathEvents,
-          this.requestBinaryFile,
-        );
-        await this.backgroundSync.startAll("guest");
-        this.registerManifestChangeHandler();
-        this.onActiveFileChange();
-        this.logger.log("session", `joined, room=${this.settings.roomId}`);
-        this.notify(`Live Share: joined session, synced ${syncedCount} file(s)`);
-      } catch {
-        this.logger.error("session", "failed to join session");
-        await this.abortSession("Live Share: failed to join session");
+      const ok = await this.sessionManager.joinSession(invite);
+      if (ok) {
+        try {
+          await this.connectSync();
+          await this.manifestManager.connect(this.syncManager);
+          await this.cleanupStaleFiles();
+          const syncedCount = await this.manifestManager.syncFromManifest(
+            this.mutePathEvents,
+            this.unmutePathEvents,
+            this.requestBinaryFile,
+          );
+          await this.backgroundSync.startAll("guest");
+          this.registerManifestChangeHandler();
+          this.onActiveFileChange();
+          this.logger.log("session", `joined, room=${this.settings.roomId}`);
+          this.notify(`Live Share: joined session, synced ${syncedCount} file(s)`);
+        } catch {
+          this.logger.error("session", "failed to join session");
+          await this.abortSession("Live Share: failed to join session");
+        }
       }
+    } finally {
+      this.isStartingSession = false;
     }
   }
 
   private async joinWithInvite(inviteString: string) {
-    if (this.sessionManager.isActive) {
+    if (this.sessionManager.isActive || this.isStartingSession) {
       new Notice("Live Share: session already active");
       return;
     }
-
-    const ok = await this.sessionManager.joinSession(inviteString);
-    if (ok) {
-      try {
-        await this.connectSync();
-        await this.manifestManager.connect(this.syncManager);
-        await this.cleanupStaleFiles();
-        const syncedCount = await this.manifestManager.syncFromManifest(
-          this.mutePathEvents,
-          this.unmutePathEvents,
-          this.requestBinaryFile,
-        );
-        await this.backgroundSync.startAll("guest");
-        this.registerManifestChangeHandler();
-        this.onActiveFileChange();
-        this.logger.log("session", `joined via link, room=${this.settings.roomId}`);
-        this.notify(`Live Share: joined session, synced ${syncedCount} file(s)`);
-      } catch {
-        this.logger.error("session", "failed to join via link");
-        await this.abortSession("Live Share: failed to join session");
+    this.isStartingSession = true;
+    try {
+      const ok = await this.sessionManager.joinSession(inviteString);
+      if (ok) {
+        try {
+          await this.connectSync();
+          await this.manifestManager.connect(this.syncManager);
+          await this.cleanupStaleFiles();
+          const syncedCount = await this.manifestManager.syncFromManifest(
+            this.mutePathEvents,
+            this.unmutePathEvents,
+            this.requestBinaryFile,
+          );
+          await this.backgroundSync.startAll("guest");
+          this.registerManifestChangeHandler();
+          this.onActiveFileChange();
+          this.logger.log("session", `joined via link, room=${this.settings.roomId}`);
+          this.notify(`Live Share: joined session, synced ${syncedCount} file(s)`);
+        } catch {
+          this.logger.error("session", "failed to join via link");
+          await this.abortSession("Live Share: failed to join session");
+        }
       }
+    } finally {
+      this.isStartingSession = false;
     }
   }
 
