@@ -588,4 +588,52 @@ describe("ControlChannel", () => {
       expect(ws.url).not.toContain("jwt=");
     });
   });
+
+  describe("join handshake integration", () => {
+    it("connects, opens, and completes join handshake via message flow", async () => {
+      const states: string[] = [];
+      channel = new CC(createSettings({ role: "guest" }));
+      channel.onStateChange((s) => states.push(s));
+
+      const joinResponseHandler = vi.fn();
+      channel.on("join-response", joinResponseHandler);
+
+      // 1. Connect — WS starts in CONNECTING state
+      channel.connect();
+      const ws = (channel as any).ws as MockWebSocket;
+      expect(ws.readyState).toBe(MockWebSocket.CONNECTING);
+      expect(states).toEqual([]);
+
+      // 2. Simulate open — state transitions to connected
+      ws.simulateOpen();
+      expect(states).toEqual(["connected"]);
+
+      // 3. Send a join-request (as the plugin would after connecting)
+      channel.send({
+        type: "join-request",
+        userId: "guest-1",
+        displayName: "Guest User",
+      });
+      expect(ws.sent).toHaveLength(1);
+      const sentMsg = JSON.parse(ws.sent[0]);
+      expect(sentMsg.type).toBe("join-request");
+      expect(sentMsg.userId).toBe("guest-1");
+
+      // 4. Simulate receiving join-response with approved: true
+      ws.simulateMessage(
+        JSON.stringify({
+          type: "join-response",
+          approved: true,
+          permission: "read-write",
+        }),
+      );
+
+      expect(joinResponseHandler).toHaveBeenCalledOnce();
+      expect(joinResponseHandler).toHaveBeenCalledWith({
+        type: "join-response",
+        approved: true,
+        permission: "read-write",
+      });
+    });
+  });
 });
