@@ -307,15 +307,23 @@ export class FileOpsManager {
           this.pendingChunks.delete(endKey);
           const joined = assembly.chunks.join("");
           const exists = this.vault.getAbstractFileByPath(op.path);
-          if (!exists) {
-            const parentDir = op.path.substring(0, op.path.lastIndexOf("/"));
-            if (parentDir) await ensureFolder(this.vault, parentDir);
-          }
           if (assembly.binary) {
             const binaryData = base64ToArrayBuffer(joined);
-            await this.vault.adapter.writeBinary(op.path, binaryData);
+            if (exists && exists instanceof TFile) {
+              await this.vault.modifyBinary(exists, binaryData);
+            } else {
+              const parentDir = op.path.substring(0, op.path.lastIndexOf("/"));
+              if (parentDir) await ensureFolder(this.vault, parentDir);
+              await this.vault.createBinary(op.path, binaryData);
+            }
           } else {
-            await this.vault.adapter.write(op.path, joined);
+            if (exists && exists instanceof TFile) {
+              await this.vault.modify(exists, joined);
+            } else {
+              const parentDir = op.path.substring(0, op.path.lastIndexOf("/"));
+              if (parentDir) await ensureFolder(this.vault, parentDir);
+              await this.vault.create(op.path, joined);
+            }
           }
           break;
         }

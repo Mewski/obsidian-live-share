@@ -322,11 +322,11 @@ describe("FileOpsManager", () => {
         type: "chunk-end",
         path: "big.md",
       });
-      expect(vault.adapter.write).toHaveBeenCalledWith("big.md", "HelloWorld");
+      expect(vault.create).toHaveBeenCalledWith("big.md", "HelloWorld");
     });
 
     it("assembles text chunks and modifies existing file", async () => {
-      vault.files.set("big.md", { path: "big.md", extension: "md" });
+      vault.files.set("big.md", createMockTFile("big.md") as any);
 
       await manager.applyRemoteOp({
         type: "chunk-start",
@@ -350,7 +350,7 @@ describe("FileOpsManager", () => {
         path: "big.md",
       });
 
-      expect(vault.adapter.write).toHaveBeenCalled();
+      expect(vault.modify).toHaveBeenCalled();
     });
 
     it("assembles binary chunks and creates binary file", async () => {
@@ -376,7 +376,7 @@ describe("FileOpsManager", () => {
         type: "chunk-end",
         path: "big.png",
       });
-      expect(vault.adapter.writeBinary).toHaveBeenCalled();
+      expect(vault.createBinary).toHaveBeenCalled();
     });
 
     it("ignores chunk-end without a matching chunk-start", async () => {
