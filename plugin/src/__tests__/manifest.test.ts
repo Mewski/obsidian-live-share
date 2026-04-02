@@ -833,4 +833,34 @@ describe("ManifestManager", () => {
       manager.destroy();
     });
   });
+
+  describe("syncFromManifest mute/unmute suppression", () => {
+    it("calls mute for each synced text file to prevent broadcast loops", async () => {
+      const manager = new ManifestManager(vault as any, createSettings());
+      const { manifest } = injectManifest(manager);
+      const mockSyncManager = createMockSyncManager();
+      (manager as any).syncManager = mockSyncManager;
+
+      manifest.set("notes/a.md", { hash: "aaa", size: 10, mtime: 1000 });
+      manifest.set("notes/b.md", { hash: "bbb", size: 20, mtime: 2000 });
+
+      const mutedPaths: string[] = [];
+      const unmutedPaths: string[] = [];
+      const mute = vi.fn((path: string) => mutedPaths.push(path));
+      const unmute = vi.fn((path: string) => unmutedPaths.push(path));
+
+      const synced = await manager.syncFromManifest(mute, unmute);
+
+      expect(synced).toBe(2);
+      expect(mute).toHaveBeenCalledTimes(2);
+      expect(mutedPaths).toContain("notes/a.md");
+      expect(mutedPaths).toContain("notes/b.md");
+
+      // Verify vault was written to (create, since files don't exist locally)
+      expect(vault.create).toHaveBeenCalledTimes(2);
+
+      // Unmute is deferred via setTimeout, so it should not have fired yet
+      expect(unmute).not.toHaveBeenCalled();
+    });
+  });
 });
