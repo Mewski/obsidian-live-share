@@ -6,7 +6,7 @@ class MockWebSocket {
   static OPEN = 1;
   static CLOSED = 3;
   static CONNECTING = 0;
-  readyState = MockWebSocket.OPEN;
+  readyState = MockWebSocket.CONNECTING;
   sent: string[] = [];
   onopen: (() => void) | null = null;
   onmessage: ((event: { data: string | ArrayBuffer }) => void) | null = null;
@@ -16,7 +16,11 @@ class MockWebSocket {
 
   constructor(url: string) {
     this.url = url;
-    setTimeout(() => this.onopen?.(), 0);
+  }
+
+  simulateOpen() {
+    this.readyState = MockWebSocket.OPEN;
+    this.onopen?.();
   }
 
   send(data: string) {
@@ -74,7 +78,9 @@ function createMockE2E() {
 
 function connectAndGetWs(channel: ControlChannel): MockWebSocket {
   channel.connect();
-  return (channel as any).ws as MockWebSocket;
+  const ws = (channel as any).ws as MockWebSocket;
+  ws.simulateOpen();
+  return ws;
 }
 
 describe("ControlChannel", () => {
