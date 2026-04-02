@@ -118,7 +118,7 @@ describe("BackgroundSync", () => {
     expect(text.toString()).toBe("hello world");
   });
 
-  it("host overwrites non-empty Y.Text with local content", async () => {
+  it("host respects existing Y.Text from guests instead of overwriting", async () => {
     const entries = new Map([["test.md", { hash: "abc", size: 5, mtime: 1 }]]);
     manifestManager = createManifestManager(entries);
     vault.getAbstractFileByPath.mockReturnValue(mockFile("test.md"));
@@ -130,7 +130,13 @@ describe("BackgroundSync", () => {
 
     await bg.startAll("host");
 
-    expect(text.toString()).toBe("local content");
+    // Y.Text keeps remote content — host does NOT overwrite it
+    expect(text.toString()).toBe("existing remote content");
+    // Instead the remote content is written to disk
+    expect(vault.adapter.write).toHaveBeenCalledWith(
+      "test.md",
+      "existing remote content",
+    );
   });
 
   it("guest writes remote Y.Text to vault if different from local", async () => {

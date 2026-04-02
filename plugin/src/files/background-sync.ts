@@ -89,8 +89,17 @@ export class BackgroundSync {
         if (file) {
           const content = normalizeLineEndings(await this.vault.read(file));
           if (this.cancelledSubscribes.has(path)) return;
-          applyMinimalYTextUpdate(docHandle.doc, docHandle.text, content);
-          this.lastWrittenContent.set(path, content);
+          const remoteContent = docHandle.text.toString();
+          if (remoteContent.length === 0) {
+            // No remote content yet — host seeds the Y.Text
+            applyMinimalYTextUpdate(docHandle.doc, docHandle.text, content);
+            this.lastWrittenContent.set(path, content);
+          } else if (remoteContent !== content) {
+            // Remote has content (from guests or prior sync) — write remote to disk instead
+            await this.writeToDisk(path, remoteContent);
+          } else {
+            this.lastWrittenContent.set(path, content);
+          }
         }
       } else if (this.role === "guest" && docHandle.text.length > 0) {
         const file = getFileByPath(this.vault, diskPath);
