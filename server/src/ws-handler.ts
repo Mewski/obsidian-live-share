@@ -86,7 +86,7 @@ export function createYjsWSS() {
     }
   }
 
-  function handleSubscribe(client: MuxClient, docId: string) {
+  function handleSubscribe(client: MuxClient, docId: string, payload: Uint8Array) {
     const roomId = `${client.baseRoomId}:${docId}`;
     const state = getOrCreateRoom(roomId);
 
@@ -99,6 +99,21 @@ export function createYjsWSS() {
       const permission = getPermission(client.baseRoomId, client.userId);
       if (permission === "read-only") {
         state.readOnlyClients.add(client);
+      }
+    }
+
+    if (payload.length > 0) {
+      try {
+        const decoder = decoding.createDecoder(payload);
+        const clientId = decoding.readVarUint(decoder);
+        let ids = state.clientAwarenessIds.get(client);
+        if (!ids) {
+          ids = new Set();
+          state.clientAwarenessIds.set(client, ids);
+        }
+        ids.add(clientId);
+      } catch {
+        // Payload may not contain clientID (old clients)
       }
     }
 
@@ -241,7 +256,7 @@ export function createYjsWSS() {
         const { docId, msgType, payload } = decodeMuxMessage(data);
         switch (msgType) {
           case MUX_SUBSCRIBE:
-            handleSubscribe(client, docId);
+            handleSubscribe(client, docId, payload);
             break;
           case MUX_UNSUBSCRIBE:
             handleUnsubscribe(client, docId);

@@ -444,7 +444,14 @@ export class SyncManager {
   }
 
   private sendSubscribe(filePath: string): void {
-    this.sendMux(filePath, MUX_SUBSCRIBE);
+    const doc = this.docs.get(filePath);
+    if (doc) {
+      const encoder = encoding.createEncoder();
+      encoding.writeVarUint(encoder, doc.clientID);
+      this.sendMux(filePath, MUX_SUBSCRIBE, encoding.toUint8Array(encoder));
+    } else {
+      this.sendMux(filePath, MUX_SUBSCRIBE);
+    }
   }
 
   private sendUnsubscribe(filePath: string): void {
