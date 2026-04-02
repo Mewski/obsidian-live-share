@@ -52,6 +52,7 @@ export class SyncManager {
   private e2e: E2ECrypto | null = null;
   private sendQueue: Promise<void> = Promise.resolve();
   private isDestroyed = false;
+  private onMaxReconnectCallback: (() => void) | null = null;
 
   constructor(settings: LiveShareSettings) {
     this.settings = settings;
@@ -59,6 +60,10 @@ export class SyncManager {
 
   setE2E(e2e: E2ECrypto | null): void {
     this.e2e = e2e;
+  }
+
+  onMaxReconnect(callback: () => void): void {
+    this.onMaxReconnectCallback = callback;
   }
 
   updateSettings(settings: LiveShareSettings) {
@@ -256,6 +261,7 @@ export class SyncManager {
     if (this.reconnectTimer) return;
     if (this.reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
       this.shouldConnect = false;
+      this.onMaxReconnectCallback?.();
       return;
     }
     const delay = Math.min(RECONNECT_BASE_MS * 2 ** this.reconnectAttempts, RECONNECT_MAX_MS);

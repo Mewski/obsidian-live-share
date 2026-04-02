@@ -523,6 +523,11 @@ export default class LiveSharePlugin extends Plugin {
     }
     this.connectionState.transition({ type: "connect" });
     this.syncManager.connect();
+    this.syncManager.onMaxReconnect(() => {
+      this.logger.error("sync", "mux channel exhausted reconnect attempts");
+      new Notice("Live Share: sync connection lost, ending session");
+      void this.endSession();
+    });
 
     if (this.controlChannel) {
       this.controlChannel.destroy();

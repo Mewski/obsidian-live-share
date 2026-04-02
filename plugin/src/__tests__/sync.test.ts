@@ -205,4 +205,39 @@ describe("SyncManager", () => {
     expect(handle).toBeNull();
     sm.destroy();
   });
+
+  it("fires onMaxReconnect callback after max reconnect attempts", () => {
+    vi.useFakeTimers();
+    try {
+      const sm = new SyncManager(makeSettings());
+      const callback = vi.fn();
+      sm.onMaxReconnect(callback);
+      sm.connect();
+
+      // First WS instance is the initial connection attempt.
+      // Each iteration: close the current WS (triggering scheduleReconnect),
+      // then advance timers so the reconnect fires and opens a new WS.
+      // After 15 reconnect attempts, the next close triggers the max-reconnect path.
+      for (let i = 0; i < 15; i++) {
+        const ws = mockWsInstances[mockWsInstances.length - 1];
+        ws.close();
+        vi.runAllTimers();
+      }
+
+      // Close the final WS — this triggers scheduleReconnect with attempts >= 15
+      const lastWs = mockWsInstances[mockWsInstances.length - 1];
+      lastWs.close();
+
+      // After exhausting reconnect attempts, the callback should have fired
+      expect(callback).toHaveBeenCalledTimes(1);
+
+      // getDoc should return null since shouldConnect is now false
+      const handle = sm.getDoc("notes/test.md");
+      expect(handle).toBeNull();
+
+      sm.destroy();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });
