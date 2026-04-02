@@ -246,10 +246,10 @@ export class BackgroundSync {
 
   destroy(): void {
     this.running = false;
-    for (const timer of this.writeTimers.values()) {
-      clearTimeout(timer);
+    // Flush all pending debounced writes before clearing
+    for (const path of [...this.writeTimers.keys()]) {
+      this.flushWrite(path);
     }
-    this.writeTimers.clear();
     for (const [, unobserve] of this.observers) {
       unobserve();
     }

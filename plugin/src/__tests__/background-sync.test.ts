@@ -324,7 +324,7 @@ describe("BackgroundSync", () => {
     expect(vault.modify).not.toHaveBeenCalled();
   });
 
-  it("destroy cancels pending writes and cleans up", async () => {
+  it("destroy flushes pending debounced writes to disk", async () => {
     const entries = new Map([["flush.md", { hash: "abc", size: 5, mtime: 1 }]]);
     manifestManager = createManifestManager(entries);
     vault.getAbstractFileByPath.mockReturnValue(mockFile("flush.md"));
@@ -332,7 +332,8 @@ describe("BackgroundSync", () => {
     bg = new BackgroundSync(vault, syncManager, manifestManager, fileOpsManager);
 
     await bg.startAll("guest");
-    vault.modify.mockClear();
+    bg.setActiveFile("other.md");
+    vault.adapter.write.mockClear();
 
     const { doc } = syncManager.getDoc("flush.md");
     const remoteDoc = new Y.Doc();
@@ -341,8 +342,13 @@ describe("BackgroundSync", () => {
     Y.applyUpdate(doc, Y.encodeStateAsUpdate(remoteDoc));
     remoteDoc.destroy();
 
-    bg.destroy();
+    // Debounced write is scheduled but not yet executed
+    expect(vault.adapter.write).not.toHaveBeenCalled();
 
-    expect(vault.modify).not.toHaveBeenCalled();
+    // destroy() should flush the pending write immediately
+    bg.destroy();
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(vault.adapter.write).toHaveBeenCalledWith("flush.md", "pending content");
   });
 });
