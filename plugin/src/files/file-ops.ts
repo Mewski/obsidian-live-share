@@ -128,14 +128,22 @@ export class FileOpsManager {
 
   async applyRemoteOp(op: FileOp) {
     const paths = this.getOpPaths(op);
-    const waitFor = paths.map((path) => this.opQueues.get(path)).filter(Boolean) as Promise<void>[];
-    if (waitFor.length > 0) await Promise.all(waitFor);
 
-    const promise = this.applyRemoteOpInner(op);
+    // Chain onto existing queue for all affected paths atomically
+    const currentQueues = paths.map((path) => this.opQueues.get(path) ?? Promise.resolve());
+    const gate = Promise.all(currentQueues);
+
+    const promise = gate.then(() => this.applyRemoteOpInner(op));
+
+    // Set the new promise for all paths BEFORE awaiting
     for (const path of paths) this.opQueues.set(path, promise);
-    await promise;
-    for (const path of paths) {
-      if (this.opQueues.get(path) === promise) this.opQueues.delete(path);
+
+    try {
+      await promise;
+    } finally {
+      for (const path of paths) {
+        if (this.opQueues.get(path) === promise) this.opQueues.delete(path);
+      }
     }
   }
 

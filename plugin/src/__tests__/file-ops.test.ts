@@ -493,4 +493,34 @@ describe("FileOpsManager", () => {
       expect((sentOps[0] as any).binary).toBe(true);
     });
   });
+
+  describe("op-queue serialization", () => {
+    it("serializes concurrent ops on the same path", async () => {
+      const log: string[] = [];
+      const file = createMockTFile("race.md");
+      vault.files.set("race.md", file);
+
+      // Make vault.modify take time so we can observe ordering
+      vault.modify
+        .mockImplementationOnce(async () => {
+          log.push("start-1");
+          await new Promise((r) => setTimeout(r, 50));
+          log.push("end-1");
+        })
+        .mockImplementationOnce(async () => {
+          log.push("start-2");
+          await new Promise((r) => setTimeout(r, 50));
+          log.push("end-2");
+        });
+
+      // Fire two ops for the same path concurrently
+      const p1 = manager.applyRemoteOp({ type: "modify", path: "race.md", content: "a" });
+      const p2 = manager.applyRemoteOp({ type: "modify", path: "race.md", content: "b" });
+
+      await Promise.all([p1, p2]);
+
+      // Should be sequential: first op fully completes before second starts
+      expect(log).toEqual(["start-1", "end-1", "start-2", "end-2"]);
+    });
+  });
 });
