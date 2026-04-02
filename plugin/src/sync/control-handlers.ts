@@ -52,8 +52,7 @@ export function registerControlHandlers(plugin: LiveSharePlugin): void {
       if (paths.some((path) => !plugin.manifestManager.isSharedPath(path))) return;
     }
     plugin.fileOpsManager
-      .applyRemoteOp(op)
-      .then(async () => {
+      .applyRemoteOp(op, async () => {
         if (plugin.settings.role !== "host") return;
         if (op.type === "create" && "path" in op) {
           const file = plugin.app.vault.getAbstractFileByPath(toLocalPath(op.path));
