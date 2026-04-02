@@ -173,7 +173,7 @@ export function createControlWSS(options?: ControlWSSOptions) {
       verifiedUserId,
       displayName: "",
       isHost: false,
-      isApproved: true,
+      isApproved: !serverRoom?.requireApproval,
       permission: serverRoom?.defaultPermission || "read-write",
       msgTimestamps: [],
       joinOrder: room.nextJoinOrder++,
@@ -235,15 +235,12 @@ export function createControlWSS(options?: ControlWSSOptions) {
           typeof msg.displayName === "string" ? msg.displayName.slice(0, 100) : "";
 
         if (serverRoom?.requireApproval) {
-          const existingPermission = client.userId
-            ? getPermission(roomId, client.userId)
-            : undefined;
-          if (existingPermission) {
+          if (client.isHost) {
             client.isApproved = true;
-            client.permission = existingPermission;
+            setPermission(roomId, client.userId, client.permission);
             void appendLog(roomId, {
               timestamp: Date.now(),
-              event: "rejoin",
+              event: "join",
               userId: client.userId,
               displayName: client.displayName,
             });
@@ -254,18 +251,38 @@ export function createControlWSS(options?: ControlWSSOptions) {
               readOnlyPatterns: serverRoom?.readOnlyPatterns,
             });
           } else {
-            client.isApproved = false;
-            room.pendingApprovals.set(client.userId, ws);
-
-            const host = getHostClient(room);
-            if (host) {
-              sendTo(host.ws, {
-                type: "join-request",
+            const existingPermission = client.userId
+              ? getPermission(roomId, client.userId)
+              : undefined;
+            if (existingPermission) {
+              client.isApproved = true;
+              client.permission = existingPermission;
+              void appendLog(roomId, {
+                timestamp: Date.now(),
+                event: "rejoin",
                 userId: client.userId,
                 displayName: client.displayName,
-                avatarUrl: msg.avatarUrl || "",
-                verified: !!client.verifiedUserId,
               });
+              sendTo(ws, {
+                type: "join-response",
+                approved: true,
+                permission: client.permission,
+                readOnlyPatterns: serverRoom?.readOnlyPatterns,
+              });
+            } else {
+              client.isApproved = false;
+              room.pendingApprovals.set(client.userId, ws);
+
+              const host = getHostClient(room);
+              if (host) {
+                sendTo(host.ws, {
+                  type: "join-request",
+                  userId: client.userId,
+                  displayName: client.displayName,
+                  avatarUrl: msg.avatarUrl || "",
+                  verified: !!client.verifiedUserId,
+                });
+              }
             }
           }
         } else if (room.kickedUserIds.has(client.userId)) {

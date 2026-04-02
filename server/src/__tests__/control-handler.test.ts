@@ -545,10 +545,9 @@ describe("Control WebSocket handler", () => {
     await delay(50);
 
     sendJSON(host.ws, {
-      type: "presence-update",
+      type: "join-request",
       userId: "host-1",
       displayName: "Host",
-      isHost: true,
     });
     await delay(100);
 
@@ -708,10 +707,9 @@ describe("Control WebSocket handler", () => {
     const host = await connectControl(room.id, room.token);
     await delay(50);
     sendJSON(host.ws, {
-      type: "presence-update",
+      type: "join-request",
       userId: "host-1",
       displayName: "Host",
-      isHost: true,
     });
     await delay(100);
 
@@ -1205,6 +1203,42 @@ describe("Control WebSocket handler", () => {
     await delay(200);
     const hostJoinReq = host.messages.find((m) => JSON.parse(m).type === "join-request");
     expect(hostJoinReq).toBeUndefined();
+  });
+
+  it("isApproved defaults false in requireApproval rooms — no file-ops without join-request", async () => {
+    const room = await createRoom("ctrl-default-unapproved");
+
+    const { getRoom } = await import("../rooms.js");
+    const serverRoom = getRoom(room.id);
+    expect(serverRoom).toBeDefined();
+    serverRoom!.requireApproval = true;
+
+    const host = await connectControl(room.id, room.token);
+    await delay(50);
+    sendJSON(host.ws, {
+      type: "join-request",
+      userId: "host-1",
+      displayName: "Host",
+    });
+    await delay(100);
+
+    // Guest connects but never sends join-request
+    const guest = await connectControl(room.id, room.token);
+    await delay(100);
+
+    host.messages.length = 0;
+
+    sendJSON(guest.ws, {
+      type: "file-op",
+      op: { type: "create", path: "sneaky.md", content: "should not arrive" },
+    });
+
+    await delay(300);
+    const fileOpMsg = host.messages.find((m) => {
+      const parsed = JSON.parse(m);
+      return parsed.type === "file-op";
+    });
+    expect(fileOpMsg).toBeUndefined();
   });
 
   it("readOnlyPatterns blocks guest writes to matching files", async () => {
