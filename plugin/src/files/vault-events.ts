@@ -26,6 +26,7 @@ export function registerVaultEvents(plugin: LiveSharePlugin): void {
       const originalPath = file.path;
       if (!plugin.manifestManager.isSharedPath(originalPath)) return;
       if (plugin.fileOpsManager.isPathMuted(originalPath)) return;
+      if (renamedPaths.has(originalPath)) return;
       void plugin.fileOpsManager.onFileCreate(file);
       if (plugin.settings.role === "host") {
         if (file instanceof TFile) {
