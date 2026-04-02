@@ -61,6 +61,9 @@ export class FileOpsManager {
     this.outgoingTransfers.clear();
     this.pendingChunks.clear();
     this.offlineQueue.clear();
+    this.mutedPaths.clear();
+    this.opQueues.clear();
+    this.sendQueues.clear();
   }
 
   setOnline(online: boolean): void {
