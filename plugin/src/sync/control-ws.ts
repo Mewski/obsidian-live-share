@@ -142,7 +142,8 @@ export class ControlChannel {
       msg.type === "file-op" ||
       msg.type === "file-chunk-start" ||
       msg.type === "file-chunk-data" ||
-      msg.type === "file-chunk-end";
+      msg.type === "file-chunk-end" ||
+      msg.type === "file-chunk-resume";
     if (this.e2e?.enabled && encryptable) {
       void this.encryptAndSend(msg);
     } else {
@@ -224,6 +225,9 @@ export class ControlChannel {
             encrypted: true,
           }),
         );
+      } else if (msg.type === "file-chunk-resume" && typeof msg.path === "string") {
+        const encrypted = await this.e2e.encryptString(msg.path);
+        this.ws.send(JSON.stringify({ ...msg, path: encrypted, encrypted: true }));
       } else if (msg.type === "file-op") {
         const op = msg.op as unknown as Record<string, unknown>;
         if (op && typeof op.content === "string") {
@@ -281,6 +285,9 @@ export class ControlChannel {
           data: decryptedData,
           path: decryptedPath,
         };
+      } else if (msg.type === "file-chunk-resume" && typeof msg.path === "string") {
+        const decryptedPath = await this.e2e.decryptString(msg.path);
+        decryptedMsg = { ...msg, path: decryptedPath };
       } else if (msg.type === "file-op") {
         const op = msg.op as unknown as Record<string, unknown>;
         if (op && typeof op.content === "string") {

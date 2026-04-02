@@ -425,6 +425,25 @@ describe("ControlChannel", () => {
       expect(e2e.encryptString).toHaveBeenCalledWith("big.bin");
     });
 
+    it("encrypts file-chunk-resume path before sending", async () => {
+      const e2e = createMockE2E();
+      channel = new CC(createSettings(), e2e as any);
+      const ws = connectAndGetWs(channel);
+
+      channel.send({
+        type: "file-chunk-resume",
+        path: "big.bin",
+        transferId: "t1",
+      } as any);
+
+      await vi.waitFor(() => expect(ws.sent).toHaveLength(1));
+      const sent = JSON.parse(ws.sent[0]);
+      expect(sent.encrypted).toBe(true);
+      expect(sent.path).toBe("encrypted:big.bin");
+      expect(sent.transferId).toBe("t1");
+      expect(e2e.encryptString).toHaveBeenCalledWith("big.bin");
+    });
+
     it("drops message when encryption fails instead of sending plaintext", async () => {
       const e2e = createMockE2E();
       e2e.encryptString.mockRejectedValue(new Error("crypto error"));
