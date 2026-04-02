@@ -264,7 +264,10 @@ describe("SyncManager", () => {
     const fakeEncryptedPayload = new Uint8Array([0, 99, 99, 99, 99]);
     const muxMsg = encodeMuxMessage("notes/test.md", MUX_SYNC_ENCRYPTED, fakeEncryptedPayload);
     ws.onmessage?.({
-      data: muxMsg.buffer.slice(muxMsg.byteOffset, muxMsg.byteOffset + muxMsg.byteLength),
+      data: (muxMsg.buffer as ArrayBuffer).slice(
+        muxMsg.byteOffset,
+        muxMsg.byteOffset + muxMsg.byteLength,
+      ),
     });
 
     // The doc should remain uncorrupted

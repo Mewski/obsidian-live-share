@@ -613,6 +613,7 @@ describe("ControlChannel", () => {
         type: "join-request",
         userId: "guest-1",
         displayName: "Guest User",
+        avatarUrl: "",
       });
       expect(ws.sent).toHaveLength(1);
       const sentMsg = JSON.parse(ws.sent[0]);
