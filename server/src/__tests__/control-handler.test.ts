@@ -1397,4 +1397,93 @@ describe("Control WebSocket handler", () => {
     const fileOp = JSON.parse(guest.messages[0]);
     expect(fileOp.type).toBe("file-op");
   });
+
+  it("read-only permission persists across reconnect — file-ops blocked after rejoin", async () => {
+    const room = await createRoom("ctrl-reconnect-ro");
+
+    const { getRoom } = await import("../rooms.js");
+    const serverRoom = getRoom(room.id);
+    expect(serverRoom).toBeDefined();
+    serverRoom!.requireApproval = true;
+
+    // Host joins
+    const host = await connectControl(room.id, room.token);
+    await delay(50);
+    sendJSON(host.ws, {
+      type: "join-request",
+      userId: "host-1",
+      displayName: "Host",
+    });
+    await delay(100);
+
+    // Guest joins and gets approved with read-write
+    const guest = await connectControl(room.id, room.token);
+    await delay(50);
+    sendJSON(guest.ws, {
+      type: "join-request",
+      userId: "guest-1",
+      displayName: "Guest",
+    });
+
+    await waitForMessages(host.messages, 1);
+    host.messages.length = 0;
+
+    sendJSON(host.ws, {
+      type: "join-response",
+      userId: "guest-1",
+      approved: true,
+      permission: "read-write",
+    });
+
+    await waitForMessages(guest.messages, 1);
+    const approval = JSON.parse(guest.messages[0]);
+    expect(approval.approved).toBe(true);
+    expect(approval.permission).toBe("read-write");
+
+    // Host changes guest to read-only
+    sendJSON(host.ws, {
+      type: "set-permission",
+      userId: "guest-1",
+      permission: "read-only",
+    });
+
+    await waitForMessages(guest.messages, 2);
+
+    // Guest disconnects
+    const guestClosed = new Promise<void>((resolve) => {
+      guest.ws.on("close", () => resolve());
+    });
+    guest.ws.close();
+    await guestClosed;
+    await delay(100);
+
+    // Guest reconnects — should auto-approve with persisted read-only permission
+    host.messages.length = 0;
+    const guest2 = await connectControl(room.id, room.token);
+    await delay(50);
+    sendJSON(guest2.ws, {
+      type: "join-request",
+      userId: "guest-1",
+      displayName: "Guest",
+    });
+
+    await waitForMessages(guest2.messages, 1);
+    const rejoinApproval = JSON.parse(guest2.messages[0]);
+    expect(rejoinApproval.type).toBe("join-response");
+    expect(rejoinApproval.approved).toBe(true);
+
+    // Guest sends a file-op — should be BLOCKED because permission is read-only
+    host.messages.length = 0;
+    sendJSON(guest2.ws, {
+      type: "file-op",
+      op: { type: "create", path: "blocked.md", content: "should not arrive" },
+    });
+
+    await delay(300);
+    const fileOpMsg = host.messages.find((m) => {
+      const parsed = JSON.parse(m);
+      return parsed.type === "file-op";
+    });
+    expect(fileOpMsg).toBeUndefined();
+  });
 });
