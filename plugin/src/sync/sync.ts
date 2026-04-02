@@ -66,7 +66,6 @@ export class SyncManager {
   }
 
   connect(): void {
-    this.isConnected = true;
     this.shouldConnect = true;
     this.reconnectAttempts = 0;
     this.openWebSocket();
@@ -94,7 +93,7 @@ export class SyncManager {
   }
 
   getDoc(rawPath: string): DocHandle | null {
-    if (!this.isConnected || !this.settings.roomId) return null;
+    if ((!this.isConnected && !this.shouldConnect) || !this.settings.roomId) return null;
 
     const filePath = normalizePath(rawPath);
 
@@ -138,7 +137,9 @@ export class SyncManager {
     awareness.on("update", awarenessHandler);
     this.awarenessHandlers.set(filePath, awarenessHandler);
 
-    this.sendSubscribe(filePath);
+    if (this.isConnected) {
+      this.sendSubscribe(filePath);
+    }
 
     const text = doc.getText("content");
     return { doc, text, awareness };
@@ -221,6 +222,7 @@ export class SyncManager {
     this.ws = ws;
 
     ws.onopen = () => {
+      this.isConnected = true;
       this.reconnectAttempts = 0;
       for (const filePath of this.docs.keys()) {
         this.synced.set(filePath, false);
@@ -235,6 +237,7 @@ export class SyncManager {
 
     ws.onclose = () => {
       this.ws = null;
+      this.isConnected = false;
       for (const filePath of this.docs.keys()) {
         this.setSynced(filePath, false);
       }
