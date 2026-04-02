@@ -133,10 +133,7 @@ describe("BackgroundSync", () => {
     // Y.Text keeps remote content — host does NOT overwrite it
     expect(text.toString()).toBe("existing remote content");
     // Instead the remote content is written to disk
-    expect(vault.adapter.write).toHaveBeenCalledWith(
-      "test.md",
-      "existing remote content",
-    );
+    expect(vault.adapter.write).toHaveBeenCalledWith("test.md", "existing remote content");
   });
 
   it("guest writes remote Y.Text to vault if different from local", async () => {

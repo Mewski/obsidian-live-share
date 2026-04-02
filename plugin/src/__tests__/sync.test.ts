@@ -33,7 +33,9 @@ class MockWebSocket {
       throw new Error("WebSocket is not open");
     }
     if (data instanceof Uint8Array) {
-      this.sent.push(data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength));
+      this.sent.push(
+        (data.buffer as ArrayBuffer).slice(data.byteOffset, data.byteOffset + data.byteLength),
+      );
     } else {
       this.sent.push(data);
     }
