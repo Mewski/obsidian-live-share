@@ -1205,6 +1205,76 @@ describe("Control WebSocket handler", () => {
     expect(hostJoinReq).toBeUndefined();
   });
 
+  it("preserves permissions across reconnect — approved guest auto-approved on rejoin", async () => {
+    const room = await createRoom("ctrl-reconnect-perm");
+
+    const { getRoom } = await import("../rooms.js");
+    const serverRoom = getRoom(room.id);
+    expect(serverRoom).toBeDefined();
+    serverRoom!.requireApproval = true;
+
+    const host = await connectControl(room.id, room.token);
+    await delay(50);
+    sendJSON(host.ws, {
+      type: "join-request",
+      userId: "host-1",
+      displayName: "Host",
+    });
+    await delay(100);
+
+    // Guest joins and gets approved
+    const guest = await connectControl(room.id, room.token);
+    await delay(50);
+    sendJSON(guest.ws, {
+      type: "join-request",
+      userId: "guest-1",
+      displayName: "Guest",
+    });
+
+    await waitForMessages(host.messages, 1);
+    host.messages.length = 0;
+
+    sendJSON(host.ws, {
+      type: "join-response",
+      userId: "guest-1",
+      approved: true,
+      permission: "read-write",
+    });
+
+    await waitForMessages(guest.messages, 1);
+    const approval = JSON.parse(guest.messages[0]);
+    expect(approval.type).toBe("join-response");
+    expect(approval.approved).toBe(true);
+
+    // Guest disconnects
+    const guestClosed = new Promise<void>((resolve) => {
+      guest.ws.on("close", () => resolve());
+    });
+    guest.ws.close();
+    await guestClosed;
+    await delay(100);
+
+    // Guest reconnects — should auto-approve due to preserved permission
+    host.messages.length = 0;
+    const guest2 = await connectControl(room.id, room.token);
+    await delay(50);
+    sendJSON(guest2.ws, {
+      type: "join-request",
+      userId: "guest-1",
+      displayName: "Guest",
+    });
+
+    await waitForMessages(guest2.messages, 1);
+    const rejoinApproval = JSON.parse(guest2.messages[0]);
+    expect(rejoinApproval.type).toBe("join-response");
+    expect(rejoinApproval.approved).toBe(true);
+
+    // Host should NOT have received a join-request (auto-approved)
+    await delay(200);
+    const hostJoinReq = host.messages.find((m) => JSON.parse(m).type === "join-request");
+    expect(hostJoinReq).toBeUndefined();
+  });
+
   it("isApproved defaults false in requireApproval rooms — no file-ops without join-request", async () => {
     const room = await createRoom("ctrl-default-unapproved");
 

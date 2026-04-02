@@ -357,6 +357,7 @@ export function createControlWSS(options?: ControlWSSOptions) {
         const targetUserId = msg.userId;
         if (typeof targetUserId !== "string" || !targetUserId) return;
         room.kickedUserIds.add(targetUserId);
+        clearPermission(roomId, targetUserId);
         for (const [clientWs, targetClient] of room.clients) {
           if (targetClient.userId === targetUserId) {
             void appendLog(roomId, {
@@ -522,7 +523,6 @@ export function createControlWSS(options?: ControlWSSOptions) {
       if (closingClient) {
         room.pendingApprovals.delete(closingClient.userId);
         if (closingClient.userId) {
-          clearPermission(roomId, closingClient.userId);
           void appendLog(roomId, {
             timestamp: Date.now(),
             event: "leave",
