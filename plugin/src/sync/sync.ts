@@ -353,7 +353,11 @@ export class SyncManager {
   }
 
   private async handleSyncEncrypted(docId: string, payload: Uint8Array): Promise<void> {
-    if (!this.e2e?.enabled || payload.length <= 1) {
+    if (!this.e2e?.enabled) {
+      // Received encrypted data but we don't have E2E — drop to prevent corruption
+      return;
+    }
+    if (payload.length <= 1) {
       this.handleSync(docId, payload);
       return;
     }
@@ -371,7 +375,7 @@ export class SyncManager {
 
   private async handleAwarenessEncrypted(docId: string, payload: Uint8Array): Promise<void> {
     if (!this.e2e?.enabled) {
-      this.handleAwareness(docId, payload);
+      // Received encrypted awareness but we don't have E2E — drop
       return;
     }
     try {

@@ -1,5 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { MUX_SUBSCRIBE, decodeMuxMessage } from "../sync/mux-protocol";
+import {
+  MUX_SUBSCRIBE,
+  MUX_SYNC_ENCRYPTED,
+  decodeMuxMessage,
+  encodeMuxMessage,
+} from "../sync/mux-protocol";
 import { SyncManager } from "../sync/sync";
 import type { LiveShareSettings } from "../types";
 
@@ -241,5 +246,30 @@ describe("SyncManager", () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  it("drops MUX_SYNC_ENCRYPTED when E2E is disabled instead of corrupting doc", () => {
+    const sm = new SyncManager(makeSettings());
+    sm.connect();
+
+    const handle = sm.getDoc("notes/test.md")!;
+    handle.doc.transact(() => {
+      handle.text.insert(0, "clean");
+    });
+
+    const ws = mockWsInstances[0];
+    ws.simulateOpen();
+
+    // Simulate receiving an encrypted sync message while E2E is not enabled
+    const fakeEncryptedPayload = new Uint8Array([0, 99, 99, 99, 99]);
+    const muxMsg = encodeMuxMessage("notes/test.md", MUX_SYNC_ENCRYPTED, fakeEncryptedPayload);
+    ws.onmessage?.({
+      data: muxMsg.buffer.slice(muxMsg.byteOffset, muxMsg.byteOffset + muxMsg.byteLength),
+    });
+
+    // The doc should remain uncorrupted
+    expect(handle.text.toString()).toBe("clean");
+
+    sm.destroy();
   });
 });
