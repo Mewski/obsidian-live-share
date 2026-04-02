@@ -250,7 +250,7 @@ export function registerControlHandlers(plugin: LiveSharePlugin): void {
     void plugin
       .saveSettings()
       .then(() => plugin.backgroundSync.startAll("host"))
-      .then(() => plugin.manifestManager.publishManifest({ purge: false }))
+      .then(() => plugin.manifestManager.publishManifest({ purge: true }))
       .then(() => {
         plugin.presenceManager?.broadcastPresence();
         plugin.updateStatusBar();
