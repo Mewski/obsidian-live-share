@@ -371,6 +371,11 @@ export default class LiveSharePlugin extends Plugin {
   }
 
   cleanupSession() {
+    const activeView = this.app.workspace.getActiveViewOfType(MarkdownView);
+    if (activeView) {
+      const cmView = getCmView(activeView);
+      if (cmView) this.collabManager.deactivateAll(cmView);
+    }
     this.explorerIndicators?.destroy();
     this.explorerIndicators = null;
     this.canvasSync?.destroy();
