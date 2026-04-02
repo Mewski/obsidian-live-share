@@ -111,16 +111,11 @@ export class ControlChannel {
       this.stopPing();
       this.ws = null;
       if (this.isDestroyed) return;
-      if (!this.everConnected && this.reconnectAttempts === 0) {
-        this.shouldConnect = false;
-        this.stateChangeCallback?.("auth-required");
-        return;
-      }
       if (this.shouldConnect) {
         this.stateChangeCallback?.("reconnecting");
         this.scheduleReconnect();
       } else {
-        this.stateChangeCallback?.("disconnected");
+        this.stateChangeCallback?.(this.everConnected ? "disconnected" : "auth-required");
       }
     };
 
@@ -130,7 +125,7 @@ export class ControlChannel {
   private scheduleReconnect(): void {
     if (this.reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
       this.shouldConnect = false;
-      this.stateChangeCallback?.("disconnected");
+      this.stateChangeCallback?.(this.everConnected ? "disconnected" : "auth-required");
       return;
     }
     const delay = Math.min(RECONNECT_BASE_MS * 2 ** this.reconnectAttempts, RECONNECT_MAX_MS);

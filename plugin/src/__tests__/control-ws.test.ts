@@ -512,6 +512,20 @@ describe("ControlChannel", () => {
       expect(stateCallback).toHaveBeenCalledTimes(1);
     });
 
+    it("retries on first connection failure instead of auth-required", () => {
+      channel = new CC(createSettings());
+      const states: string[] = [];
+      channel.onStateChange((s) => states.push(s));
+      channel.connect();
+
+      const ws = (channel as any).ws as MockWebSocket;
+      ws.readyState = MockWebSocket.CLOSED;
+      ws.onclose?.();
+
+      expect(states).not.toContain("auth-required");
+      expect(states).toContain("reconnecting");
+    });
+
     it("drops messages when WebSocket is not open", () => {
       channel = new CC(createSettings());
       const ws = connectAndGetWs(channel);
