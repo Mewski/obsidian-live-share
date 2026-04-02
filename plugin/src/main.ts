@@ -65,6 +65,7 @@ export default class LiveSharePlugin extends Plugin {
   statusBarEl!: HTMLElement;
   private isEndingSession = false;
   private currentScrollListener: (() => void) | null = null;
+  private manifestHandlerQueue: Promise<void> = Promise.resolve();
 
   private requestBinaryFile = (path: string) => {
     this.controlChannel?.send({ type: "sync-request", path });
@@ -75,7 +76,7 @@ export default class LiveSharePlugin extends Plugin {
 
   private registerManifestChangeHandler() {
     this.manifestManager.setManifestChangeHandler((added, removed) => {
-      void (async () => {
+      this.manifestHandlerQueue = this.manifestHandlerQueue.then(async () => {
         const renamedOldPaths = new Set<string>();
         const renamedNewPaths = new Set<string>();
         if (added.length > 0 && removed.length > 0) {
@@ -148,7 +149,9 @@ export default class LiveSharePlugin extends Plugin {
         }
         if (actuallyRemoved.length > 0)
           this.notify(`Live Share: removed ${actuallyRemoved.length} file(s)`);
-      })();
+      }).catch((err) => {
+        this.logger.error("manifest", "handler error", err);
+      });
     });
   }
 
