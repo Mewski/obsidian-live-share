@@ -399,6 +399,7 @@ export default class LiveSharePlugin extends Plugin {
     this.explorerIndicators = null;
     this.canvasSync?.destroy();
     this.canvasSync = null;
+    this.backgroundSync.setCollabBoundFile(null);
     this.backgroundSync.destroy();
     this.syncManager.disconnect();
     this.controlChannel?.destroy();
@@ -703,6 +704,7 @@ export default class LiveSharePlugin extends Plugin {
         ? toCanonicalPath(normalizePath(filePath))
         : null;
     this.backgroundSync.setActiveFile(sharedPath);
+    this.backgroundSync.setCollabBoundFile(null);
     let effectivePermission = this.settings.permission;
     if (
       sharedPath &&
@@ -711,18 +713,22 @@ export default class LiveSharePlugin extends Plugin {
     ) {
       effectivePermission = "read-only";
     }
-    void this.collabManager.activateForFile(
-      cmView,
-      sharedPath,
-      this.syncManager,
-      this.settings.role,
-      effectivePermission,
-      {
-        name: this.settings.displayName,
-        color: this.settings.cursorColor,
-        colorLight: `${this.settings.cursorColor}33`,
-      },
-    );
+    void this.collabManager
+      .activateForFile(
+        cmView,
+        sharedPath,
+        this.syncManager,
+        this.settings.role,
+        effectivePermission,
+        {
+          name: this.settings.displayName,
+          color: this.settings.cursorColor,
+          colorLight: `${this.settings.cursorColor}33`,
+        },
+      )
+      .then(() => {
+        this.backgroundSync.setCollabBoundFile(sharedPath);
+      });
 
     this.removeScrollListener();
     const scrollDOM = cmView.scrollDOM;

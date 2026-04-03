@@ -25,6 +25,7 @@ export class BackgroundSync {
   private cancelledSubscribes = new Set<string>();
   private writeTimers = new Map<string, ReturnType<typeof setTimeout>>();
   private activeFile: string | null = null;
+  private collabBoundFile: string | null = null;
   private recentDiskWrites = new Set<string>();
   private lastWrittenContent = new Map<string, string>();
   private writeQueue: Promise<void> = Promise.resolve();
@@ -158,6 +159,10 @@ export class BackgroundSync {
     }
   }
 
+  setCollabBoundFile(path: string | null): void {
+    this.collabBoundFile = path;
+  }
+
   async onFileAdded(rawPath: string): Promise<void> {
     const path = toCanonicalPath(normalizePath(rawPath));
     if (!isTextFile(path)) return;
@@ -240,7 +245,7 @@ export class BackgroundSync {
   async handleLocalTextModify(rawPath: string): Promise<void> {
     const path = toCanonicalPath(normalizePath(rawPath));
     if (this.recentDiskWrites.has(path)) return;
-    if (path === this.activeFile) return;
+    if (path === this.collabBoundFile) return;
 
     const docHandle = this.syncManager.getDoc(path);
     if (!docHandle) return;
@@ -274,6 +279,7 @@ export class BackgroundSync {
     this.observers.clear();
     this.cancelledSubscribes.clear();
     this.activeFile = null;
+    this.collabBoundFile = null;
     this.recentDiskWrites.clear();
     this.lastWrittenContent.clear();
   }
@@ -281,7 +287,7 @@ export class BackgroundSync {
   private attachObserver(path: string, text: Y.Text): void {
     const observer = (_event: Y.YTextEvent, transaction: Y.Transaction) => {
       if (transaction.local) return;
-      if (path === this.activeFile) return;
+      if (path === this.collabBoundFile) return;
       this.scheduleDiskWrite(path, text);
     };
     text.observe(observer);

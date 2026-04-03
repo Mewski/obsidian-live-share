@@ -189,6 +189,7 @@ describe("BackgroundSync", () => {
     await vi.advanceTimersByTimeAsync(2100);
     await startPromise;
     bg.setActiveFile("test.md");
+    bg.setCollabBoundFile("test.md");
     vault.modify.mockClear();
 
     const { doc } = syncManager.getDoc("test.md");
@@ -258,6 +259,7 @@ describe("BackgroundSync", () => {
 
     await bg.startAll("host");
     bg.setActiveFile("note.md");
+    bg.setCollabBoundFile("note.md");
 
     vault.read.mockResolvedValue("edited");
     await bg.handleLocalTextModify("note.md");
