@@ -83,6 +83,8 @@ export function registerControlHandlers(plugin: LiveSharePlugin): void {
             await plugin.backgroundSync.onFileRenamed(renameOp.oldPath, renameOp.newPath);
           }
           plugin.manifestManager.renameFile(renameOp.oldPath, renameOp.newPath, plugin.syncManager);
+        } else if (op.type === "folder-create" && "path" in op) {
+          plugin.manifestManager.addFolder(op.path);
         }
       })
       .catch((err) => {
