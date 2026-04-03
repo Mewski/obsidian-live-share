@@ -1486,4 +1486,92 @@ describe("Control WebSocket handler", () => {
     });
     expect(fileOpMsg).toBeUndefined();
   });
+
+  it("join-response includes isHost: true for host and isHost: false for guest", async () => {
+    const room = await createRoom("ctrl-ishost-flag");
+
+    const host = await connectControl(room.id, room.token);
+    const guest = await connectControl(room.id, room.token);
+
+    await delay(100);
+
+    sendJSON(host.ws, {
+      type: "join-request",
+      userId: "host-1",
+      displayName: "Host",
+    });
+
+    await waitForMessages(host.messages, 1);
+    const hostResponse = JSON.parse(host.messages[0]);
+    expect(hostResponse.type).toBe("join-response");
+    expect(hostResponse.approved).toBe(true);
+    expect(hostResponse.isHost).toBe(true);
+
+    sendJSON(guest.ws, {
+      type: "join-request",
+      userId: "guest-1",
+      displayName: "Guest",
+    });
+
+    await waitForMessages(guest.messages, 1);
+    const guestResponse = JSON.parse(guest.messages[0]);
+    expect(guestResponse.type).toBe("join-response");
+    expect(guestResponse.approved).toBe(true);
+    expect(guestResponse.isHost).toBe(false);
+  });
+
+  it("reconnecting host gets isHost: false when another host was auto-elected", async () => {
+    const room = await createRoom("ctrl-ishost-reconnect");
+
+    const host = await connectControl(room.id, room.token);
+    const guest = await connectControl(room.id, room.token);
+
+    await delay(100);
+
+    sendJSON(host.ws, {
+      type: "join-request",
+      userId: "host-1",
+      displayName: "Host",
+    });
+
+    sendJSON(guest.ws, {
+      type: "join-request",
+      userId: "guest-1",
+      displayName: "Guest",
+    });
+
+    await delay(100);
+
+    // Host disconnects — guest should be auto-elected
+    const hostClosed = new Promise<void>((resolve) => {
+      host.ws.on("close", () => resolve());
+    });
+    host.ws.close();
+    await hostClosed;
+
+    await waitForMessages(guest.messages, 2);
+    const transferMsg = guest.messages.find((m) => {
+      const parsed = JSON.parse(m);
+      return parsed.type === "host-transfer-complete";
+    });
+    expect(transferMsg).toBeDefined();
+
+    // Original host reconnects
+    guest.messages.length = 0;
+    const reconnected = await connectControl(room.id, room.token);
+
+    await delay(100);
+
+    sendJSON(reconnected.ws, {
+      type: "join-request",
+      userId: "host-1",
+      displayName: "Host",
+    });
+
+    await waitForMessages(reconnected.messages, 1);
+    const reconnectResponse = JSON.parse(reconnected.messages[0]);
+    expect(reconnectResponse.type).toBe("join-response");
+    expect(reconnectResponse.approved).toBe(true);
+    expect(reconnectResponse.isHost).toBe(false);
+  });
 });

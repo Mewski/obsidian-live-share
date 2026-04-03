@@ -188,6 +188,7 @@ export interface JoinResponseMessage {
   approved: boolean;
   permission?: Permission;
   readOnlyPatterns?: string[];
+  isHost?: boolean;
 }
 
 export interface KickMessage {

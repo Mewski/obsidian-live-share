@@ -139,6 +139,10 @@ export function registerControlHandlers(plugin: LiveSharePlugin): void {
   });
 
   channel.on("join-response", (msg) => {
+    if (msg.isHost === false && plugin.settings.role === "host") {
+      void plugin.demoteToGuest();
+      return;
+    }
     if (plugin.settings.role !== "guest") return;
     if (msg.approved === false) {
       new Notice("Live Share: join request denied by host");

@@ -249,6 +249,7 @@ export function createControlWSS(options?: ControlWSSOptions) {
               approved: true,
               permission: client.permission,
               readOnlyPatterns: serverRoom?.readOnlyPatterns,
+              isHost: client.isHost,
             });
           } else {
             const existingPermission = client.userId
@@ -268,6 +269,7 @@ export function createControlWSS(options?: ControlWSSOptions) {
                 approved: true,
                 permission: client.permission,
                 readOnlyPatterns: serverRoom?.readOnlyPatterns,
+                isHost: client.isHost,
               });
             } else {
               client.isApproved = false;
@@ -288,7 +290,7 @@ export function createControlWSS(options?: ControlWSSOptions) {
         } else if (room.kickedUserIds.has(client.userId)) {
           const host = getHostClient(room);
           if (!host) {
-            sendTo(ws, { type: "join-response", approved: false });
+            sendTo(ws, { type: "join-response", approved: false, isHost: false });
             return;
           }
           room.kickedUserIds.delete(client.userId);
@@ -315,6 +317,7 @@ export function createControlWSS(options?: ControlWSSOptions) {
             approved: true,
             permission: client.permission,
             readOnlyPatterns: serverRoom?.readOnlyPatterns,
+            isHost: client.isHost,
           });
         }
         return;
@@ -347,6 +350,7 @@ export function createControlWSS(options?: ControlWSSOptions) {
               approved: targetClient.isApproved,
               permission: targetClient.permission,
               readOnlyPatterns: targetClient.isApproved ? serverRoom?.readOnlyPatterns : undefined,
+              isHost: targetClient.isHost,
             });
           }
         }
@@ -539,7 +543,7 @@ export function createControlWSS(options?: ControlWSSOptions) {
       room.clients.delete(ws);
       if (wasHost && room.clients.size > 0) {
         for (const [, pendingWs] of room.pendingApprovals) {
-          sendTo(pendingWs, { type: "join-response", approved: false });
+          sendTo(pendingWs, { type: "join-response", approved: false, isHost: false });
         }
         room.pendingApprovals.clear();
 
