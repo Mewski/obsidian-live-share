@@ -66,11 +66,11 @@ export default class LiveSharePlugin extends Plugin {
   private isEndingSession = false;
   private isStartingSession = false;
   private currentScrollListener: (() => void) | null = null;
-  private muxConnected = false;
-  private controlConnected = false;
+  muxConnected = false;
+  controlConnected = false;
   private manifestHandlerQueue: Promise<void> = Promise.resolve();
 
-  private updateOnlineState() {
+  updateOnlineState() {
     const bothUp = this.muxConnected && this.controlConnected;
     this.fileOpsManager.setOnline(bothUp);
   }
@@ -583,7 +583,6 @@ export default class LiveSharePlugin extends Plugin {
     this.controlChannel.onStateChange((controlState) => {
       this.logger.log("connection", `control channel ${controlState}`);
       if (controlState === "connected") {
-        this.controlConnected = true;
         this.connectionState.transition({ type: "connected" });
         // Both host and guest must send join-request so the server knows identities
         this.controlChannel?.send({
@@ -592,7 +591,10 @@ export default class LiveSharePlugin extends Plugin {
           displayName: this.settings.displayName,
           avatarUrl: this.settings.avatarUrl,
         });
-        this.updateOnlineState();
+        if (this.settings.role === "host") {
+          this.controlConnected = true;
+          this.updateOnlineState();
+        }
         this.presenceManager?.broadcastPresence();
         if (this.backgroundSync.isRunning()) {
           this.onActiveFileChange();

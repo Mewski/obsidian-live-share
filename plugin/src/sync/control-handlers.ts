@@ -160,7 +160,8 @@ export function registerControlHandlers(plugin: LiveSharePlugin): void {
         .filter((p) => msg.readOnlyPatterns?.some((pat) => minimatch(p, pat)));
       plugin.explorerIndicators?.update(readOnlyPaths);
     }
-    plugin.fileOpsManager.setOnline(true);
+    plugin.controlConnected = true;
+    plugin.updateOnlineState();
     plugin.presenceManager?.broadcastPresence();
   });
 
