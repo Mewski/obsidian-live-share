@@ -1,6 +1,6 @@
 {
   "name": "live-share",
-  "version": "0.5.2-beta.2",
+  "version": "0.5.2-beta.3",
   "private": true,
   "main": "main.js",
   "scripts": {
