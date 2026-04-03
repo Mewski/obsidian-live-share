@@ -8,9 +8,9 @@ Obsidian Live Share has two parts: a **relay server** and an **Obsidian plugin**
 
 Each session uses two WebSocket channels:
 
-1. **Yjs sync** (`/ws-mux/:roomId`) — Multiplexed binary channel for Yjs CRDT updates and cursor awareness. One Y.Doc per file, keyed as `roomId:filePath`. The manifest doc is at `roomId:__manifest__`. The server is a stateless relay. Read-only enforcement peeks at sync message types server-side.
+1. **Yjs sync** (`/ws-mux/:roomId`) - Multiplexed binary channel for Yjs CRDT updates and cursor awareness. One Y.Doc per file, keyed as `roomId:filePath`. The manifest doc is at `roomId:__manifest__`. The server is a stateless relay. Read-only enforcement peeks at sync message types server-side.
 
-2. **Control** (`/control/:roomId`) — JSON messages for file operations, presence, permissions, follow/summon, guest approval, kick, ping/pong, and session lifecycle.
+2. **Control** (`/control/:roomId`) - JSON messages for file operations, presence, permissions, follow/summon, guest approval, kick, ping/pong, and session lifecycle.
 
 ## Data Flow
 

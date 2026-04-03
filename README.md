@@ -44,19 +44,19 @@ Open **Settings > Live Share** and set your **Server URL**, **Display name**, an
 
 ## Features
 
-- **Real-time editing** — Yjs CRDT-powered character-level sync with live cursors and selections
-- **File sync** — Creates, deletes, renames, and binary files sync automatically
-- **End-to-end encryption** — AES-256-GCM with PBKDF2 key derivation; passphrase never leaves the invite link
-- **Presence panel** — See who's connected, what file they're viewing, follow/summon/kick users
-- **Permissions** — Host can set guests to read-write or read-only (enforced server-side), with per-file overrides
-- **Guest approval** — Optionally require host approval before guests can join
-- **Kick protection** — Kicked users must be re-approved by the host to rejoin, even when approval is not required
-- **Host transfer** — Hand off the host role to another participant
-- **Presentation mode** — Auto-broadcast your navigation to all participants
-- **Canvas collaboration** — Real-time sync of `.canvas` files
-- **Cross-platform support** — Windows filename character mapping for seamless sync between platforms
-- **Offline queue** — File operations are buffered when disconnected and replayed on reconnect
-- **Auto-reconnect** — Optionally rejoin the previous session on startup
+- **Real-time editing** - Yjs CRDT-powered character-level sync with live cursors and selections
+- **File sync** - Creates, deletes, renames, and binary files sync automatically
+- **End-to-end encryption** - AES-256-GCM with PBKDF2 key derivation; passphrase never leaves the invite link
+- **Presence panel** - See who's connected, what file they're viewing, follow/summon/kick users
+- **Permissions** - Host can set guests to read-write or read-only (enforced server-side), with per-file overrides
+- **Guest approval** - Optionally require host approval before guests can join
+- **Kick protection** - Kicked users must be re-approved by the host to rejoin, even when approval is not required
+- **Host transfer** - Hand off the host role to another participant
+- **Presentation mode** - Auto-broadcast your navigation to all participants
+- **Canvas collaboration** - Real-time sync of `.canvas` files
+- **Cross-platform support** - Windows filename character mapping for seamless sync between platforms
+- **Offline queue** - File operations are buffered when disconnected and replayed on reconnect
+- **Auto-reconnect** - Optionally rejoin the previous session on startup
 
 ## Commands
 
@@ -84,28 +84,28 @@ Open **Settings > Live Share** and set your **Server URL**, **Display name**, an
 | Setting | Default | Description |
 |---------|---------|-------------|
 | Server URL | `http://localhost:3000` | Your Live Share server address |
-| Server password | — | Optional server password |
+| Server password | - | Optional server password |
 | Display name | `Anonymous` | Your name shown to collaborators |
 | Cursor color | `#7c3aed` | Your cursor color in the editor |
-| Shared folder | — | Subfolder to share (empty = whole vault) |
+| Shared folder | - | Subfolder to share (empty = whole vault) |
 | Require approval | `false` | Require host approval for guests |
 | Approval timeout | `60` | Auto-deny join requests after N seconds (0 = disabled) |
 | Notifications | `true` | Toggle non-critical status notices |
 | Auto-reconnect | `true` | Rejoin previous session on startup |
 | Debug logging | `false` | Write debug logs to a vault file |
-| Excluded patterns | — | Glob patterns for files to exclude from sync |
+| Excluded patterns | - | Glob patterns for files to exclude from sync |
 
 ## Server Configuration
 
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `PORT` | `3000` | Server port |
-| `SERVER_PASSWORD` | — | Restrict access to authorized clients |
-| `TLS_CERT` / `TLS_KEY` | — | Enable HTTPS/WSS |
+| `SERVER_PASSWORD` | - | Restrict access to authorized clients |
+| `TLS_CERT` / `TLS_KEY` | - | Enable HTTPS/WSS |
 | `REQUIRE_GITHUB_AUTH` | `false` | Require GitHub OAuth |
-| `GITHUB_CLIENT_ID` | — | GitHub OAuth client ID |
-| `GITHUB_CLIENT_SECRET` | — | GitHub OAuth client secret |
-| `JWT_SECRET` | — | JWT signing secret (required with auth) |
+| `GITHUB_CLIENT_ID` | - | GitHub OAuth client ID |
+| `GITHUB_CLIENT_SECRET` | - | GitHub OAuth client secret |
+| `JWT_SECRET` | - | JWT signing secret (required with auth) |
 | `CORS_ORIGIN` | `*` | Allowed CORS origins |
 
 ## File Exclusion
@@ -120,8 +120,8 @@ Example patterns: `drafts/**`, `*.tmp`, `private/**`.
 
 The system uses a stateless relay server and two WebSocket channels:
 
-- **Yjs sync** (`/ws-mux/:roomId`) — Multiplexed binary channel for Yjs CRDT updates and cursor awareness per file
-- **Control** (`/control/:roomId`) — JSON messages for file operations, presence, permissions, and session lifecycle
+- **Yjs sync** (`/ws-mux/:roomId`) - Multiplexed binary channel for Yjs CRDT updates and cursor awareness per file
+- **Control** (`/control/:roomId`) - JSON messages for file operations, presence, permissions, and session lifecycle
 
 The host's vault is the source of truth. Text files sync character-by-character via Yjs. Binary files transfer as base64 with automatic chunking (up to 50 MB).
 

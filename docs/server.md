@@ -35,13 +35,13 @@ npm run format       # Auto-fix formatting
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `PORT` | `3000` | Server port (validated: 1-65535) |
-| `SERVER_PASSWORD` | — | Require this password for all REST and WebSocket connections |
-| `TLS_CERT` | — | Path to TLS certificate (enables HTTPS/WSS) |
-| `TLS_KEY` | — | Path to TLS private key |
+| `SERVER_PASSWORD` | - | Require this password for all REST and WebSocket connections |
+| `TLS_CERT` | - | Path to TLS certificate (enables HTTPS/WSS) |
+| `TLS_KEY` | - | Path to TLS private key |
 | `REQUIRE_GITHUB_AUTH` | `false` | Require GitHub OAuth for all connections |
-| `GITHUB_CLIENT_ID` | — | GitHub OAuth app client ID |
-| `GITHUB_CLIENT_SECRET` | — | GitHub OAuth app client secret |
-| `JWT_SECRET` | — | Secret for signing JWTs (required when `REQUIRE_GITHUB_AUTH=true`) |
+| `GITHUB_CLIENT_ID` | - | GitHub OAuth app client ID |
+| `GITHUB_CLIENT_SECRET` | - | GitHub OAuth app client secret |
+| `JWT_SECRET` | - | Secret for signing JWTs (required when `REQUIRE_GITHUB_AUTH=true`) |
 | `CORS_ORIGIN` | `*` | Allowed CORS origin(s) |
 
 ## TLS
@@ -91,7 +91,7 @@ Both require `?token=<room_token>` query parameter. When `SERVER_PASSWORD` is se
 
 ## Persistence
 
-Room metadata is persisted to LevelDB at `./data/yjs-docs`. The server does not persist document state — it operates as a stateless relay. The host's local vault is the single source of truth.
+Room metadata is persisted to LevelDB at `./data/yjs-docs`. The server does not persist document state - it operates as a stateless relay. The host's local vault is the single source of truth.
 
 Rooms expire after 24 hours of inactivity. An hourly reaper deletes stale rooms from both memory and disk. Room activity timestamps are debounced (5-second window) to reduce disk writes.
 
@@ -104,7 +104,7 @@ In-memory cleanup timers reclaim control channel rooms 35 seconds after the last
 
 ## Kick Protection
 
-When a host kicks a user, the server records their user ID. If the kicked user attempts to rejoin, they are forced through the host approval flow regardless of the room's `requireApproval` setting. This is a one-time gate — once the host re-approves the user, they can rejoin freely if kicked again (until kicked again). If no host is connected when a kicked user tries to rejoin, the join is rejected.
+When a host kicks a user, the server records their user ID. If the kicked user attempts to rejoin, they are forced through the host approval flow regardless of the room's `requireApproval` setting. This is a one-time gate - once the host re-approves the user, they can rejoin freely if kicked again (until kicked again). If no host is connected when a kicked user tries to rejoin, the join is rejected.
 
 ## Graceful Shutdown
 

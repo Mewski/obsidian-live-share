@@ -31,7 +31,7 @@ Open **Settings > Live Share**:
 | Setting | Default | Description |
 |---------|---------|-------------|
 | Server URL | `http://localhost:3000` | URL of your Live Share server |
-| Server password | — | Optional password if the server requires one |
+| Server password | - | Optional password if the server requires one |
 
 ### Identity
 
@@ -44,7 +44,7 @@ Open **Settings > Live Share**:
 
 | Setting | Default | Description |
 |---------|---------|-------------|
-| Shared folder | — | Restrict sharing to a subfolder (empty = whole vault) |
+| Shared folder | - | Restrict sharing to a subfolder (empty = whole vault) |
 | Require approval | `false` | Require host approval before guests can join |
 | Approval timeout | `60` seconds | Auto-deny pending join requests after this duration (0 = no timeout) |
 
@@ -125,7 +125,7 @@ The host can set per-file overrides via the **Set file permissions** command. Pe
 
 ### Kick Protection
 
-When the host kicks a user, that user must be re-approved by the host to rejoin the session. This applies even when **Require approval** is disabled — the server forces a one-time approval gate for kicked users.
+When the host kicks a user, that user must be re-approved by the host to rejoin the session. This applies even when **Require approval** is disabled - the server forces a one-time approval gate for kicked users.
 
 ## Host Transfer
 
@@ -153,7 +153,7 @@ When the host enables presentation mode via **Toggle presentation mode**, every 
 
 ## Cross-Platform Support
 
-Live Share supports collaboration between Windows and macOS/Linux vaults. Windows-forbidden filename characters (`? * < > " | :`) are transparently mapped to fullwidth Unicode equivalents on Windows systems. This mapping is automatic — no configuration needed.
+Live Share supports collaboration between Windows and macOS/Linux vaults. Windows-forbidden filename characters (`? * < > " | :`) are transparently mapped to fullwidth Unicode equivalents on Windows systems. This mapping is automatic - no configuration needed.
 
 ## Invite Link Format
 
@@ -161,4 +161,4 @@ Invite links use the format `obsliveshare:<base64>` containing the server URL, r
 
 You can also join via Obsidian protocol link: `obsidian://live-share?invite=obsliveshare%3A...`
 
-Share invite links through a secure channel — anyone with the link can join the session.
+Share invite links through a secure channel - anyone with the link can join the session.
