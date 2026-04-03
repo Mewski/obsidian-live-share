@@ -141,10 +141,14 @@ export class ManifestManager {
 
       const diskPath = toLocalPath(path);
       if (entry.directory) {
-        const existing = this.vault.getAbstractFileByPath(diskPath);
-        if (!existing) {
-          await ensureFolder(this.vault, diskPath);
-          synced++;
+        // Only create directories during initial sync, not during live changes
+        // (live folder creation is handled by ensureFolder when files are synced)
+        if (!options?.skipText) {
+          const existing = this.vault.getAbstractFileByPath(diskPath);
+          if (!existing) {
+            await ensureFolder(this.vault, diskPath);
+            synced++;
+          }
         }
         continue;
       }
@@ -236,6 +240,14 @@ export class ManifestManager {
   async updateFile(file: TFile, content: string | ArrayBuffer): Promise<void> {
     if (!this.manifest || !this.isSharedPath(file.path)) return;
     const canonical = toCanonicalPath(normalizePath(file.path));
+    // Remove parent folder entry if it exists — folder is no longer empty
+    const parentDir = canonical.substring(0, canonical.lastIndexOf("/"));
+    if (parentDir && this.manifest.has(parentDir)) {
+      const parentEntry = this.manifest.get(parentDir);
+      if (parentEntry?.directory) {
+        this.manifest.delete(parentDir);
+      }
+    }
     if (content instanceof ArrayBuffer) {
       this.manifest.set(canonical, {
         hash: await hashBuffer(content),
