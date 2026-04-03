@@ -188,7 +188,7 @@ describe("Regression: manifest update events trigger binary re-sync", () => {
       updatedCalls.push(updated);
     });
 
-    // Host modifies the binary file — hash changes
+    // Host modifies the binary file - hash changes
     manifest.set("images/photo.png", {
       hash: "bbb",
       size: 200,
@@ -290,7 +290,7 @@ describe("Regression: guest subscribe waits for Y.Text content", () => {
     vault.getAbstractFileByPath.mockReturnValue(null);
     bg = new BackgroundSync(vault, syncManager, manifestManager, fileOpsManager);
 
-    // Y.Text starts empty — guest must wait
+    // Y.Text starts empty - guest must wait
     const { text } = syncManager.getDoc("note.md");
     expect(text.toString()).toBe("");
 
@@ -314,7 +314,7 @@ describe("Regression: guest subscribe waits for Y.Text content", () => {
     vault.getAbstractFileByPath.mockReturnValue(null);
     bg = new BackgroundSync(vault, syncManager, manifestManager, fileOpsManager);
 
-    // Y.Text stays empty — host created an empty file
+    // Y.Text stays empty - host created an empty file
     const startPromise = bg.startAll("guest");
 
     // Advance past the full 2s polling window (20 * 100ms)
@@ -372,14 +372,14 @@ describe("Regression: host subscribe respects existing Y.Text content", () => {
 
     await bg.startAll("host");
 
-    // Y.Text must NOT be overwritten — guest content stays
+    // Y.Text must NOT be overwritten - guest content stays
     expect(text.toString()).toBe("guest edit");
     // Disk is updated to match Y.Text
     expect(vault.adapter.write).toHaveBeenCalledWith("shared.md", "guest edit");
   });
 });
 
-describe("Regression: op-queue serialization — afterApply runs inside queue", () => {
+describe("Regression: op-queue serialization - afterApply runs inside queue", () => {
   it("afterApply callback completes before next op on same path starts", async () => {
     const vault = createVault();
     const fileManager = createMockFileManager(vault);
@@ -495,7 +495,7 @@ describe("Regression: collabBoundFile prevents backgroundSync skip", () => {
     vi.advanceTimersByTime(2000);
     await vi.advanceTimersByTimeAsync(0);
 
-    // yCollab handles it — backgroundSync must NOT write
+    // yCollab handles it - backgroundSync must NOT write
     expect(vault.adapter.write).not.toHaveBeenCalled();
     expect(vault.modify).not.toHaveBeenCalled();
   });
@@ -552,7 +552,7 @@ describe("Regression: FileOpsManager.setOnline channel coordination", () => {
     // Start online (default), go offline
     manager.setOnline(false);
 
-    // Queue an op while offline — onFileDelete dispatches through sendQueue
+    // Queue an op while offline - onFileDelete dispatches through sendQueue
     manager.onFileDelete({ path: "deleted.md" } as any);
     // Wait for the sendQueue promise to settle
     await new Promise((r) => setTimeout(r, 10));
@@ -562,7 +562,7 @@ describe("Regression: FileOpsManager.setOnline channel coordination", () => {
     manager.setOnline(false);
     expect(sentOps).toHaveLength(0);
 
-    // Both channels up — go online
+    // Both channels up - go online
     manager.setOnline(true);
 
     // Offline queue should have been drained
@@ -573,7 +573,7 @@ describe("Regression: FileOpsManager.setOnline channel coordination", () => {
     manager.setOnline(true);
     expect(sentOps).toHaveLength(1);
 
-    // Drop back offline then online — no extra ops
+    // Drop back offline then online - no extra ops
     manager.setOnline(false);
     manager.setOnline(true);
     expect(sentOps).toHaveLength(1);
@@ -599,7 +599,7 @@ describe("Regression: FileOpsManager.setOnline channel coordination", () => {
     // Nothing sent while offline
     expect(sentOps).toHaveLength(0);
 
-    // Come back online — both ops drained
+    // Come back online - both ops drained
     manager.setOnline(true);
     expect(sentOps).toHaveLength(2);
 

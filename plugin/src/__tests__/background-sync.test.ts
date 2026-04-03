@@ -130,7 +130,7 @@ describe("BackgroundSync", () => {
 
     await bg.startAll("host");
 
-    // Y.Text keeps remote content — host does NOT overwrite it
+    // Y.Text keeps remote content - host does NOT overwrite it
     expect(text.toString()).toBe("existing remote content");
     // Instead the remote content is written to disk
     expect(vault.adapter.write).toHaveBeenCalledWith("test.md", "existing remote content");

@@ -174,7 +174,7 @@ afterEach(async () => {
 });
 
 describe("Multi-client integration", () => {
-  // ─── Scenario 1: Host identity — host sends join-request first, then guest joins ───
+  // ─── Scenario 1: Host identity - host sends join-request first, then guest joins ───
   it("host sends join-request first, gets isHost: true; guest gets isHost: false", async () => {
     const room = await createRoom("int-host-first");
 
@@ -208,7 +208,7 @@ describe("Multi-client integration", () => {
     expect(guestResp.isHost).toBe(false);
   });
 
-  // ─── Scenario 2: Host identity — guest connects before host sends join-request ───
+  // ─── Scenario 2: Host identity - guest connects before host sends join-request ───
   it("first client to send join-request becomes host regardless of connect order", async () => {
     const room = await createRoom("int-guest-first");
 
@@ -218,7 +218,7 @@ describe("Multi-client integration", () => {
 
     await delay(100);
 
-    // earlyBird sends join-request first — becomes host
+    // earlyBird sends join-request first - becomes host
     sendJSON(earlyBird.ws, {
       type: "join-request",
       userId: "early-bird",
@@ -230,7 +230,7 @@ describe("Multi-client integration", () => {
     expect(earlyResp.type).toBe("join-response");
     expect(earlyResp.isHost).toBe(true);
 
-    // laterHost sends join-request second — should NOT be host
+    // laterHost sends join-request second - should NOT be host
     sendJSON(laterHost.ws, {
       type: "join-request",
       userId: "later-host",
@@ -307,7 +307,7 @@ describe("Multi-client integration", () => {
     expect(reconnResp.isHost).toBe(false);
   });
 
-  // ─── Scenario 4: requireApproval — guest must wait for host approval ───
+  // ─── Scenario 4: requireApproval - guest must wait for host approval ───
   it("requireApproval room: guest waits for host to approve join-request", async () => {
     const room = await createRoom("int-require-approval");
 
@@ -320,7 +320,7 @@ describe("Multi-client integration", () => {
     const host = await connectControl(room.id, room.token);
     await delay(50);
 
-    // Host sends join-request — auto-approved as host
+    // Host sends join-request - auto-approved as host
     sendJSON(host.ws, {
       type: "join-request",
       userId: "host-1",
@@ -372,7 +372,7 @@ describe("Multi-client integration", () => {
     expect(guestResp.isHost).toBe(false);
   });
 
-  // ─── Scenario 5: requireApproval — unapproved guest can't send file-ops ───
+  // ─── Scenario 5: requireApproval - unapproved guest can't send file-ops ───
   it("unapproved guest file-ops are dropped in requireApproval room", async () => {
     const room = await createRoom("int-unapproved-fileop");
 
@@ -505,7 +505,7 @@ describe("Multi-client integration", () => {
     const hostJoinReq = host.messages.find((m) => JSON.parse(m).type === "join-request");
     expect(hostJoinReq).toBeUndefined();
 
-    // Guest tries to send file-op — should be blocked
+    // Guest tries to send file-op - should be blocked
     host.messages.length = 0;
     sendJSON(guest2.ws, {
       type: "file-op",
@@ -517,7 +517,7 @@ describe("Multi-client integration", () => {
     expect(fileOpMsg).toBeUndefined();
   });
 
-  // ─── Scenario 7: File-op relay — guest creates file, host receives it ───
+  // ─── Scenario 7: File-op relay - guest creates file, host receives it ───
   it("guest file-op is relayed to host but not echoed back to guest", async () => {
     const room = await createRoom("int-file-relay");
 
@@ -610,7 +610,7 @@ describe("Multi-client integration", () => {
     expect(guest.messages.length).toBe(0);
   });
 
-  // ─── Scenario 9: Mux sync — both clients subscribe to same doc ───
+  // ─── Scenario 9: Mux sync - both clients subscribe to same doc ───
   it("mux sync message relayed to peer but not echoed to sender", async () => {
     const room = await createRoom("int-mux-sync");
     const docId = "test.md";

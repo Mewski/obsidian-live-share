@@ -926,7 +926,7 @@ export default class LiveSharePlugin extends Plugin {
   }
 
   async demoteToGuest() {
-    this.logger.log("session", "demoted from host — another host exists");
+    this.logger.log("session", "demoted from host - another host exists");
     this.settings.role = "guest";
     if (this.presenceManager?.getIsPresenting()) {
       this.presenceManager.togglePresent();
@@ -939,7 +939,7 @@ export default class LiveSharePlugin extends Plugin {
       this.unmutePathEvents,
       this.requestBinaryFile,
     );
-    this.notify("Live Share: reconnected as guest — another user is host");
+    this.notify("Live Share: reconnected as guest - another user is host");
     this.updateStatusBar();
     this.refreshPresenceView();
     this.onActiveFileChange();

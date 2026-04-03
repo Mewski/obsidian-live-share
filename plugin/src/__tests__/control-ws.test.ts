@@ -598,13 +598,13 @@ describe("ControlChannel", () => {
       const joinResponseHandler = vi.fn();
       channel.on("join-response", joinResponseHandler);
 
-      // 1. Connect — WS starts in CONNECTING state
+      // 1. Connect - WS starts in CONNECTING state
       channel.connect();
       const ws = (channel as any).ws as MockWebSocket;
       expect(ws.readyState).toBe(MockWebSocket.CONNECTING);
       expect(states).toEqual([]);
 
-      // 2. Simulate open — state transitions to connected
+      // 2. Simulate open - state transitions to connected
       ws.simulateOpen();
       expect(states).toEqual(["connected"]);
 

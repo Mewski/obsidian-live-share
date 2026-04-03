@@ -240,7 +240,7 @@ export class ManifestManager {
   async updateFile(file: TFile, content: string | ArrayBuffer): Promise<void> {
     if (!this.manifest || !this.isSharedPath(file.path)) return;
     const canonical = toCanonicalPath(normalizePath(file.path));
-    // Remove parent folder entry if it exists — folder is no longer empty
+    // Remove parent folder entry if it exists - folder is no longer empty
     const parentDir = canonical.substring(0, canonical.lastIndexOf("/"));
     if (parentDir && this.manifest.has(parentDir)) {
       const parentEntry = this.manifest.get(parentDir);

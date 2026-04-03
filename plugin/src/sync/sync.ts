@@ -361,7 +361,7 @@ export class SyncManager {
 
   private async handleSyncEncrypted(docId: string, payload: Uint8Array): Promise<void> {
     if (!this.e2e?.enabled) {
-      // Received encrypted data but we don't have E2E — drop to prevent corruption
+      // Received encrypted data but we don't have E2E - drop to prevent corruption
       return;
     }
     if (payload.length <= 1) {
@@ -376,20 +376,20 @@ export class SyncManager {
       result.set(decrypted, 1);
       this.handleSync(docId, result);
     } catch {
-      // Decryption failure — drop silently to preserve E2E guarantee
+      // Decryption failure - drop silently to preserve E2E guarantee
     }
   }
 
   private async handleAwarenessEncrypted(docId: string, payload: Uint8Array): Promise<void> {
     if (!this.e2e?.enabled) {
-      // Received encrypted awareness but we don't have E2E — drop
+      // Received encrypted awareness but we don't have E2E - drop
       return;
     }
     try {
       const decrypted = await this.e2e.decrypt(payload);
       this.handleAwareness(docId, decrypted);
     } catch {
-      // Decryption failure — drop silently to preserve E2E guarantee
+      // Decryption failure - drop silently to preserve E2E guarantee
     }
   }
 
@@ -438,7 +438,7 @@ export class SyncManager {
         this.ws.send(encodeMuxMessage(docId, MUX_SYNC_ENCRYPTED, result));
       }
     } catch {
-      // Do not fall back to unencrypted — drop the message to preserve E2E guarantee
+      // Do not fall back to unencrypted - drop the message to preserve E2E guarantee
     }
   }
 
@@ -450,7 +450,7 @@ export class SyncManager {
         this.ws.send(encodeMuxMessage(docId, MUX_AWARENESS_ENCRYPTED, encrypted));
       }
     } catch {
-      // Do not fall back to unencrypted — drop the message to preserve E2E guarantee
+      // Do not fall back to unencrypted - drop the message to preserve E2E guarantee
     }
   }
 

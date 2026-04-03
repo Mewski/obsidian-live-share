@@ -231,7 +231,7 @@ describe("SyncManager", () => {
         vi.runAllTimers();
       }
 
-      // Close the final WS — this triggers scheduleReconnect with attempts >= 15
+      // Close the final WS - this triggers scheduleReconnect with attempts >= 15
       const lastWs = mockWsInstances[mockWsInstances.length - 1];
       lastWs.close();
 

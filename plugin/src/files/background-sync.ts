@@ -92,11 +92,11 @@ export class BackgroundSync {
           if (this.cancelledSubscribes.has(path)) return;
           const remoteContent = docHandle.text.toString();
           if (remoteContent.length === 0) {
-            // No remote content yet — host seeds the Y.Text
+            // No remote content yet - host seeds the Y.Text
             applyMinimalYTextUpdate(docHandle.doc, docHandle.text, content);
             this.lastWrittenContent.set(path, content);
           } else if (remoteContent !== content) {
-            // Remote has content (from guests or prior sync) — write remote to disk instead
+            // Remote has content (from guests or prior sync) - write remote to disk instead
             await this.writeToDisk(path, remoteContent);
           } else {
             this.lastWrittenContent.set(path, content);

@@ -1193,7 +1193,7 @@ describe("Control WebSocket handler", () => {
     expect(hostJoinReq).toBeUndefined();
   });
 
-  it("preserves permissions across reconnect — approved guest auto-approved on rejoin", async () => {
+  it("preserves permissions across reconnect - approved guest auto-approved on rejoin", async () => {
     const room = await createRoom("ctrl-reconnect-perm");
 
     const { getRoom } = await import("../rooms.js");
@@ -1242,7 +1242,7 @@ describe("Control WebSocket handler", () => {
     await guestClosed;
     await delay(100);
 
-    // Guest reconnects — should auto-approve due to preserved permission
+    // Guest reconnects - should auto-approve due to preserved permission
     host.messages.length = 0;
     const guest2 = await connectControl(room.id, room.token);
     await delay(50);
@@ -1263,7 +1263,7 @@ describe("Control WebSocket handler", () => {
     expect(hostJoinReq).toBeUndefined();
   });
 
-  it("isApproved defaults false in requireApproval rooms — no file-ops without join-request", async () => {
+  it("isApproved defaults false in requireApproval rooms - no file-ops without join-request", async () => {
     const room = await createRoom("ctrl-default-unapproved");
 
     const { getRoom } = await import("../rooms.js");
@@ -1398,7 +1398,7 @@ describe("Control WebSocket handler", () => {
     expect(fileOp.type).toBe("file-op");
   });
 
-  it("read-only permission persists across reconnect — file-ops blocked after rejoin", async () => {
+  it("read-only permission persists across reconnect - file-ops blocked after rejoin", async () => {
     const room = await createRoom("ctrl-reconnect-ro");
 
     const { getRoom } = await import("../rooms.js");
@@ -1457,7 +1457,7 @@ describe("Control WebSocket handler", () => {
     await guestClosed;
     await delay(100);
 
-    // Guest reconnects — should auto-approve with persisted read-only permission
+    // Guest reconnects - should auto-approve with persisted read-only permission
     host.messages.length = 0;
     const guest2 = await connectControl(room.id, room.token);
     await delay(50);
@@ -1472,7 +1472,7 @@ describe("Control WebSocket handler", () => {
     expect(rejoinApproval.type).toBe("join-response");
     expect(rejoinApproval.approved).toBe(true);
 
-    // Guest sends a file-op — should be BLOCKED because permission is read-only
+    // Guest sends a file-op - should be BLOCKED because permission is read-only
     host.messages.length = 0;
     sendJSON(guest2.ws, {
       type: "file-op",
@@ -1542,7 +1542,7 @@ describe("Control WebSocket handler", () => {
 
     await delay(100);
 
-    // Host disconnects — guest should be auto-elected
+    // Host disconnects - guest should be auto-elected
     const hostClosed = new Promise<void>((resolve) => {
       host.ws.on("close", () => resolve());
     });
