@@ -101,7 +101,16 @@ export class BackgroundSync {
             this.lastWrittenContent.set(path, content);
           }
         }
-      } else if (this.role === "guest" && docHandle.text.length > 0) {
+      } else if (this.role === "guest") {
+        // Wait for host to seed Y.Text if it's empty
+        if (docHandle.text.length === 0) {
+          for (let i = 0; i < 20; i++) {
+            await new Promise((resolve) => setTimeout(resolve, 100));
+            if (this.cancelledSubscribes.has(path)) return;
+            if (docHandle.doc.isDestroyed) return;
+            if (docHandle.text.length > 0) break;
+          }
+        }
         const file = getFileByPath(this.vault, diskPath);
         const remoteContent = docHandle.text.toString();
         const localContent = file ? normalizeLineEndings(await this.vault.read(file)) : "";

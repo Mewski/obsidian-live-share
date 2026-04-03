@@ -185,7 +185,9 @@ describe("BackgroundSync", () => {
     vault.read.mockResolvedValue("");
     bg = new BackgroundSync(vault, syncManager, manifestManager, fileOpsManager);
 
-    await bg.startAll("guest");
+    const startPromise = bg.startAll("guest");
+    await vi.advanceTimersByTimeAsync(2100);
+    await startPromise;
     bg.setActiveFile("test.md");
     vault.modify.mockClear();
 
@@ -208,7 +210,9 @@ describe("BackgroundSync", () => {
     vault.read.mockResolvedValue("");
     bg = new BackgroundSync(vault, syncManager, manifestManager, fileOpsManager);
 
-    await bg.startAll("guest");
+    const startPromise = bg.startAll("guest");
+    await vi.advanceTimersByTimeAsync(2100);
+    await startPromise;
     bg.setActiveFile("other.md");
     vault.modify.mockClear();
 
@@ -298,6 +302,10 @@ describe("BackgroundSync", () => {
     vault.read.mockResolvedValue("initial");
     bg = new BackgroundSync(vault, syncManager, manifestManager, fileOpsManager);
 
+    // Pre-seed Y.Text so subscribe doesn't trigger a disk write
+    const { text: seedText } = syncManager.getDoc("note.md");
+    seedText.insert(0, "initial");
+
     await bg.startAll("guest");
 
     vault.read.mockResolvedValue("updated by plugin");
@@ -327,7 +335,9 @@ describe("BackgroundSync", () => {
     vault.read.mockResolvedValue("");
     bg = new BackgroundSync(vault, syncManager, manifestManager, fileOpsManager);
 
-    await bg.startAll("guest");
+    const startPromise = bg.startAll("guest");
+    await vi.advanceTimersByTimeAsync(2100);
+    await startPromise;
 
     bg.onFileRemoved("rm.md");
 
@@ -352,7 +362,9 @@ describe("BackgroundSync", () => {
     vault.read.mockResolvedValue("");
     bg = new BackgroundSync(vault, syncManager, manifestManager, fileOpsManager);
 
-    await bg.startAll("guest");
+    const startPromise = bg.startAll("guest");
+    await vi.advanceTimersByTimeAsync(2100);
+    await startPromise;
     bg.setActiveFile("other.md");
     vault.adapter.write.mockClear();
 
