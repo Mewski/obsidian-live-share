@@ -3,8 +3,8 @@ import * as decoding from "lib0/decoding";
 import * as encoding from "lib0/encoding";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { WebSocket } from "ws";
-import * as Y from "yjs";
 import * as syncProtocol from "y-protocols/sync";
+import * as Y from "yjs";
 import { createApp } from "../index.js";
 import {
   MUX_AWARENESS,
@@ -36,10 +36,7 @@ function listen(s: Server<typeof IncomingMessage, typeof ServerResponse>): Promi
   });
 }
 
-async function createRoom(
-  name: string,
-  opts?: { requireApproval?: boolean },
-): Promise<RoomInfo> {
+async function createRoom(name: string, opts?: { requireApproval?: boolean }): Promise<RoomInfo> {
   const res = await fetch(`http://localhost:${port}/rooms`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
