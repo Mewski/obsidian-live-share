@@ -670,20 +670,21 @@ describe("ManifestManager", () => {
       expect(added[0]).toEqual([]);
     });
 
-    it("ignores update events on existing keys", () => {
+    it("fires update events on existing keys", () => {
       const manager = new ManifestManager(vault as any, createSettings());
       const { manifest } = injectManifest(manager);
 
       manifest.set("file.md", { hash: "abc", size: 10, mtime: 1000 });
 
-      const added: string[][] = [];
-      manager.setManifestChangeHandler((a) => {
-        added.push(a);
+      const updated: string[][] = [];
+      manager.setManifestChangeHandler((_a, _r, u) => {
+        updated.push(u);
       });
 
       manifest.set("file.md", { hash: "def", size: 20, mtime: 2000 });
 
-      expect(added.length).toBe(0);
+      expect(updated.length).toBe(1);
+      expect(updated[0]).toEqual(["file.md"]);
     });
 
     it("replaces the previous observer when called again", () => {

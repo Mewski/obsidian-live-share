@@ -208,7 +208,9 @@ export class ManifestManager {
     return synced;
   }
 
-  setManifestChangeHandler(callback: (added: string[], removed: string[]) => void): void {
+  setManifestChangeHandler(
+    callback: (added: string[], removed: string[], updated: string[]) => void,
+  ): void {
     if (!this.manifest) return;
 
     if (this.observer && this.manifest) {
@@ -218,12 +220,14 @@ export class ManifestManager {
     this.observer = (event: Y.YMapEvent<FileEntry>) => {
       const added: string[] = [];
       const removed: string[] = [];
+      const updated: string[] = [];
       event.changes.keys.forEach((change, key) => {
         if (change.action === "add") added.push(key);
         else if (change.action === "delete") removed.push(key);
+        else if (change.action === "update") updated.push(key);
       });
-      if (added.length > 0 || removed.length > 0) {
-        callback(added, removed);
+      if (added.length > 0 || removed.length > 0 || updated.length > 0) {
+        callback(added, removed, updated);
       }
     };
     this.manifest.observe(this.observer);

@@ -83,7 +83,7 @@ export default class LiveSharePlugin extends Plugin {
   private unmutePathEvents = (path: string) => this.fileOpsManager.unmutePathEvents(path);
 
   private registerManifestChangeHandler() {
-    this.manifestManager.setManifestChangeHandler((added, removed) => {
+    this.manifestManager.setManifestChangeHandler((added, removed, updated) => {
       this.manifestHandlerQueue = this.manifestHandlerQueue
         .then(async () => {
           const renamedOldPaths = new Set<string>();
@@ -158,6 +158,15 @@ export default class LiveSharePlugin extends Plugin {
           }
           if (actuallyRemoved.length > 0)
             this.notify(`Live Share: removed ${actuallyRemoved.length} file(s)`);
+
+          if (updated.length > 0) {
+            for (const path of updated) {
+              const entry = this.manifestManager.getEntries().get(path);
+              if (entry?.binary) {
+                this.requestBinaryFile(path);
+              }
+            }
+          }
         })
         .catch((err) => {
           this.logger.error("manifest", "handler error", err);
