@@ -53,6 +53,7 @@ export class SyncManager {
   private sendQueue: Promise<void> = Promise.resolve();
   private isDestroyed = false;
   private onMaxReconnectCallback: (() => void) | null = null;
+  private onConnectionChangeCallback: ((connected: boolean) => void) | null = null;
 
   constructor(settings: LiveShareSettings) {
     this.settings = settings;
@@ -64,6 +65,10 @@ export class SyncManager {
 
   onMaxReconnect(callback: () => void): void {
     this.onMaxReconnectCallback = callback;
+  }
+
+  onConnectionChange(callback: (connected: boolean) => void): void {
+    this.onConnectionChangeCallback = callback;
   }
 
   updateSettings(settings: LiveShareSettings) {
@@ -233,6 +238,7 @@ export class SyncManager {
         this.synced.set(filePath, false);
         this.sendSubscribe(filePath);
       }
+      this.onConnectionChangeCallback?.(true);
     };
 
     ws.onmessage = (event) => {
@@ -243,6 +249,7 @@ export class SyncManager {
     ws.onclose = () => {
       this.ws = null;
       this.isConnected = false;
+      this.onConnectionChangeCallback?.(false);
       for (const filePath of this.docs.keys()) {
         this.setSynced(filePath, false);
       }

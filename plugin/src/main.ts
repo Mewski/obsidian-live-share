@@ -66,7 +66,14 @@ export default class LiveSharePlugin extends Plugin {
   private isEndingSession = false;
   private isStartingSession = false;
   private currentScrollListener: (() => void) | null = null;
+  private muxConnected = false;
+  private controlConnected = false;
   private manifestHandlerQueue: Promise<void> = Promise.resolve();
+
+  private updateOnlineState() {
+    const bothUp = this.muxConnected && this.controlConnected;
+    this.fileOpsManager.setOnline(bothUp);
+  }
 
   private requestBinaryFile = (path: string) => {
     this.controlChannel?.send({ type: "sync-request", path });
@@ -395,6 +402,8 @@ export default class LiveSharePlugin extends Plugin {
     this.refreshPresenceView();
     this.fileOpsManager.clearPendingChunks();
     this.manifestManager.destroy();
+    this.muxConnected = false;
+    this.controlConnected = false;
     this.connectionState.transition({ type: "disconnect" });
   }
 
@@ -542,11 +551,17 @@ export default class LiveSharePlugin extends Plugin {
       this.settings.permission = "read-write";
     }
     this.connectionState.transition({ type: "connect" });
+    this.muxConnected = false;
+    this.controlConnected = false;
     this.syncManager.connect();
     this.syncManager.onMaxReconnect(() => {
       this.logger.error("sync", "mux channel exhausted reconnect attempts");
       new Notice("Live Share: sync connection lost, ending session");
       void this.endSession();
+    });
+    this.syncManager.onConnectionChange((connected) => {
+      this.muxConnected = connected;
+      this.updateOnlineState();
     });
 
     if (this.controlChannel) {
@@ -568,6 +583,7 @@ export default class LiveSharePlugin extends Plugin {
     this.controlChannel.onStateChange((controlState) => {
       this.logger.log("connection", `control channel ${controlState}`);
       if (controlState === "connected") {
+        this.controlConnected = true;
         this.connectionState.transition({ type: "connected" });
         // Both host and guest must send join-request so the server knows identities
         this.controlChannel?.send({
@@ -576,23 +592,24 @@ export default class LiveSharePlugin extends Plugin {
           displayName: this.settings.displayName,
           avatarUrl: this.settings.avatarUrl,
         });
-        if (this.settings.role === "host") {
-          this.fileOpsManager.setOnline(true);
-        }
+        this.updateOnlineState();
         this.presenceManager?.broadcastPresence();
         if (this.backgroundSync.isRunning()) {
           this.onActiveFileChange();
         }
       } else if (controlState === "reconnecting") {
+        this.controlConnected = false;
         this.connectionState.transition({ type: "reconnecting" });
-        this.fileOpsManager.setOnline(false);
+        this.updateOnlineState();
       } else if (controlState === "auth-required") {
-        this.fileOpsManager.setOnline(false);
+        this.controlConnected = false;
+        this.updateOnlineState();
         this.connectionState.transition({ type: "auth-expired" });
         new Notice("Live Share: authentication required - sign in via settings");
         void this.endSession();
       } else {
-        this.fileOpsManager.setOnline(false);
+        this.controlConnected = false;
+        this.updateOnlineState();
         this.connectionState.transition({ type: "disconnect" });
         if (this.sessionManager.isActive && !this.isEndingSession) {
           new Notice("Live Share: connection lost, session ended");
