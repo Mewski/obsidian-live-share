@@ -85,8 +85,7 @@ export class LiveShareSettingTab extends PluginSettingTab {
               .setPlaceholder("Anonymous")
               .setValue(settings.displayName)
               .onChange(async (value) => {
-                settings.displayName = value.trim() || "Anonymous";
-                await this.plugin.saveSettings();
+                await this.plugin.updateDisplayName(value);
               });
             if (authManager.isAuthenticated) text.setDisabled(true);
           });
@@ -97,8 +96,7 @@ export class LiveShareSettingTab extends PluginSettingTab {
           .setDesc("Your cursor and selection color visible to others")
           .addColorPicker((color) =>
             color.setValue(settings.cursorColor).onChange(async (value) => {
-              settings.cursorColor = value;
-              await this.plugin.saveSettings();
+              await this.plugin.updateCursorColor(value);
             }),
           );
       });

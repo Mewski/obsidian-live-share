@@ -1,7 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
+  MUX_AWARENESS,
   MUX_SUBSCRIBE,
   MUX_SYNC_ENCRYPTED,
+  MUX_UNSUBSCRIBE,
   decodeMuxMessage,
   encodeMuxMessage,
 } from "../sync/mux-protocol";
@@ -86,10 +88,22 @@ function makeSettings(overrides: Partial<LiveShareSettings> = {}): LiveShareSett
 }
 
 let mockWsInstances: MockWebSocket[] = [];
+let animationFrames = new Map<number, FrameRequestCallback>();
+let nextAnimationFrame = 1;
 
 describe("SyncManager", () => {
   beforeEach(() => {
     mockWsInstances = [];
+    animationFrames = new Map<number, FrameRequestCallback>();
+    nextAnimationFrame = 1;
+    vi.stubGlobal("requestAnimationFrame", (callback: FrameRequestCallback) => {
+      const id = nextAnimationFrame++;
+      animationFrames.set(id, callback);
+      return id;
+    });
+    vi.stubGlobal("cancelAnimationFrame", (id: number) => {
+      animationFrames.delete(id);
+    });
     vi.stubGlobal(
       "WebSocket",
       Object.assign(
@@ -105,6 +119,7 @@ describe("SyncManager", () => {
 
   afterEach(() => {
     vi.restoreAllMocks();
+    vi.unstubAllGlobals();
   });
 
   it("getDoc returns a handle before WS opens (shouldConnect is true)", () => {
@@ -194,6 +209,54 @@ describe("SyncManager", () => {
 
     // The local content is still intact
     expect(handle.text.toString()).toBe("hello world");
+
+    sm.destroy();
+  });
+
+  it("coalesces awareness changes into one update per animation frame", () => {
+    const sm = new SyncManager(makeSettings());
+    sm.connect();
+    const handle = sm.getDoc("notes/test.md");
+    expect(handle).not.toBeNull();
+    const ws = mockWsInstances[0];
+    ws.simulateOpen();
+    ws.sent = [];
+
+    handle?.awareness.setLocalStateField("cursor", { anchor: 1 });
+    handle?.awareness.setLocalStateField("cursor", { anchor: 2 });
+
+    expect(ws.sent).toHaveLength(0);
+    expect(animationFrames.size).toBe(1);
+    const frame = animationFrames.values().next().value;
+    expect(frame).toBeDefined();
+    frame?.(0);
+
+    const awarenessMessages = ws.sent
+      .map((buf) => decodeMuxMessage(new Uint8Array(buf)))
+      .filter((message) => message.msgType === MUX_AWARENESS);
+    expect(awarenessMessages).toHaveLength(1);
+
+    sm.destroy();
+  });
+
+  it("flushes awareness removal before unsubscribing a document", () => {
+    const sm = new SyncManager(makeSettings());
+    sm.connect();
+    const handle = sm.getDoc("notes/test.md");
+    expect(handle).not.toBeNull();
+    const ws = mockWsInstances[0];
+    ws.simulateOpen();
+    ws.sent = [];
+
+    handle?.awareness.setLocalStateField("cursor", { anchor: 1 });
+    sm.releaseDoc("notes/test.md");
+
+    const messageTypes = ws.sent.map((buf) => decodeMuxMessage(new Uint8Array(buf)).msgType);
+    const awarenessIndex = messageTypes.indexOf(MUX_AWARENESS);
+    const unsubscribeIndex = messageTypes.indexOf(MUX_UNSUBSCRIBE);
+    expect(awarenessIndex).toBeGreaterThanOrEqual(0);
+    expect(unsubscribeIndex).toBeGreaterThan(awarenessIndex);
+    expect(animationFrames.size).toBe(0);
 
     sm.destroy();
   });

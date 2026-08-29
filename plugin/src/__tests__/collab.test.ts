@@ -100,8 +100,13 @@ function createMockSyncManager(opts?: {
     delete: vi.fn(),
     toString: () => (opts?.textLength ? "remote" : ""),
   };
+  const meta = new Map<string, unknown>();
   const doc = {
     transact: vi.fn((fn: () => void) => fn()),
+    getMap: vi.fn(() => ({
+      get: (key: string) => meta.get(key),
+      set: (key: string, value: unknown) => meta.set(key, value),
+    })),
   };
   const awareness = {
     setLocalStateField: vi.fn(),
@@ -278,6 +283,52 @@ describe("CollabManager", () => {
         (c) => Array.isArray(c) && c.includes("yCollab-extension"),
       );
       expect(yCollabDispatches).toHaveLength(0);
+    });
+
+    it("keeps old awareness active until the new binding is ready", async () => {
+      const firstView = createMockView();
+      const secondView = createMockView();
+      const firstSync = createMockSyncManager({ textLength: 5 });
+      const secondSync = createMockSyncManager({ textLength: 5 });
+      // Purpose-built structural doubles for the CodeMirror and sync-manager boundaries.
+      const firstEditorView = firstView as unknown as Parameters<
+        InstanceType<typeof CollabManager>["activateForFile"]
+      >[0];
+      const secondEditorView = secondView as unknown as Parameters<
+        InstanceType<typeof CollabManager>["activateForFile"]
+      >[0];
+      const firstSyncManager = firstSync as unknown as Parameters<
+        InstanceType<typeof CollabManager>["activateForFile"]
+      >[2];
+      const secondSyncManager = secondSync as unknown as Parameters<
+        InstanceType<typeof CollabManager>["activateForFile"]
+      >[2];
+      let secondSynced = false;
+      secondSync.waitForSync.mockImplementation(() =>
+        vi.waitUntil(() => secondSynced, { interval: 1, timeout: 100 }).then(() => undefined),
+      );
+
+      await collab.activateForFile(firstEditorView, "first.md", firstSyncManager, "host");
+      firstSync._awareness.setLocalState.mockClear();
+
+      const transition = collab.activateForFile(
+        secondEditorView,
+        "second.md",
+        secondSyncManager,
+        "host",
+      );
+      await Promise.resolve();
+
+      expect(firstSync._awareness.setLocalState).not.toHaveBeenCalled();
+
+      secondSynced = true;
+      await transition;
+
+      expect(firstSync._awareness.setLocalState).toHaveBeenCalledWith(null);
+      expect(secondSync._awareness.setLocalStateField).toHaveBeenCalledWith(
+        "cursor",
+        expect.any(Object),
+      );
     });
   });
 

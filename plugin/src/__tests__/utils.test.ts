@@ -1,6 +1,7 @@
 import { Platform } from "obsidian";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
+  DEFAULT_CURSOR_COLOR,
   applyMinimalYTextUpdate,
   arrayBufferToBase64,
   base64ToArrayBuffer,
@@ -9,10 +10,21 @@ import {
   normalizeLineEndings,
   normalizePath,
   parseJwtPayload,
+  resolveCursorColor,
   toCanonicalPath,
   toLocalPath,
   toWsUrl,
 } from "../utils";
+
+function relativeLuminance(hex: string): number {
+  const channels = [1, 3, 5].map(
+    (offset) => Number.parseInt(hex.slice(offset, offset + 2), 16) / 255,
+  );
+  const [red, green, blue] = channels.map((channel) =>
+    channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4,
+  );
+  return 0.2126 * red + 0.7152 * green + 0.0722 * blue;
+}
 
 describe("normalizePath", () => {
   it("converts backslashes to forward slashes", () => {
@@ -131,6 +143,31 @@ describe("normalizeLineEndings", () => {
 
   it("handles empty string", () => {
     expect(normalizeLineEndings("")).toBe("");
+  });
+});
+
+describe("resolveCursorColor", () => {
+  it("assigns stable distinct colors to users on the default color", () => {
+    const aliceColor = resolveCursorColor("alice", DEFAULT_CURSOR_COLOR);
+
+    expect(aliceColor).toBe(resolveCursorColor("alice", DEFAULT_CURSOR_COLOR));
+    expect(aliceColor).not.toBe(resolveCursorColor("bob", DEFAULT_CURSOR_COLOR));
+    expect(aliceColor).not.toBe(DEFAULT_CURSOR_COLOR);
+  });
+
+  it("keeps automatic colors readable against white cursor labels", () => {
+    for (let index = 0; index < 100; index++) {
+      const color = resolveCursorColor(`user-${index}`, DEFAULT_CURSOR_COLOR);
+      expect(1.05 / (relativeLuminance(color) + 0.05)).toBeGreaterThanOrEqual(4.5);
+    }
+  });
+
+  it("preserves an explicitly configured color", () => {
+    expect(resolveCursorColor("alice", "#123456")).toBe("#123456");
+  });
+
+  it("preserves the default when no stable user ID is available", () => {
+    expect(resolveCursorColor("", DEFAULT_CURSOR_COLOR)).toBe(DEFAULT_CURSOR_COLOR);
   });
 });
 

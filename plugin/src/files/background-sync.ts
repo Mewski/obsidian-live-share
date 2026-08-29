@@ -92,8 +92,10 @@ export class BackgroundSync {
           if (this.cancelledSubscribes.has(path)) return;
           const remoteContent = docHandle.text.toString();
           if (remoteContent.length === 0) {
-            // No remote content yet - host seeds the Y.Text
-            applyMinimalYTextUpdate(docHandle.doc, docHandle.text, content);
+            docHandle.doc.transact(() => {
+              applyMinimalYTextUpdate(docHandle.doc, docHandle.text, content);
+              docHandle.doc.getMap("meta").set("seeded", true);
+            });
             this.lastWrittenContent.set(path, content);
           } else if (remoteContent !== content) {
             // Remote has content (from guests or prior sync) - write remote to disk instead
@@ -104,18 +106,18 @@ export class BackgroundSync {
         }
       } else if (this.role === "guest") {
         // Wait for host to seed Y.Text if it's empty
-        if (docHandle.text.length === 0) {
+        if (docHandle.text.length === 0 && !docHandle.doc.getMap("meta").get("seeded")) {
           for (let i = 0; i < 20; i++) {
             await new Promise((resolve) => setTimeout(resolve, 100));
             if (this.cancelledSubscribes.has(path)) return;
             if (docHandle.doc.isDestroyed) return;
-            if (docHandle.text.length > 0) break;
+            if (docHandle.text.length > 0 || docHandle.doc.getMap("meta").get("seeded")) break;
           }
         }
         const file = getFileByPath(this.vault, diskPath);
         const remoteContent = docHandle.text.toString();
         const localContent = file ? normalizeLineEndings(await this.vault.read(file)) : "";
-        if (remoteContent !== localContent) {
+        if (!file || remoteContent !== localContent) {
           await this.writeToDisk(path, remoteContent);
         } else {
           this.lastWrittenContent.set(path, localContent);
@@ -225,13 +227,16 @@ export class BackgroundSync {
         const file = getFileByPath(this.vault, diskNew);
         if (file) {
           const content = normalizeLineEndings(await this.vault.read(file));
-          applyMinimalYTextUpdate(docHandle.doc, docHandle.text, content);
+          docHandle.doc.transact(() => {
+            applyMinimalYTextUpdate(docHandle.doc, docHandle.text, content);
+            docHandle.doc.getMap("meta").set("seeded", true);
+          });
         }
-      } else if (docHandle.text.length > 0) {
+      } else {
         const file = getFileByPath(this.vault, diskNew);
         const remoteContent = docHandle.text.toString();
         const localContent = file ? normalizeLineEndings(await this.vault.read(file)) : "";
-        if (remoteContent !== localContent) {
+        if (!file || remoteContent !== localContent) {
           await this.writeToDisk(normNew, remoteContent);
         }
       }

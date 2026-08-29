@@ -33,6 +33,34 @@ export function toCanonicalPath(localPath: string): string {
 
 export const HEX_COLOR_RE = /^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/;
 
+export const DEFAULT_CURSOR_COLOR = "#7c3aed";
+
+const DEFAULT_CURSOR_PALETTE = [
+  "#b91c1c",
+  "#047857",
+  "#92400e",
+  "#1d4ed8",
+  "#c2410c",
+  "#7e22ce",
+  "#0e7490",
+  "#be185d",
+  "#4d7c0f",
+  "#6d28d9",
+  "#0f766e",
+  "#9f1239",
+] as const;
+
+export function resolveCursorColor(userId: string, configuredColor: string): string {
+  if (configuredColor !== DEFAULT_CURSOR_COLOR || userId.length === 0) return configuredColor;
+
+  let hash = 2_166_136_261;
+  for (let index = 0; index < userId.length; index++) {
+    hash ^= userId.charCodeAt(index);
+    hash = Math.imul(hash, 16_777_619);
+  }
+  return DEFAULT_CURSOR_PALETTE[(hash >>> 0) % DEFAULT_CURSOR_PALETTE.length];
+}
+
 export function normalizePath(filePath: string): string {
   return filePath.replace(/\\/g, "/");
 }

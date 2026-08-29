@@ -73,30 +73,27 @@
 }
 
 /* Remote cursor labels */
-.yRemoteSelectionHead {
+.cm-ySelectionCaret {
   position: relative;
   border-left: 2px solid;
-  border-color: inherit;
+  border-right: none;
   margin-left: -1px;
 }
 
-.yRemoteSelectionHead::after {
-  content: attr(data-name);
+.cm-ySelectionCaret > .cm-ySelectionInfo {
   position: absolute;
   top: -1.4em;
   left: -1px;
-  font-size: 0.7em;
   padding: 1px 4px;
   border-radius: 3px 3px 3px 0;
   white-space: nowrap;
-  color: var(--text-on-accent);
-  background: inherit;
-  background-color: currentColor;
+  color: #fff;
+  background-color: inherit;
   pointer-events: none;
   line-height: 1.2;
 }
 
-.yRemoteSelection {
+.cm-ySelection {
   opacity: 0.3;
 }
 
@@ -184,6 +181,18 @@
   border-radius: 50%;
 }
 
+.live-share-user-avatar-self {
+  padding: 0;
+  border: 0;
+  box-shadow: none;
+  cursor: pointer;
+}
+
+.live-share-user-avatar-self:focus-visible {
+  outline: 2px solid var(--interactive-accent);
+  outline-offset: 2px;
+}
+
 /* Info column */
 .live-share-user-info {
   flex: 1;
@@ -204,6 +213,21 @@
   text-overflow: ellipsis;
 }
 
+.live-share-user-name-input {
+  width: 100%;
+  min-width: 0;
+  height: auto;
+  padding: 1px 2px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text-normal);
+}
+
+.live-share-user-name-input:hover,
+.live-share-user-name-input:focus {
+  border-color: var(--background-modifier-border);
+}
+
 .live-share-badge {
   font-size: 9px;
   font-weight: 600;
@@ -218,6 +242,11 @@
 .live-share-badge.mod-host {
   background: var(--interactive-accent);
   color: var(--text-on-accent);
+}
+
+.live-share-badge.mod-self {
+  background: var(--background-modifier-border);
+  color: var(--text-muted);
 }
 
 .live-share-badge.mod-readonly {

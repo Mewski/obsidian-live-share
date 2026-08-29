@@ -43,6 +43,8 @@ export class SyncManager {
     string,
     (changes: { added: number[]; updated: number[]; removed: number[] }, origin: unknown) => void
   >();
+  private awarenessFrames = new Map<string, number>();
+  private pendingAwarenessClients = new Map<string, Set<number>>();
   private settings: LiveShareSettings;
   private isConnected = false;
   private ws: WebSocket | null = null;
@@ -141,8 +143,7 @@ export class SyncManager {
       if (origin === "remote") return;
       const changedClients = changes.added.concat(changes.updated, changes.removed);
       if (changedClients.length === 0) return;
-      const awarenessUpdate = awarenessProtocol.encodeAwarenessUpdate(awareness, changedClients);
-      this.sendMux(filePath, MUX_AWARENESS, awarenessUpdate);
+      this.queueAwarenessUpdate(filePath, awareness, changedClients);
     };
     awareness.on("update", awarenessHandler);
     this.awarenessHandlers.set(filePath, awarenessHandler);
@@ -157,18 +158,25 @@ export class SyncManager {
 
   releaseDoc(rawPath: string): void {
     const filePath = normalizePath(rawPath);
-
-    this.sendUnsubscribe(filePath);
-
     const awareness = this.awarenessMap.get(filePath);
     const awarenessHandler = this.awarenessHandlers.get(filePath);
+
     if (awareness && awarenessHandler) {
-      awareness.off("update", awarenessHandler);
       awarenessProtocol.removeAwarenessStates(awareness, [awareness.doc.clientID], null);
+      const frame = this.awarenessFrames.get(filePath);
+      if (frame !== undefined) {
+        cancelAnimationFrame(frame);
+        this.awarenessFrames.delete(filePath);
+      }
+      this.flushAwarenessUpdate(filePath, awareness);
+      awareness.off("update", awarenessHandler);
       awareness.destroy();
     }
+    this.pendingAwarenessClients.delete(filePath);
     this.awarenessMap.delete(filePath);
     this.awarenessHandlers.delete(filePath);
+
+    this.sendUnsubscribe(filePath);
 
     const doc = this.docs.get(filePath);
     const updateHandler = this.updateHandlers.get(filePath);
@@ -406,6 +414,35 @@ export class SyncManager {
     }
   }
 
+  private queueAwarenessUpdate(
+    filePath: string,
+    awareness: awarenessProtocol.Awareness,
+    clientIds: number[],
+  ): void {
+    let pending = this.pendingAwarenessClients.get(filePath);
+    if (!pending) {
+      pending = new Set<number>();
+      this.pendingAwarenessClients.set(filePath, pending);
+    }
+    for (const clientId of clientIds) pending.add(clientId);
+
+    if (this.awarenessFrames.has(filePath)) return;
+    const frame = requestAnimationFrame(() => {
+      this.awarenessFrames.delete(filePath);
+      this.flushAwarenessUpdate(filePath, awareness);
+    });
+    this.awarenessFrames.set(filePath, frame);
+  }
+
+  private flushAwarenessUpdate(filePath: string, awareness: awarenessProtocol.Awareness): void {
+    const pending = this.pendingAwarenessClients.get(filePath);
+    this.pendingAwarenessClients.delete(filePath);
+    if (!pending || pending.size === 0) return;
+
+    const update = awarenessProtocol.encodeAwarenessUpdate(awareness, [...pending]);
+    this.sendMux(filePath, MUX_AWARENESS, update);
+  }
+
   private sendMux(docId: string, msgType: number, payload?: Uint8Array): void {
     if (!this.e2e?.enabled || !payload || payload.length === 0) {
       if (this.ws?.readyState === WebSocket.OPEN) {
@@ -466,6 +503,14 @@ export class SyncManager {
   }
 
   private sendUnsubscribe(filePath: string): void {
+    if (this.e2e?.enabled) {
+      this.sendQueue = this.sendQueue.then(() => {
+        if (this.ws?.readyState === WebSocket.OPEN) {
+          this.ws.send(encodeMuxMessage(filePath, MUX_UNSUBSCRIBE));
+        }
+      });
+      return;
+    }
     this.sendMux(filePath, MUX_UNSUBSCRIBE);
   }
 }

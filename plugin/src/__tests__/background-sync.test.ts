@@ -118,6 +118,44 @@ describe("BackgroundSync", () => {
     expect(text.toString()).toBe("hello world");
   });
 
+  it("marks the host document as seeded even when the file is empty", async () => {
+    const entries = new Map([["empty.md", { hash: "abc", size: 0, mtime: 1 }]]);
+    manifestManager = createManifestManager(entries);
+    vault.getAbstractFileByPath.mockReturnValue(mockFile("empty.md"));
+    vault.read.mockResolvedValue("");
+    bg = new BackgroundSync(vault, syncManager, manifestManager, fileOpsManager);
+
+    await bg.startAll("host");
+
+    const { doc } = syncManager.getDoc("empty.md");
+    expect(doc.getMap("meta").get("seeded")).toBe(true);
+  });
+
+  it("creates a missing guest file when the host document is seeded and empty", async () => {
+    const entries = new Map([["empty.md", { hash: "abc", size: 0, mtime: 1 }]]);
+    manifestManager = createManifestManager(entries);
+    vault.getAbstractFileByPath.mockReturnValue(null);
+    bg = new BackgroundSync(vault, syncManager, manifestManager, fileOpsManager);
+    syncManager.getDoc("empty.md").doc.getMap("meta").set("seeded", true);
+
+    await bg.startAll("guest");
+
+    expect(vault.adapter.write).toHaveBeenCalledWith("empty.md", "");
+  });
+
+  it("replaces stale guest content with a seeded empty host document", async () => {
+    const entries = new Map([["empty.md", { hash: "abc", size: 0, mtime: 1 }]]);
+    manifestManager = createManifestManager(entries);
+    vault.getAbstractFileByPath.mockReturnValue(mockFile("empty.md"));
+    vault.read.mockResolvedValue("stale local content");
+    bg = new BackgroundSync(vault, syncManager, manifestManager, fileOpsManager);
+    syncManager.getDoc("empty.md").doc.getMap("meta").set("seeded", true);
+
+    await bg.startAll("guest");
+
+    expect(vault.adapter.write).toHaveBeenCalledWith("empty.md", "");
+  });
+
   it("host respects existing Y.Text from guests instead of overwriting", async () => {
     const entries = new Map([["test.md", { hash: "abc", size: 5, mtime: 1 }]]);
     manifestManager = createManifestManager(entries);

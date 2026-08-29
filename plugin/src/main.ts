@@ -29,11 +29,13 @@ import { ExplorerIndicators } from "./ui/explorer-indicators";
 import { ConfirmModal, PromptModal } from "./ui/modals";
 import { LiveShareSettingTab } from "./ui/settings";
 import {
+  HEX_COLOR_RE,
   VAULT_EVENT_SETTLE_MS,
   ensureFolder,
   isTextFile,
   normalizePath,
   parseJwtPayload,
+  resolveCursorColor,
   toCanonicalPath,
   toLocalPath,
 } from "./utils";
@@ -178,6 +180,36 @@ export default class LiveSharePlugin extends Plugin {
     return this.settings.githubUserId || this.settings.clientId;
   }
 
+  async updateDisplayName(value: string): Promise<void> {
+    const displayName = value.trim().replace(/\s+/g, " ").slice(0, 80) || "Anonymous";
+    if (displayName === this.settings.displayName) return;
+    this.settings.displayName = displayName;
+    this.publishLocalIdentity();
+    await this.saveSettings();
+  }
+
+  async updateCursorColor(value: string): Promise<void> {
+    if (!HEX_COLOR_RE.test(value)) return;
+    if (value === this.settings.cursorColor) {
+      this.publishLocalIdentity();
+      return;
+    }
+    this.settings.cursorColor = value;
+    this.publishLocalIdentity();
+    await this.saveSettings();
+  }
+
+  private publishLocalIdentity(): void {
+    const color = resolveCursorColor(this.userId, this.settings.cursorColor);
+    this.collabManager.updateCursorUser({
+      name: this.settings.displayName,
+      color,
+      colorLight: `${color}33`,
+    });
+    this.presenceManager?.broadcastPresence();
+    this.refreshPresenceView();
+  }
+
   async onload() {
     await this.loadSettings();
 
@@ -241,6 +273,8 @@ export default class LiveSharePlugin extends Plugin {
       view.setKickHandler((userId) => void this.kickUser(userId));
       view.setSummonHandler((userId) => this.summonUser(userId));
       view.setPermissionHandler((userId) => this.setUserPermission(userId));
+      view.setDisplayNameChangeHandler((name) => void this.updateDisplayName(name));
+      view.setCursorColorChangeHandler((color) => void this.updateCursorColor(color));
       return view;
     });
 
@@ -647,7 +681,7 @@ export default class LiveSharePlugin extends Plugin {
       getUserId: () => this.userId,
       getDisplayName: () => this.settings.displayName,
       getAvatarUrl: () => this.settings.avatarUrl,
-      getCursorColor: () => this.settings.cursorColor,
+      getCursorColor: () => resolveCursorColor(this.userId, this.settings.cursorColor),
       getRole: () => this.settings.role ?? "guest",
       getCurrentFile: () => {
         const activeView = this.app.workspace.getActiveViewOfType(MarkdownView);
@@ -672,7 +706,6 @@ export default class LiveSharePlugin extends Plugin {
           const file = this.app.vault.getAbstractFileByPath(toLocalPath(filePath));
           if (file instanceof TFile) {
             await this.app.workspace.getLeaf().openFile(file);
-            this.onActiveFileChange();
           }
         }
         if (scrollTop !== undefined) {
@@ -713,6 +746,7 @@ export default class LiveSharePlugin extends Plugin {
     ) {
       effectivePermission = "read-only";
     }
+    const cursorColor = resolveCursorColor(this.userId, this.settings.cursorColor);
     void this.collabManager
       .activateForFile(
         cmView,
@@ -722,8 +756,8 @@ export default class LiveSharePlugin extends Plugin {
         effectivePermission,
         {
           name: this.settings.displayName,
-          color: this.settings.cursorColor,
-          colorLight: `${this.settings.cursorColor}33`,
+          color: cursorColor,
+          colorLight: `${cursorColor}33`,
         },
       )
       .then(() => {
@@ -737,6 +771,7 @@ export default class LiveSharePlugin extends Plugin {
     };
     scrollDOM.addEventListener("scroll", scrollHandler);
     this.currentScrollListener = () => scrollDOM.removeEventListener("scroll", scrollHandler);
+    this.refreshPresenceView();
   }
 
   private removeScrollListener() {
@@ -860,23 +895,49 @@ export default class LiveSharePlugin extends Plugin {
     const existing = this.app.workspace.getLeavesOfType(PRESENCE_VIEW_TYPE);
     if (existing.length > 0) {
       this.app.workspace.revealLeaf(existing[0]);
+      this.refreshPresenceView();
       return;
     }
     const leaf = this.app.workspace.getRightLeaf(false);
     if (leaf) {
       await leaf.setViewState({ type: PRESENCE_VIEW_TYPE, active: true });
       this.app.workspace.revealLeaf(leaf);
+      this.refreshPresenceView();
     }
   }
 
-  refreshPresenceView() {
+  refreshPresenceView(): void {
+    const users = new Map<string, PresenceUser>();
+    const isActive = this.sessionManager.isActive && !this.isEndingSession;
+    const isHost = this.settings.role === "host";
+    const localUserId = isActive ? this.userId : null;
+    if (localUserId) {
+      const activeView = this.app.workspace.getActiveViewOfType(MarkdownView);
+      users.set(localUserId, {
+        userId: localUserId,
+        displayName: this.settings.displayName,
+        avatarUrl: this.settings.avatarUrl,
+        cursorColor: resolveCursorColor(localUserId, this.settings.cursorColor),
+        currentFile: activeView?.file?.path ?? "",
+        isHost,
+        permission: this.settings.permission,
+      });
+    }
+    for (const [userId, user] of this.remoteUsers) {
+      users.set(userId, {
+        ...user,
+        cursorColor: resolveCursorColor(userId, user.cursorColor),
+      });
+    }
+
     const leaves = this.app.workspace.getLeavesOfType(PRESENCE_VIEW_TYPE);
     for (const leaf of leaves) {
-      const view = leaf.view as PresenceView;
-      view.updateState(
-        this.remoteUsers,
-        this.settings.role === "host",
+      if (!(leaf.view instanceof PresenceView)) continue;
+      leaf.view.updateState(
+        users,
+        isHost,
         this.presenceManager?.getFollowTarget() ?? null,
+        localUserId,
       );
     }
   }

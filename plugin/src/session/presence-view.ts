@@ -19,10 +19,13 @@ export interface PresenceUser {
 
 export class PresenceView extends ItemView {
   private users = new Map<string, PresenceUser>();
+  private localUserId: string | null = null;
   private onFollowRequest: ((userId: string) => void) | null = null;
   private onKickRequest: ((userId: string) => void) | null = null;
   private onSummonRequest: ((userId: string) => void) | null = null;
   private onSetPermissionRequest: ((userId: string) => void) | null = null;
+  private onDisplayNameChange: ((name: string) => void) | null = null;
+  private onCursorColorChange: ((color: string) => void) | null = null;
   private isHost = false;
   private followedUserId: string | null = null;
 
@@ -54,15 +57,27 @@ export class PresenceView extends ItemView {
     this.onSetPermissionRequest = handler;
   }
 
+  setDisplayNameChangeHandler(handler: (name: string) => void): void {
+    this.onDisplayNameChange = handler;
+  }
+
+  setCursorColorChangeHandler(handler: (color: string) => void): void {
+    this.onCursorColorChange = handler;
+  }
+
   updateState(
     users: Map<string, PresenceUser>,
     isHost: boolean,
     followedUserId: string | null,
+    localUserId: string | null = null,
   ): void {
     this.users = users;
     this.isHost = isHost;
     this.followedUserId = followedUserId;
-    this.render();
+    this.localUserId = localUserId;
+    if (!this.contentEl.querySelector(".live-share-user-name-input:focus")) {
+      this.render();
+    }
   }
 
   override onOpen(): Promise<void> {
@@ -104,15 +119,20 @@ export class PresenceView extends ItemView {
     });
 
     for (const [userId, user] of this.users) {
-      const isFollowed = this.followedUserId === userId;
+      const isSelf = userId === this.localUserId;
+      const isFollowed = !isSelf && this.followedUserId === userId;
 
       const row = list.createEl("div", {
         cls: `live-share-user${isFollowed ? " is-followed" : ""}`,
       });
 
-      const avatar = row.createEl("div", {
-        cls: "live-share-user-avatar",
+      const avatar = row.createEl(isSelf ? "button" : "div", {
+        cls: `live-share-user-avatar${isSelf ? " live-share-user-avatar-self" : ""}`,
       });
+      if (isSelf) {
+        avatar.setAttr("type", "button");
+        avatar.setAttr("aria-label", "Change your cursor color");
+      }
       if (HEX_COLOR_RE.test(user.cursorColor)) {
         avatar.setCssProps({ "--user-color": user.cursorColor });
       }
@@ -144,13 +164,61 @@ export class PresenceView extends ItemView {
         avatar.setText(this.getInitial(user.displayName));
       }
 
+      if (isSelf) {
+        const colorInput = row.createEl("input", {
+          attr: {
+            type: "color",
+            "aria-label": "Your cursor color",
+          },
+        });
+        colorInput.hidden = true;
+        colorInput.value = HEX_COLOR_RE.test(user.cursorColor) ? user.cursorColor : "#7c3aed";
+        colorInput.addEventListener("change", () => {
+          if (!HEX_COLOR_RE.test(colorInput.value)) return;
+          avatar.setCssProps({ "--user-color": colorInput.value });
+          this.onCursorColorChange?.(colorInput.value);
+        });
+        avatar.addEventListener("click", () => colorInput.click());
+      }
+
       const info = row.createEl("div", { cls: "live-share-user-info" });
 
       const nameRow = info.createEl("div", { cls: "live-share-user-name-row" });
-      nameRow.createEl("span", {
-        text: user.displayName,
-        cls: "live-share-user-name",
-      });
+      if (isSelf) {
+        const nameInput = nameRow.createEl("input", {
+          cls: "live-share-user-name live-share-user-name-input",
+          attr: {
+            type: "text",
+            maxlength: "80",
+            "aria-label": "Your display name",
+            spellcheck: "false",
+          },
+        });
+        nameInput.value = user.displayName;
+        nameInput.addEventListener("change", () => {
+          const name = nameInput.value.trim().replace(/\s+/g, " ").slice(0, 80) || "Anonymous";
+          nameInput.value = name;
+          if (name !== user.displayName) this.onDisplayNameChange?.(name);
+        });
+        nameInput.addEventListener("keydown", (event) => {
+          if (event.key === "Enter") {
+            event.preventDefault();
+            nameInput.blur();
+          } else if (event.key === "Escape") {
+            nameInput.value = user.displayName;
+            nameInput.blur();
+          }
+        });
+        nameRow.createEl("span", {
+          text: "You",
+          cls: "live-share-badge mod-self",
+        });
+      } else {
+        nameRow.createEl("span", {
+          text: user.displayName,
+          cls: "live-share-user-name",
+        });
+      }
       if (user.isHost) {
         nameRow.createEl("span", {
           text: "Host",
@@ -170,6 +238,8 @@ export class PresenceView extends ItemView {
           cls: "live-share-user-file",
         });
       }
+
+      if (isSelf) continue;
 
       const actions = row.createEl("div", {
         cls: "live-share-user-actions",

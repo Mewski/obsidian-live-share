@@ -36,32 +36,36 @@ export class CollabManager {
     cursorUser?: CursorUser,
   ) {
     const gen = ++this.activationGen;
+    const previousAwareness = this.currentAwareness;
+    const previousView = this.currentView;
 
-    if (filePath !== this.currentPath || view !== this.currentView) {
-      if (this.currentAwareness) {
-        this.currentAwareness.setLocalState(null);
-      }
-      if (this.currentView && this.currentView !== view) {
+    const clearPrevious = () => {
+      previousAwareness?.setLocalState(null);
+      if (previousView && previousView !== view) {
         try {
-          this.currentView.dispatch({
-            effects: this.compartment.reconfigure([]),
-          });
+          previousView.dispatch({ effects: this.compartment.reconfigure([]) });
         } catch {
-          // Previous view may have been destroyed
+          // The previous view may already be destroyed.
         }
       }
+    };
+
+    const clearCurrentTransition = () => {
+      clearPrevious();
+      this.currentPath = null;
+      this.currentView = null;
       this.currentAwareness = null;
-    }
-    this.currentPath = filePath;
-    this.currentView = view;
+    };
+
     if (!filePath) {
-      this.currentAwareness = null;
+      clearCurrentTransition();
       view.dispatch({ effects: this.compartment.reconfigure([]) });
       return;
     }
+
     const docHandle = syncManager.getDoc(filePath);
     if (!docHandle) {
-      this.currentAwareness = null;
+      clearCurrentTransition();
       view.dispatch({ effects: this.compartment.reconfigure([]) });
       return;
     }
@@ -71,33 +75,31 @@ export class CollabManager {
     } catch {
       if (this.activationGen !== gen) return;
       new Notice("Live Share: sync timed out");
-      this.currentAwareness = null;
+      clearCurrentTransition();
       try {
         view.dispatch({ effects: this.compartment.reconfigure([]) });
       } catch {
-        // View may have been destroyed during sync
+        // The new view may have been destroyed during synchronization.
       }
       return;
     }
 
     if (this.activationGen !== gen) return;
-    if ((view as unknown as { destroyed: boolean }).destroyed) return;
-
-    if (role !== "host" && docHandle.text.length === 0) {
-      for (let i = 0; i < 10; i++) {
-        await new Promise((resolve) => setTimeout(resolve, 100));
-        if (this.activationGen !== gen) return;
-        if ((view as unknown as { destroyed: boolean }).destroyed) return;
-        if (docHandle.text.length > 0) break;
-      }
+    // CodeMirror exposes this lifecycle flag at runtime but keeps it private in the type declaration.
+    const lifecycleView = view as unknown as { readonly destroyed?: boolean };
+    if (lifecycleView.destroyed === true) {
+      clearCurrentTransition();
+      return;
     }
 
     if (role === "host") {
       const localContent = normalizeLineEndings(view.state.doc.toString());
-      applyMinimalYTextUpdate(docHandle.doc, docHandle.text, localContent);
+      docHandle.doc.transact(() => {
+        applyMinimalYTextUpdate(docHandle.doc, docHandle.text, localContent);
+        docHandle.doc.getMap("meta").set("seeded", true);
+      });
     }
 
-    this.currentAwareness = docHandle.awareness;
     if (cursorUser) {
       docHandle.awareness.setLocalStateField("user", cursorUser);
     }
@@ -109,14 +111,42 @@ export class CollabManager {
     if (permission === "read-only") {
       extensions.push(EditorState.readOnly.of(true));
     }
-    view.dispatch({
-      effects: this.compartment.reconfigure(extensions),
-    });
+
+    try {
+      view.dispatch({
+        effects: this.compartment.reconfigure(extensions),
+      });
+    } catch (error) {
+      if (docHandle.awareness !== previousAwareness) {
+        docHandle.awareness.setLocalState(null);
+      }
+      if (this.activationGen === gen) clearCurrentTransition();
+      throw error;
+    }
+
+    this.currentPath = filePath;
+    this.currentView = view;
+    this.currentAwareness = docHandle.awareness;
 
     const selection = view.state.selection.main;
     const anchor = Y.createRelativePositionFromTypeIndex(docHandle.text, selection.anchor);
     const head = Y.createRelativePositionFromTypeIndex(docHandle.text, selection.head);
     docHandle.awareness.setLocalStateField("cursor", { anchor, head });
+
+    if (previousAwareness && previousAwareness !== docHandle.awareness) {
+      previousAwareness.setLocalState(null);
+    }
+    if (previousView && previousView !== view) {
+      try {
+        previousView.dispatch({ effects: this.compartment.reconfigure([]) });
+      } catch {
+        // The previous view may already be destroyed.
+      }
+    }
+  }
+
+  updateCursorUser(user: CursorUser): void {
+    this.currentAwareness?.setLocalStateField("user", user);
   }
 
   deactivateAll(view: EditorView) {
